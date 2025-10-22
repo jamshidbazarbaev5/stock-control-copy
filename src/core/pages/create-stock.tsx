@@ -930,7 +930,7 @@ export default function CreateStock() {
                         <SelectValue placeholder={t("common.product")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <div className="p-2 sticky top-0 bg-white">
+                        <div className="p-2 sticky top-0 bg-white z-10 border-b">
                           <Input
                               placeholder="Search product"
                               value={productSearchTerm}
@@ -941,18 +941,41 @@ export default function CreateStock() {
                               autoFocus
                           />
                         </div>
-                        {(() => {
-                          const options = [...allProducts];
-                          const sel = tab.selectedProduct as any;
-                          if (sel && !options.some((p: any) => p.id === sel.id)) {
-                            options.unshift(sel);
-                          }
-                          return options.map((product: any) => (
-                              <SelectItem key={product.id} value={String(product.id)}>
-                                {product.product_name}
-                              </SelectItem>
-                          ));
-                        })()}
+                        <div className="max-h-[300px] overflow-y-auto">
+                          {(() => {
+                            const options = [...allProducts];
+                            const sel = tab.selectedProduct as any;
+                            if (sel && !options.some((p: any) => p.id === sel.id)) {
+                              options.unshift(sel);
+                            }
+                            return options.length > 0 ? (
+                              options.map((product: any) => (
+                                <SelectItem 
+                                  key={product.id} 
+                                  value={String(product.id)}
+                                  className="cursor-pointer hover:bg-blue-50 active:bg-blue-100 transition-all duration-150"
+                                >
+                                  <div className="flex justify-between items-center gap-2 w-full">
+                                    <span className="font-medium text-sm">{product.product_name}</span>
+                                    {product.quantity && (
+                                      <span className="text-xs font-semibold whitespace-nowrap">
+                                        {typeof product.quantity === "string"
+                                          ? parseFloat(product.quantity)
+                                          : product.quantity || 0}{" "}
+                                        {product.available_units?.[0]?.short_name || "шт"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-4 py-4 text-center text-gray-600 text-sm">
+                                No products found
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>

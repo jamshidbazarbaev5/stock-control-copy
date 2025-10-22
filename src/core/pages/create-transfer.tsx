@@ -17,7 +17,7 @@ import { useGetStores, type Store } from "../api/store";
 import { useCreateTransfer, type Transfer } from "../api/transfer";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function CreateTransfer() {
   const navigate = useNavigate();
@@ -25,6 +25,9 @@ export default function CreateTransfer() {
   const { t } = useTranslation();
   const [sourceStore, setSourceStore] = useState<number | null>(null);
   const { data: currentUser } = useCurrentUser();
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement | null>(null);
 
   // Get URL parameters
   const searchParams = new URLSearchParams(location.search);
@@ -244,6 +247,27 @@ export default function CreateTransfer() {
     }
   }, [selectedFromStock, form]);
 
+  // Handle click outside to close search results
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+        setProductSearchTerm("");
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Filter stocks based on search term
+  const filteredSourceStocks = sourceStocks?.filter((stock: Stock) => {
+    const productName = stock.product?.product_name || stock.product_read?.product_name || "";
+    return productName.toLowerCase().includes(productSearchTerm.toLowerCase());
+  });
+
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-2xl font-bold mb-6">
@@ -371,41 +395,70 @@ export default function CreateTransfer() {
             <div>
               <label className="block text-sm font-medium mb-1">
                 {t("forms.from_product")}
-                {selectedFromStock && (
-                  <span className="ml-2 text-gray-500">
-                    Selected:{" "}
-                    {selectedFromStock.product?.product_name ||
-                      selectedFromStock.product_read?.product_name}{" "}
-                    - {selectedFromStock.quantity}
-                  </span>
-                )}
               </label>
-              <Select
-                onValueChange={(value) =>
-                  form.setValue("from_stock", Number(value))
-                }
-                value={fromStock?.toString()}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={t("placeholders.select_product")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {sourceStocks?.map(
-                    (stock: Stock) =>
-                      stock.id && (
-                        <SelectItem key={stock.id} value={stock.id.toString()}>
-                          {stock.product?.product_name ||
-                            stock.product_read?.product_name}{" "}
-                          -{" "}
-                          {Number(stock.quantity).toLocaleString("ru-RU", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </SelectItem>
-                      ),
-                  )}
-                </SelectContent>
-              </Select>
+              <div className="relative" ref={searchRef}>
+                <Input
+                  type="text"
+                  placeholder={t("placeholders.search_products")}
+                  value={productSearchTerm}
+                  onChange={(e) => {
+                    setProductSearchTerm(e.target.value);
+                    setIsSearchOpen(true);
+                  }}
+                  onFocus={() => setIsSearchOpen(true)}
+                  className="w-full"
+                  autoComplete="off"
+                />
+                {isSearchOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-xl max-h-[300px] overflow-y-auto">
+                    {!sourceStocks || sourceStocks.length === 0 ? (
+                      <div className="px-4 py-4 text-center text-gray-600 text-sm bg-white">
+                        {t("common.no_results")}
+                      </div>
+                    ) : filteredSourceStocks && filteredSourceStocks.length > 0 ? (
+                      filteredSourceStocks.map((stock: Stock) => (
+                        <div
+                          key={stock.id}
+                          className="px-4 py-3 bg-white hover:bg-blue-50 active:bg-blue-100 cursor-pointer border-b border-gray-200 last:border-b-0 transition-all duration-150"
+                          onClick={() => {
+                            // @ts-ignore
+                            form.setValue("from_stock", stock.id);
+                            setProductSearchTerm("");
+                            setIsSearchOpen(false);
+                          }}
+                        >
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="font-medium text-sm text-gray-900">
+                              {stock.product?.product_name || stock.product_read?.product_name}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                              {Number(stock.quantity).toLocaleString("ru-RU", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-4 text-center text-gray-600 text-sm bg-white">
+                        {t("common.no_results")}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {fromStock && !isSearchOpen && selectedFromStock && (
+                  <div className="mt-2 px-3 py-2 bg-blue-50 border border-gray-300 rounded-md text-sm flex justify-between items-center shadow-sm">
+                    <span className="font-medium text-gray-900">
+                      {selectedFromStock.product?.product_name || selectedFromStock.product_read?.product_name} - {Number(selectedFromStock.quantity).toLocaleString("ru-RU", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                   
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

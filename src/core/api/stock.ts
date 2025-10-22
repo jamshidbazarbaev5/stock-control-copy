@@ -1,5 +1,6 @@
 import { createResourceApiHooks } from "../helpers/createResourceApi";
 import api from "./api";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export interface StockMeasurement {
@@ -389,6 +390,108 @@ export const {
   useGetResource: useGetStockEntry,
 } = createResourceApiHooks<StockEntry, StockEntryResponse>(STOCK_ENTRIES_URL, "stock-entries");
 
+// Stock history type from the new API endpoint
+export interface StockHistoryData {
+  id: number;
+  store: {
+    id: number;
+    name: string;
+  };
+  stock_name: string | null;
+  stock_entry: {
+    id: number;
+    supplier: {
+      id: number;
+      name: string;
+    };
+    store: {
+      id: number;
+      name: string;
+    };
+    total_amount: string;
+    is_debt: boolean;
+    is_paid: boolean;
+    stock_count: number;
+    amount_of_debt: string;
+    total_paid: string | null;
+    remaining_debt: number;
+    advance_of_debt: string | null;
+    date_of_arrived: string;
+  };
+  product: {
+    id: number;
+    product_name: string;
+    base_unit: number;
+    attribute_values: Array<{
+      id: number;
+      attribute: {
+        id: number;
+        name: string;
+        field_type: string;
+        choices: any[];
+        formula: string;
+        translations: { [key: string]: string };
+        related_model: string;
+        related_objects: any[] | null;
+      };
+      value: any;
+    }>;
+  };
+  currency: {
+    id: number;
+    name: string;
+    short_name: string;
+    is_base: boolean;
+  };
+  purchase_unit: {
+    id: number;
+    measurement_name: string;
+    short_name: string;
+  };
+  quantity: string;
+  quantity_for_history: string;
+  purchase_unit_quantity: string;
+  price_per_unit_currency: string;
+  total_price_in_currency: string;
+  price_per_unit_uz: string;
+  total_price_in_uz: string;
+  base_unit_in_currency: string;
+  base_unit_in_uzs: string;
+  is_recycled: boolean;
+  stock_data: {
+    total_quantity: string;
+    total_recycled_quantity: string;
+    total_transferred_quantity: string;
+    total_cost: number;
+    total_sales: number;
+    total_profit: number;
+    current_stock: {
+      quantity: string;
+      sold_quantity: string;
+      total_sales: number;
+      profit: number;
+      total_cost: number;
+    };
+    transferred_stock: any[];
+    recycled_stock: any[];
+  };
+}
+
+// Fetch stock history
+export const fetchStockHistory = async (stockId: number): Promise<StockHistoryData> => {
+  const response = await api.get(`${STOCK_URL}${stockId}/history/`);
+  return response.data;
+};
+
+// Hook to fetch stock history
+export const useGetStockHistory = (stockId: number) => {
+  return useQuery<StockHistoryData>({
+    queryKey: ['stock-history', stockId],
+    queryFn: () => fetchStockHistory(stockId),
+    enabled: !!stockId,
+  });
+};
+
 // Update stock entry mutation hook
 export const useUpdateStockEntry = () => {
   const queryClient = useQueryClient();
@@ -405,7 +508,6 @@ export const useUpdateStockEntry = () => {
 };
 
 // Stock debt payment mutation
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 export const usePayStockDebt = () => {
   const queryClient = useQueryClient();
