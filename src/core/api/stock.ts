@@ -38,6 +38,14 @@ export interface CreateStockDTO {
 export interface Stock {
   id?: number;
   total_amount?: number;
+  stock_entry?: {
+    id: number;
+    supplier: {
+      id: number;
+      name: string;
+    };
+    date_of_arrived: string;
+  };
   total_pure_revenue?: number;
   stock_name?: string | null;
   // New nested object structure from API

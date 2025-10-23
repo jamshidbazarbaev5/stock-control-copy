@@ -27,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import api from "../api/api";
+import { type Stock } from "../api/stock";
 
 interface PriceEdit {
   productId: number;
@@ -196,6 +197,7 @@ export default function ProductsPage() {
   const [productTab, setProductTab] = useState<
     "with_quantity" | "without_quantity" | "imported"
   >("with_quantity");
+  const [expandedRows, setExpandedRows] = useState<Record<number, Stock[]>>({});
 
   // Import dialog state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -277,9 +279,9 @@ export default function ProductsPage() {
     navigate(`/print-barcode/${product.id}`);
   };
 
-  const { mutate: revaluateProducts } = useProductRevaluation();
+  const { mutateAsync: revaluateProducts } = useProductRevaluation();
 
-  const handleRevaluation = (data: {
+  const handleRevaluation = async (data: {
     comment: string;
     new_selling_price: string;
     new_min_price: string;
@@ -289,22 +291,17 @@ export default function ProductsPage() {
       return;
     }
 
-    revaluateProducts(
-      {
+    try {
+      await revaluateProducts({
         ...data,
         product_ids: selectedProducts,
-      },
-      {
-        onSuccess: () => {
-          toast.success(t("messages.success.revaluation"));
-          setIsRevaluationDialogOpen(false);
-          setSelectedProducts([]);
-        },
-        onError: () => {
-          toast.error(t("messages.error.revaluation"));
-        },
-      },
-    );
+      });
+      toast.success(t("messages.success.revaluation"));
+      setIsRevaluationDialogOpen(false);
+      setSelectedProducts([]);
+    } catch (error) {
+      toast.error(t("messages.error.revaluation"));
+    }
   };
 
   const handlePriceChange = (
@@ -368,13 +365,17 @@ export default function ProductsPage() {
     }
   };
 
-  const handleSavePrices = () => {
+  const handleSavePrices = async () => {
     const editsToSave = Object.values(priceEdits).filter(
       (edit) =>
         edit.selling_price !== undefined ||
         edit.selling_price_in_currency !== undefined ||
         edit.min_price !== undefined,
     );
+
+    console.log("🚀 handleSavePrices called");
+    console.log("📝 Current priceEdits:", priceEdits);
+    console.log("💾 Edits to save:", editsToSave);
 
     if (editsToSave.length === 0) {
       toast.error(
@@ -383,10 +384,18 @@ export default function ProductsPage() {
       return;
     }
 
-    // Save each product's price changes individually
-    editsToSave.forEach((edit) => {
+    const totalToSave = editsToSave.length;
+    console.log(`📊 Total to save: ${totalToSave}`);
+
+    // Process all edits in parallel using Promise.allSettled
+    const promises = editsToSave.map(async (edit, index) => {
       const product = products.find((p) => p.id === edit.productId);
-      if (!product) return;
+      if (!product) {
+        console.warn(`⚠️ Product not found for edit:`, edit);
+        return { success: false, productId: edit.productId, error: "Product not found" };
+      }
+
+      console.log(`🔄 Processing edit ${index + 1}/${totalToSave} for product ${edit.productId} (${product.product_name})`);
 
       const newSellingPrice =
         edit.selling_price !== undefined
@@ -403,35 +412,148 @@ export default function ProductsPage() {
             ? String(product.selling_price_in_currency)
             : undefined;
 
-      revaluateProducts(
-        {
+      try {
+        await revaluateProducts({
           comment: "Price update from products page",
           new_selling_price: newSellingPrice,
           new_min_price: newMinPrice,
           new_selling_price_in_currency: newSellingPriceInCurrency,
           product_ids: [edit.productId],
-        },
-        {
-          onSuccess: () => {
-            toast.success(
-              t("messages.success.priceUpdated") ||
-                `Price updated for ${product.product_name}`,
-            );
-            setPriceEdits((prev) => {
-              const newEdits = { ...prev };
-              delete newEdits[edit.productId];
-              return newEdits;
-            });
-          },
-          onError: () => {
-            toast.error(
-              t("messages.error.priceUpdate") ||
-                `Failed to update price for ${product.product_name}`,
-            );
-          },
-        },
-      );
+        });
+
+        console.log(`✅ Success for product ${edit.productId} (${product.product_name})`);
+        toast.success(
+          t("messages.success.priceUpdated") ||
+            `Price updated for ${product.product_name}`,
+        );
+        return { success: true, productId: edit.productId };
+      } catch (error) {
+        console.error(`❌ Error for product ${edit.productId}:`, error);
+        toast.error(
+          t("messages.error.priceUpdate") ||
+            `Failed to update price for ${product.product_name}`,
+        );
+        return { success: false, productId: edit.productId, error };
+      }
     });
+
+    // Wait for all promises to settle
+    const results = await Promise.allSettled(promises);
+    
+    console.log("📊 All operations completed:", results);
+
+    // Collect successful product IDs
+    const productIdsToRemove: number[] = [];
+    results.forEach((result) => {
+      if (result.status === "fulfilled" && result.value.success) {
+        productIdsToRemove.push(result.value.productId);
+      }
+    });
+
+    console.log(`✅ Successful saves: ${productIdsToRemove.length}/${totalToSave}`);
+    console.log(`🗑️ Removing IDs:`, productIdsToRemove);
+
+    // Clear successful edits from state
+    setPriceEdits((prev) => {
+      console.log("📋 Previous priceEdits:", prev);
+      const newEdits = { ...prev };
+      productIdsToRemove.forEach(id => {
+        console.log(`🗑️ Deleting product ${id} from priceEdits`);
+        delete newEdits[id];
+      });
+      console.log("📋 New priceEdits:", newEdits);
+      console.log("📊 New count:", Object.keys(newEdits).length);
+      return newEdits;
+    });
+  };
+
+  // Fetch stock data for expanded row
+  const fetchStockForProduct = async (productId: number) => {
+    if (expandedRows[productId]) {
+      // Already loaded, just toggle
+      setExpandedRows((prev) => {
+        const newRows = { ...prev };
+        delete newRows[productId];
+        return newRows;
+      });
+      return;
+    }
+
+    try {
+      const response = await api.get(`items/stock/?product=${productId}`);
+      const stockData = response.data.results || [];
+      setExpandedRows((prev) => ({
+        ...prev,
+        [productId]: stockData,
+      }));
+    } catch (error) {
+      console.error("Error fetching stock data:", error);
+      toast.error("Ошибка при загрузке данных партии");
+    }
+  };
+
+  // Render expanded row content
+  const renderExpandedRow = (row: Product) => {
+    const stockData = expandedRows[row.id!];
+    
+    if (!stockData || stockData.length === 0) {
+      return (
+        <div className="p-4 bg-gray-50 text-center text-gray-500">
+          Нет данных о партиях
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-4 bg-gray-50">
+        <h3 className="text-lg font-semibold mb-4">Партии товара</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="px-4 py-2 text-left">№ Партии</th>
+                <th className="px-4 py-2 text-left">Поставщик</th>
+                <th className="px-4 py-2 text-right">Количество</th>
+                <th className="px-4 py-2 text-right">Цена за ед. (валюта)</th>
+                <th className="px-4 py-2 text-right">Цена за ед. (сум)</th>
+                <th className="px-4 py-2 text-left">Дата поступления</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stockData.map((stock: Stock, index: number) => (
+                <tr key={stock.id || index} className="border-b hover:bg-gray-100">
+                  <td className="px-4 py-2">{stock.stock_name || stock.id}</td>
+                  <td className="px-4 py-2">
+                    {stock.stock_entry?.supplier?.name || 
+                     stock.supplier?.name || 
+                     "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {stock.quantity || "0"} {stock.purchase_unit?.short_name || ""}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {stock.price_per_unit_currency
+                      ? parseFloat(stock.price_per_unit_currency).toLocaleString()
+                      : "—"}{" "}
+                    {stock.currency?.short_name || ""}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {stock.base_unit_in_uzs
+                      ? parseFloat(stock.base_unit_in_uzs).toLocaleString()
+                      : "—"} сум
+                  </td>
+                  <td className="px-4 py-2">
+                    {stock.date_of_arrived
+                      ? new Date(stock.date_of_arrived).toLocaleDateString("ru-RU")
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -680,6 +802,12 @@ export default function ProductsPage() {
         currentPage={page}
         onPageChange={(newPage) => setPage(newPage)}
         canDelete={(product: Product) => !product.is_default}
+        expandedRowRenderer={(row: Product) => renderExpandedRow(row)}
+        onRowClick={(row: Product) => {
+          if (row.id) {
+            fetchStockForProduct(row.id);
+          }
+        }}
       />
 
       <RevaluationDialog
@@ -697,3 +825,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+  

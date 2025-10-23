@@ -441,6 +441,9 @@ function CreateSale() {
         ? parseFloat(String(selectedProduct.min_price))
         : 10000;
 
+    // Preserve existing quantity if product is already in cart, otherwise use 1
+    const existingQuantity = cartProducts[index]?.quantity || 1;
+
     // Update cart products
     const newCartProducts = [...cartProducts];
     if (newCartProducts[index]) {
@@ -449,8 +452,8 @@ function CreateSale() {
         productId: selectedProduct.id || 0,
         name: selectedProduct.product_name,
         price: price,
-        quantity: newCartProducts[index].quantity || 1,
-        total: price * (newCartProducts[index].quantity || 1),
+        quantity: existingQuantity,
+        total: price * existingQuantity,
         product: selectedProduct,
         barcode: selectedProduct.barcode,
         selectedUnit: defaultUnit,
@@ -485,6 +488,11 @@ function CreateSale() {
       shouldDirty: true,
     });
     form.setValue(`sale_items.${index}.price_per_unit`, price.toString(), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    // Preserve existing quantity
+    form.setValue(`sale_items.${index}.quantity`, existingQuantity, {
       shouldValidate: true,
       shouldDirty: true,
     });
@@ -676,7 +684,7 @@ function CreateSale() {
       const formattedData = {
         store: parseInt(data.store),
         payment_method: data.sale_payments[0]?.payment_method || "Наличные",
-        total_amount: data.total_amount,
+        total_amount: Number(String(data.total_amount).replace(/,/g, "")).toFixed(2),
         ...(isAdmin || isSuperUser ? { sold_by: data.sold_by } : {}),
         on_credit: data.on_credit,
         sale_items: data.sale_items.map((item) => ({
@@ -684,12 +692,11 @@ function CreateSale() {
           quantity: item.quantity.toString(),
           selling_unit: item.selling_unit,
           price_per_unit: item.price_per_unit,
+          ...(item.stock ? { stock: item.stock } : {}),
         })),
         sale_payments: data.sale_payments.map((payment) => ({
           payment_method: payment.payment_method,
-          amount: Math.floor(
-            Number(String(payment.amount).replace(/,/g, "")),
-          ).toString(),
+          amount: Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
         })),
         ...(data.sale_debt?.client && !data.on_credit
           ? { client: data.sale_debt.client }
@@ -701,11 +708,9 @@ function CreateSale() {
                 due_date: data.sale_debt.due_date,
                 ...(data.sale_debt.deposit
                   ? {
-                      deposit: Math.floor(
-                        Number(
-                          String(data.sale_debt.deposit).replace(/,/g, ""),
-                        ),
-                      ).toString(),
+                      deposit: Number(
+                        String(data.sale_debt.deposit).replace(/,/g, ""),
+                      ).toFixed(2),
                       deposit_payment_method:
                         data.sale_debt.deposit_payment_method || "Наличные",
                     }
