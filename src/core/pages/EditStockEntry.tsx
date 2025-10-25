@@ -26,14 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../../components/ui/tabs";
 import { Checkbox } from "../../components/ui/checkbox";
-import { Plus, X } from "lucide-react";
+import { 
+  Plus, 
+  X, 
+  ChevronDown, 
+  ChevronRight, 
+  Copy, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle,
+  Loader2,
+  Save,
+  RotateCcw
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface CommonFormValues {
@@ -61,10 +67,9 @@ interface StockItemFormValues {
   stock_name?: string;
 }
 
-interface StockItemTab {
+interface StockItem {
   id: string;
   stockId?: number; // Database ID for existing stocks
-  label: string;
   form: StockItemFormValues;
   dynamicFields: { [key: string]: DynamicField };
   dynamicFieldsOrder: string[];
@@ -75,6 +80,8 @@ interface StockItemTab {
   } | null;
   selectedProduct: any;
   isCalculated: boolean;
+  isExpanded: boolean;
+  isCalculating: boolean;
 }
 
 interface CreateProductForm {
@@ -87,6 +94,8 @@ interface CreateSupplierForm {
   name: string;
   phone_number: string;
 }
+
+const LOCALSTORAGE_KEY_PREFIX = "edit-stock-entry-draft-";
 
 const formatNumberDisplay = (value: any): string => {
   if (value === "" || value === null || value === undefined) {
@@ -105,6 +114,58 @@ const formatNumberForAPI = (value: any): number | undefined => {
   return parseFloat(num.toFixed(2));
 };
 
+// LocalStorage helper functions
+const getLocalStorageKey = (stockEntryId: string) => `${LOCALSTORAGE_KEY_PREFIX}${stockEntryId}`;
+
+const saveToLocalStorage = (stockEntryId: string, commonData: CommonFormValues, items: StockItem[]) => {
+  try {
+    const draft = {
+      commonData,
+      items,
+      timestamp: new Date().toISOString(),
+    };
+    localStorage.setItem(getLocalStorageKey(stockEntryId), JSON.stringify(draft));
+  } catch (error) {
+    console.error("Failed to save draft to localStorage:", error);
+  }
+};
+
+const loadFromLocalStorage = (stockEntryId: string): { commonData: CommonFormValues; items: StockItem[] } | null => {
+  try {
+    const draft = localStorage.getItem(getLocalStorageKey(stockEntryId));
+    if (!draft) return null;
+    
+    const parsed = JSON.parse(draft);
+    return {
+      commonData: parsed.commonData,
+      items: parsed.items,
+    };
+  } catch (error) {
+    console.error("Failed to load draft from localStorage:", error);
+    return null;
+  }
+};
+
+const clearLocalStorage = (stockEntryId: string) => {
+  try {
+    localStorage.removeItem(getLocalStorageKey(stockEntryId));
+  } catch (error) {
+    console.error("Failed to clear localStorage:", error);
+  }
+};
+
+const getDraftTimestamp = (stockEntryId: string): string | null => {
+  try {
+    const draft = localStorage.getItem(getLocalStorageKey(stockEntryId));
+    if (!draft) return null;
+    
+    const parsed = JSON.parse(draft);
+    return parsed.timestamp;
+  } catch (error) {
+    return null;
+  }
+};
+
 export default function EditStockEntry() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -117,12 +178,15 @@ export default function EditStockEntry() {
   const [isScanning, setIsScanning] = useState(false);
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Tabs state
-  const [stockTabs, setStockTabs] = useState<StockItemTab[]>([]);
-  const [activeTab, setActiveTab] = useState("");
+  // Stock items state
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletedStockIds, setDeletedStockIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTimestamp, setDraftTimestamp] = useState<string | null>(null);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
 
   // API hooks
   const createProduct = useCreateProduct();
@@ -203,8 +267,8 @@ export default function EditStockEntry() {
         commonForm.setValue("advance_of_debt", entry.advance_of_debt);
       }
 
-      // Create stock tabs from existing stocks
-      const tabs: StockItemTab[] = stocks.map((stock, index) => {
+      // Create stock items from existing stocks
+      const items: StockItem[] = stocks.map((stock, index) => {
         // Extract exchange_rate ID properly
         let exchangeRateValue: any = "";
         if (stock.exchange_rate) {
@@ -233,9 +297,8 @@ export default function EditStockEntry() {
         });
 
         return {
-          id: `tab-${index + 1}`,
+          id: `item-${index + 1}`,
           stockId: stock.id, // Store the database ID
-          label: `Stock ${index + 1}`,
           form: {
             product: stock.product?.id || "",
             currency: stock.currency?.id || "",
@@ -256,26 +319,94 @@ export default function EditStockEntry() {
           calculationMetadata: null,
           selectedProduct: stock.product || null,
           isCalculated: false, // Will be recalculated to get field metadata
+          isExpanded: true, // Start with first few expanded
+          isCalculating: false,
         };
       });
 
-      if (tabs.length > 0) {
-        setStockTabs(tabs);
-        setActiveTab(tabs[0].id);
+      if (items.length > 0) {
+        setStockItems(items);
       }
       
       setIsLoading(false);
     }
   }, [stockEntryData, stocksData, stockEntryLoading, stocksLoading]);
 
-  // Add new stock tab
-  const addStockTab = () => {
-    const newId = `tab-${stockTabs.length + 1}`;
-    setStockTabs([
-      ...stockTabs,
+  // Check for saved draft on mount
+  useEffect(() => {
+    if (!stockEntryId) return;
+    
+    const timestamp = getDraftTimestamp(stockEntryId);
+    if (timestamp) {
+      setHasDraft(true);
+      setDraftTimestamp(timestamp);
+      setShowDraftDialog(true);
+    }
+  }, [stockEntryId]);
+
+  // Auto-save to localStorage whenever data changes
+  useEffect(() => {
+    if (!stockEntryId || isSubmitting || isLoading) return;
+    
+    const commonValues = commonForm.getValues();
+    
+    const hasData = 
+      commonValues.store || 
+      commonValues.supplier || 
+      stockItems.some(item => item.form.product);
+    
+    if (hasData) {
+      const timeoutId = setTimeout(() => {
+        saveToLocalStorage(stockEntryId, commonValues, stockItems);
+        setHasDraft(true);
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [stockItems, commonForm.watch(), isSubmitting, isLoading, stockEntryId]);
+
+  // Restore draft
+  const restoreDraft = () => {
+    if (!stockEntryId) return;
+    
+    const draft = loadFromLocalStorage(stockEntryId);
+    if (draft) {
+      Object.entries(draft.commonData).forEach(([key, value]) => {
+        commonForm.setValue(key as keyof CommonFormValues, value);
+      });
+      
+      setStockItems(draft.items);
+      
+      toast.success("Draft restored successfully");
+      setShowDraftDialog(false);
+      setHasDraft(false);
+    }
+  };
+
+  // Clear draft
+  const clearDraft = () => {
+    if (!stockEntryId) return;
+    
+    clearLocalStorage(stockEntryId);
+    setHasDraft(false);
+    setDraftTimestamp(null);
+    setShowDraftDialog(false);
+    toast.info("Draft cleared");
+  };
+
+  // Start fresh
+  const startFresh = () => {
+    setShowDraftDialog(false);
+    setHasDraft(false);
+  };
+
+  // Add new stock item
+  const addStockItem = () => {
+    const newId = `item-${Date.now()}`;
+    setStockItems([
+      ...stockItems,
       {
         id: newId,
-        label: `Stock ${stockTabs.length + 1}`,
         form: {
           product: "",
           currency: "",
@@ -296,74 +427,130 @@ export default function EditStockEntry() {
         calculationMetadata: null,
         selectedProduct: null,
         isCalculated: false,
+        isExpanded: true,
+        isCalculating: false,
       },
     ]);
-    setActiveTab(newId);
   };
 
-  // Remove stock tab
-  const removeStockTab = (tabId: string) => {
-    if (stockTabs.length === 1) {
+  // Duplicate stock item
+  const duplicateStockItem = (itemId: string) => {
+    const item = stockItems.find((i) => i.id === itemId);
+    if (!item) return;
+    
+    const newId = `item-${Date.now()}`;
+    const duplicated: StockItem = {
+      ...item,
+      id: newId,
+      stockId: undefined, // New item, no database ID
+      isExpanded: true,
+      isCalculated: false,
+      isCalculating: false,
+    };
+    
+    setStockItems([...stockItems, duplicated]);
+    toast.success("Item duplicated");
+  };
+
+  // Remove stock item
+  const removeStockItem = (itemId: string) => {
+    if (stockItems.length === 1) {
       toast.error("You must have at least one stock item");
       return;
     }
     
-    const tab = stockTabs.find((t) => t.id === tabId);
+    const item = stockItems.find((i) => i.id === itemId);
     
-    // If this tab has a stockId, add it to deleted list
-    if (tab?.stockId) {
-      setDeletedStockIds([...deletedStockIds, tab.stockId]);
+    // If this item has a stockId, add it to deleted list
+    if (item?.stockId) {
+      setDeletedStockIds([...deletedStockIds, item.stockId]);
     }
     
-    const newTabs = stockTabs.filter((tab) => tab.id !== tabId);
-    setStockTabs(newTabs);
-    if (activeTab === tabId) {
-      setActiveTab(newTabs[0].id);
-    }
+    setStockItems(stockItems.filter((item) => item.id !== itemId));
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(itemId);
+      return newSet;
+    });
   };
 
-  // Update stock tab form field
-  const updateStockTabField = (
-    tabId: string,
+  // Remove selected items
+  const removeSelectedItems = () => {
+    if (selectedItems.size === 0) {
+      toast.error("No items selected");
+      return;
+    }
+    if (stockItems.length === selectedItems.size) {
+      toast.error("You must have at least one stock item");
+      return;
+    }
+    
+    // Add stockIds to deleted list
+    const itemsToDelete = stockItems.filter((item) => selectedItems.has(item.id));
+    const newDeletedIds = itemsToDelete
+      .filter((item) => item.stockId)
+      .map((item) => item.stockId as number);
+    
+    setDeletedStockIds([...deletedStockIds, ...newDeletedIds]);
+    setStockItems(stockItems.filter((item) => !selectedItems.has(item.id)));
+    setSelectedItems(new Set());
+    toast.success(`Removed ${selectedItems.size} item(s)`);
+  };
+
+  // Toggle item expansion
+  const toggleItemExpansion = (itemId: string) => {
+    setStockItems(
+      stockItems.map((item) =>
+        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item
+      )
+    );
+  };
+
+  // Toggle all items expansion
+  const toggleAllExpansion = (expand: boolean) => {
+    setStockItems(stockItems.map((item) => ({ ...item, isExpanded: expand })));
+  };
+
+  // Update stock item form field
+  const updateStockItemField = (
+    itemId: string,
     field: keyof StockItemFormValues,
     value: any,
   ) => {
-    setStockTabs((tabs) =>
-      tabs.map((tab) => {
-        if (tab.id === tabId) {
+    setStockItems((items) =>
+      items.map((item) => {
+        if (item.id === itemId) {
           // If changing product, currency, or purchase_unit, need to recalculate
           const needsRecalculation = ['product', 'currency', 'purchase_unit'].includes(field);
           return {
-            ...tab,
+            ...item,
             form: {
-              ...tab.form,
+              ...item.form,
               [field]: value,
             },
             ...(needsRecalculation && { isCalculated: false }), // Force recalculation
           };
         }
-        return tab;
+        return item;
       }),
     );
   };
 
-  // Get tab label based on product name
-  const getTabLabel = (tab: StockItemTab): string => {
-    if (tab.selectedProduct?.product_name) {
-      const name = tab.selectedProduct.product_name;
-      return name.length > 15 ? `${name.substring(0, 15)}...` : name;
-    }
-    return tab.label;
-  };
-
-  // Get field configuration for a stock tab (for new tabs or recalculation)
+  // Get field configuration for a stock item (for new items or recalculation)
   const getFieldConfiguration = useCallback(
-    async (tabId: string) => {
-      const tab = stockTabs.find((t) => t.id === tabId);
-      if (!tab) return;
+    async (itemId: string) => {
+      const item = stockItems.find((i) => i.id === itemId);
+      if (!item) return;
 
       const commonValues = commonForm.getValues();
-      const { form } = tab;
+      const { form } = item;
+      
+      // Set calculating state
+      setStockItems((items) =>
+        items.map((i) =>
+          i.id === itemId ? { ...i, isCalculating: true } : i
+        )
+      );
 
       if (
         !commonValues.store ||
@@ -410,11 +597,11 @@ export default function EditStockEntry() {
           is_base_currency: response.currency?.is_base || false,
         };
 
-        // Update tab with calculation results
-        setStockTabs((tabs) =>
-          tabs.map((t) => {
-            if (t.id === tabId) {
-              const updatedForm = { ...t.form };
+        // Update item with calculation results
+        setStockItems((items) =>
+          items.map((i) => {
+            if (i.id === itemId) {
+              const updatedForm = { ...i.form };
 
               // Populate form with calculated values
               Object.entries(response.dynamic_fields).forEach(
@@ -429,29 +616,36 @@ export default function EditStockEntry() {
               );
 
               return {
-                ...t,
+                ...i,
                 form: updatedForm,
                 dynamicFields: response.dynamic_fields,
                 dynamicFieldsOrder: fieldOrder,
                 calculationMetadata: metadata,
                 isCalculated: true,
+                isCalculating: false,
               };
             }
-            return t;
+            return i;
           }),
         );
       } catch (error) {
         console.error("Field configuration error:", error);
         toast.error("Failed to calculate stock values");
+        // Reset calculating state on error
+        setStockItems((items) =>
+          items.map((i) =>
+            i.id === itemId ? { ...i, isCalculating: false } : i
+          )
+        );
       }
     },
-    [stockTabs, commonForm],
+    [stockItems, commonForm],
   );
 
   // Get field configuration but preserve original values (for loading existing data)
   const getFieldConfigurationWithOriginalValues = useCallback(
-    async (tabId: string, originalForm: StockItemFormValues) => {
-      console.log('getFieldConfigurationWithOriginalValues called for tab:', tabId);
+    async (itemId: string, originalForm: StockItemFormValues) => {
+      console.log('getFieldConfigurationWithOriginalValues called for item:', itemId);
       console.log('originalForm:', originalForm);
       
       const commonValues = commonForm.getValues();
@@ -504,11 +698,11 @@ export default function EditStockEntry() {
         };
         console.log('Metadata:', metadata);
 
-        // Update tab with metadata but keep original form values
-        setStockTabs((tabs) =>
-          tabs.map((t) => {
-            if (t.id === tabId) {
-              console.log('Updating tab with preserved values:', originalForm);
+        // Update item with metadata but keep original form values
+        setStockItems((items) =>
+          items.map((i) => {
+            if (i.id === itemId) {
+              console.log('Updating item with preserved values:', originalForm);
               console.log('Exchange rate from response:', response.dynamic_fields.exchange_rate);
               
               // Extract exchange_rate ID from response if not in originalForm
@@ -527,7 +721,7 @@ export default function EditStockEntry() {
               console.log('Final form with exchange_rate:', finalForm.exchange_rate);
               
               return {
-                ...t,
+                ...i,
                 form: finalForm, // Keep the original loaded values with fixed exchange_rate
                 dynamicFields: response.dynamic_fields,
                 dynamicFieldsOrder: fieldOrder,
@@ -535,10 +729,10 @@ export default function EditStockEntry() {
                 isCalculated: true, // Mark as calculated to prevent auto-recalculation
               };
             }
-            return t;
+            return i;
           }),
         );
-        console.log('State updated for tab:', tabId);
+        console.log('State updated for item:', itemId);
       } catch (error) {
         console.error("Field configuration error:", error);
         toast.error("Failed to load stock configuration");
@@ -565,49 +759,49 @@ export default function EditStockEntry() {
     return String(value);
   };
 
-  // Handle product selection change in tab
-  const handleProductChange = (tabId: string, productId: string) => {
+  // Handle product selection change
+  const handleProductChange = (itemId: string, productId: string) => {
     const product = allProducts.find((p) => p.id === Number(productId));
     console.log('Product changed:', productId, product);
-    setStockTabs((tabs) =>
-      tabs.map((tab) => {
-        if (tab.id === tabId) {
+    setStockItems((items) =>
+      items.map((item) => {
+        if (item.id === itemId) {
           const updatedForm = {
-            ...tab.form,
+            ...item.form,
             product: productId,
             purchase_unit: "", // Reset purchase unit
           };
           
           return {
-            ...tab,
+            ...item,
             selectedProduct: product,
             form: updatedForm,
             isCalculated: false, // Reset calculation status
           };
         }
-        return tab;
+        return item;
       }),
     );
   };
 
   // Calculate fields based on user input
-  const calculateTabFields = useCallback(
-    (tabId: string, changedField: string, value: any) => {
-      console.log(`calculateTabFields called: tab=${tabId}, field=${changedField}, value=${value}`);
-      const tab = stockTabs.find((t) => t.id === tabId);
-      if (!tab) {
-        console.log('Tab not found:', tabId);
+  const calculateItemFields = useCallback(
+    (itemId: string, changedField: string, value: any) => {
+      console.log(`calculateItemFields called: item=${itemId}, field=${changedField}, value=${value}`);
+      const item = stockItems.find((i) => i.id === itemId);
+      if (!item) {
+        console.log('Item not found:', itemId);
         return;
       }
-      if (!tab.calculationMetadata) {
-        console.log('No calculation metadata for tab:', tabId);
+      if (!item.calculationMetadata) {
+        console.log('No calculation metadata for item:', itemId);
         return;
       }
 
       const { conversion_factor, exchange_rate, is_base_currency } =
-        tab.calculationMetadata;
+        item.calculationMetadata;
       console.log('Calculation metadata:', { conversion_factor, exchange_rate, is_base_currency });
-      const currentForm = { ...tab.form, [changedField]: value };
+      const currentForm = { ...item.form, [changedField]: value };
       console.log('Current form before calculation:', currentForm);
 
       const qty = Number(currentForm.purchase_unit_quantity) || 0;
@@ -617,13 +811,13 @@ export default function EditStockEntry() {
       if (
         changedField === "purchase_unit_quantity" &&
         qty &&
-        !tab.dynamicFields.quantity?.editable
+        !item.dynamicFields.quantity?.editable
       ) {
         currentForm.quantity = formatNumberDisplay(qty * conversion_factor);
       } else if (
         changedField === "quantity" &&
         quantity &&
-        !tab.dynamicFields.purchase_unit_quantity?.editable
+        !item.dynamicFields.purchase_unit_quantity?.editable
       ) {
         currentForm.purchase_unit_quantity = formatNumberDisplay(
           quantity * conversion_factor,
@@ -687,22 +881,22 @@ export default function EditStockEntry() {
         );
       }
 
-      // Update the tab
+      // Update the item
       console.log('Final calculated form:', currentForm);
-      setStockTabs((tabs) =>
-        tabs.map((t) => {
-          if (t.id === tabId) {
+      setStockItems((items) =>
+        items.map((i) => {
+          if (i.id === itemId) {
             return {
-              ...t,
+              ...i,
               form: currentForm,
             };
           }
-          return t;
+          return i;
         }),
       );
-      console.log('Tab state updated');
+      console.log('Item state updated');
     },
-    [stockTabs],
+    [stockItems],
   );
 
   // Barcode scanner
@@ -729,10 +923,20 @@ export default function EditStockEntry() {
           searchProductByBarcode(scanBuffer.trim())
             .then((product) => {
               if (product) {
-                handleProductChange(activeTab, String(product.id));
-                toast.success(
-                  `Product found and selected: ${product.product_name}`,
-                );
+                // Find first empty item or create new one
+                const firstEmptyItem = stockItems.find(i => !i.form.product);
+                const targetItemId = firstEmptyItem?.id || `item-${Date.now()}`;
+                
+                if (!firstEmptyItem) {
+                  addStockItem();
+                }
+                
+                setTimeout(() => {
+                  handleProductChange(targetItemId, String(product.id));
+                  toast.success(
+                    `Product found and selected: ${product.product_name}`,
+                  );
+                }, 100);
                 setProductSearchTerm("");
               } else {
                 setProductSearchTerm(scanBuffer.trim());
@@ -770,7 +974,7 @@ export default function EditStockEntry() {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [scanBuffer, activeTab]);
+  }, [scanBuffer, stockItems]);
 
   const handleSubmit = async () => {
     try {
@@ -783,9 +987,9 @@ export default function EditStockEntry() {
         return;
       }
 
-      // Validate all tabs are calculated
-      const uncalculatedTabs = stockTabs.filter((tab) => !tab.isCalculated);
-      if (uncalculatedTabs.length > 0) {
+      // Validate all items are calculated
+      const uncalculatedItems = stockItems.filter((item) => !item.isCalculated);
+      if (uncalculatedItems.length > 0) {
         toast.error(
           "Please complete all stock items by filling required fields and calculating",
         );
@@ -793,8 +997,8 @@ export default function EditStockEntry() {
       }
 
       // Build stocks array
-      const stocks: StockItemEntry[] = stockTabs.map((tab) => {
-        const exchangeRateField = tab.dynamicFields.exchange_rate;
+      const stocks: StockItemEntry[] = stockItems.map((item) => {
+        const exchangeRateField = item.dynamicFields.exchange_rate;
         let exchangeRateId: number;
 
         if (
@@ -804,37 +1008,37 @@ export default function EditStockEntry() {
         ) {
           exchangeRateId = (exchangeRateField.value as any).id;
         } else {
-          exchangeRateId = Number(tab.form.exchange_rate);
+          exchangeRateId = Number(item.form.exchange_rate);
         }
 
         const stockEntry: any = {
-          product: Number(tab.form.product),
-          purchase_unit: Number(tab.form.purchase_unit),
-          currency: Number(tab.form.currency),
+          product: Number(item.form.product),
+          purchase_unit: Number(item.form.purchase_unit),
+          currency: Number(item.form.currency),
           exchange_rate: exchangeRateId,
-          quantity: formatNumberForAPI(tab.form.quantity) || 0,
+          quantity: formatNumberForAPI(item.form.quantity) || 0,
           purchase_unit_quantity:
-            formatNumberForAPI(tab.form.purchase_unit_quantity) || 0,
-          price_per_unit_uz: formatNumberForAPI(tab.form.price_per_unit_uz) || 0,
-          total_price_in_uz: formatNumberForAPI(tab.form.total_price_in_uz) || 0,
+            formatNumberForAPI(item.form.purchase_unit_quantity) || 0,
+          price_per_unit_uz: formatNumberForAPI(item.form.price_per_unit_uz) || 0,
+          total_price_in_uz: formatNumberForAPI(item.form.total_price_in_uz) || 0,
           price_per_unit_currency:
-            formatNumberForAPI(tab.form.price_per_unit_currency) || 0,
+            formatNumberForAPI(item.form.price_per_unit_currency) || 0,
           total_price_in_currency:
-            formatNumberForAPI(tab.form.total_price_in_currency) || 0,
-          base_unit_in_uzs: formatNumberForAPI(tab.form.base_unit_in_uzs),
+            formatNumberForAPI(item.form.total_price_in_currency) || 0,
+          base_unit_in_uzs: formatNumberForAPI(item.form.base_unit_in_uzs),
           base_unit_in_currency: formatNumberForAPI(
-            tab.form.base_unit_in_currency,
+            item.form.base_unit_in_currency,
           ),
         };
 
         // Add stock_name only if it exists
-        if (tab.form.stock_name && tab.form.stock_name.trim()) {
-          stockEntry.stock_name = tab.form.stock_name.trim();
+        if (item.form.stock_name && item.form.stock_name.trim()) {
+          stockEntry.stock_name = item.form.stock_name.trim();
         }
 
         // Add id if this is an existing stock
-        if (tab.stockId) {
-          stockEntry.id = tab.stockId;
+        if (item.stockId) {
+          stockEntry.id = item.stockId;
         }
 
         return stockEntry;
@@ -860,6 +1064,12 @@ export default function EditStockEntry() {
         id: Number(stockEntryId),
         data: payload,
       });
+      
+      // Clear localStorage on successful submission
+      if (stockEntryId) {
+        clearLocalStorage(stockEntryId);
+      }
+      
       toast.success("Stock entry updated successfully");
       navigate(`/suppliers/${supplierId}`);
     } catch (error) {
@@ -875,10 +1085,10 @@ export default function EditStockEntry() {
   useEffect(() => {
     if (!isDebt) return;
     
-    // Sum all calculated tabs' total_price_in_uz
-    const totalUZS = stockTabs.reduce((sum, tab) => {
-      if (tab.isCalculated && tab.form.total_price_in_uz) {
-        const v = Number(tab.form.total_price_in_uz) || 0;
+    // Sum all calculated items' total_price_in_uz
+    const totalUZS = stockItems.reduce((sum, item) => {
+      if (item.isCalculated && item.form.total_price_in_uz) {
+        const v = Number(item.form.total_price_in_uz) || 0;
         return sum + v;
       }
       return sum;
@@ -894,48 +1104,49 @@ export default function EditStockEntry() {
         );
       }
     }
-  }, [isDebt, stockTabs]);
+  }, [isDebt, stockItems]);
 
   // Auto-trigger calculation when all required fields are filled
   useEffect(() => {
-    console.log('Auto-trigger effect running, stockTabs:', stockTabs.length);
+    console.log('Auto-trigger effect running, stockItems:', stockItems.length);
     const commonValues = commonForm.getValues();
     console.log('Common values:', commonValues);
     
-    stockTabs.forEach((tab) => {
-      console.log(`Tab ${tab.id}:`, {
+    stockItems.forEach((item) => {
+      console.log(`Item ${item.id}:`, {
         hasStore: !!commonValues.store,
         hasSupplier: !!commonValues.supplier,
         hasDate: !!commonValues.date_of_arrived,
-        hasProduct: !!tab.form.product,
-        hasCurrency: !!tab.form.currency,
-        hasPurchaseUnit: !!tab.form.purchase_unit,
-        isCalculated: tab.isCalculated,
-        stockId: tab.stockId
+        hasProduct: !!item.form.product,
+        hasCurrency: !!item.form.currency,
+        hasPurchaseUnit: !!item.form.purchase_unit,
+        isCalculated: item.isCalculated,
+        stockId: item.stockId
       });
       
       if (
         commonValues.store &&
         commonValues.supplier &&
         commonValues.date_of_arrived &&
-        tab.form.product &&
-        tab.form.currency &&
-        tab.form.purchase_unit &&
-        !tab.isCalculated
+        item.form.product &&
+        item.form.currency &&
+        item.form.purchase_unit &&
+        !item.isCalculated &&
+        !item.isCalculating
       ) {
-        console.log(`Triggering configuration for tab ${tab.id}, has stockId:`, !!tab.stockId);
+        console.log(`Triggering configuration for item ${item.id}, has stockId:`, !!item.stockId);
         // For existing stocks (with stockId), preserve values
-        if (tab.stockId) {
-          const originalForm = { ...tab.form }; // Capture current values
-          getFieldConfigurationWithOriginalValues(tab.id, originalForm);
+        if (item.stockId) {
+          const originalForm = { ...item.form }; // Capture current values
+          getFieldConfigurationWithOriginalValues(item.id, originalForm);
         } else {
           // For new stocks, calculate normally
-          getFieldConfiguration(tab.id);
+          getFieldConfiguration(item.id);
         }
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stockTabs, commonForm.watch("store"), commonForm.watch("supplier"), commonForm.watch("date_of_arrived")]);
+  }, [stockItems, commonForm.watch("store"), commonForm.watch("supplier"), commonForm.watch("date_of_arrived")]);
 
   const handleCreateProductSubmit = async (data: CreateProductForm) => {
     try {
@@ -985,14 +1196,36 @@ export default function EditStockEntry() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h1 className="text-2xl font-bold mb-6">
-          {t("common.edit_stock_entry")}
-        </h1>
+      <div className="bg-white rounded-lg shadow">
+        {/* Header */}
+        <div className="p-6 border-b">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">
+              {t("common.edit_stock_entry")}
+            </h1>
+            {hasDraft && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md">
+                  <Save className="h-4 w-4" />
+                  <span>Draft auto-saved</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearDraft}
+                  title="Clear saved draft"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        {/* Common Fields Section - First */}
-        <div className="space-y-4 mb-8 pb-6 border-b">
-          <h2 className="text-lg font-semibold">{t("common.common_information")}</h2>
+        {/* Common Fields Section */}
+        <div className="p-6 border-b bg-gray-50">
+          <h2 className="text-lg font-semibold mb-4">{t("common.common_information")}</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Store */}
@@ -1068,262 +1301,363 @@ export default function EditStockEntry() {
                 {t("common.is_debt")}
               </Label>
             </div>
-
-            {/* Debt fields */}
-            {commonForm.watch("is_debt") && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="amount_of_debt">
-                    {t("common.amount_of_debt")}
-                  </Label>
-                  <Input
-                    id="amount_of_debt"
-                    type="number"
-                    step="0.01"
-                    {...commonForm.register("amount_of_debt")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="advance_of_debt">
-                    {t("common.advance_of_debt")}
-                  </Label>
-                  <Input
-                    id="advance_of_debt"
-                    type="number"
-                    step="0.01"
-                    {...commonForm.register("advance_of_debt")}
-                  />
-                </div>
-              </>
-            )}
           </div>
+
+          {/* Debt fields */}
+          {commonForm.watch("is_debt") && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount_of_debt">
+                  {t("common.amount_of_debt")}
+                </Label>
+                <Input
+                  id="amount_of_debt"
+                  type="number"
+                  step="0.01"
+                  {...commonForm.register("amount_of_debt")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="advance_of_debt">
+                  {t("common.advance_of_debt")}
+                </Label>
+                <Input
+                  id="advance_of_debt"
+                  type="number"
+                  step="0.01"
+                  {...commonForm.register("advance_of_debt")}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Stock Items Tabs - After Common Fields */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">{t("common.stock_items")}</h2>
-            <Button type="button" variant="outline" onClick={addStockTab}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t("common.add_stock_item")}
-            </Button>
+        {/* Stock Items List */}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">
+              {t("common.stock_items")} ({stockItems.length})
+            </h2>
+            <div className="flex gap-2">
+              {selectedItems.size > 0 && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={removeSelectedItems}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedItems.size})
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => toggleAllExpansion(false)}
+              >
+                Collapse All
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => toggleAllExpansion(true)}
+              >
+                Expand All
+              </Button>
+              <Button type="button" onClick={addStockItem}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t("common.add_stock_item")}
+              </Button>
+            </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              {stockTabs.map((tab) => (
-                <div key={tab.id} className="flex items-center">
-                  <TabsTrigger value={tab.id}>{getTabLabel(tab)}</TabsTrigger>
-                  {stockTabs.length > 1 && (
+          <div className="space-y-2">
+            {stockItems.map((item, index) => (
+              <div
+                key={item.id}
+                className={`border rounded-lg transition-all ${
+                  selectedItems.has(item.id) ? "ring-2 ring-blue-500" : ""
+                } ${item.isCalculated ? "border-green-300 bg-green-50/30" : "border-gray-200"}`}
+              >
+                {/* Item Header */}
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-t-lg">
+                  <Checkbox
+                    checked={selectedItems.has(item.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedItems((prev) => {
+                        const newSet = new Set(prev);
+                        if (checked) {
+                          newSet.add(item.id);
+                        } else {
+                          newSet.delete(item.id);
+                        }
+                        return newSet;
+                      });
+                    }}
+                  />
+                  
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleItemExpansion(item.id)}
+                    className="p-1"
+                  >
+                    {item.isExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <div className="flex-1 flex items-center gap-4">
+                    <span className="font-medium text-gray-600">#{index + 1}</span>
+                    <span className="font-semibold text-lg">
+                      {item.selectedProduct?.product_name || "Select product..."}
+                    </span>
+                    {item.isCalculated && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-green-700 font-medium">
+                          {item.form.quantity} {item.selectedProduct?.available_units?.[0]?.short_name} · 
+                          {" "}{formatNumberDisplay(item.form.total_price_in_uz)} UZS
+                        </span>
+                      </div>
+                    )}
+                    {item.isCalculating && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Calculating...</span>
+                      </div>
+                    )}
+                    {!item.isCalculated && !item.isCalculating && item.form.product && (
+                      <div className="flex items-center gap-2 text-sm text-amber-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>Incomplete</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="ml-1 h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeStockTab(tab.id);
-                      }}
+                      onClick={() => duplicateStockItem(item.id)}
+                      title="Duplicate"
                     >
-                      <X className="h-3 w-3" />
+                      <Copy className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              ))}
-            </TabsList>
-
-            {stockTabs.map((tab) => (
-              <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-                {/* Product Selection Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Product */}
-                  <div className="space-y-2">
-                    <Label htmlFor={`product-${tab.id}`}>
-                      {t("common.product")} *
-                    </Label>
-                    <Select
-                      value={tab.form.product?.toString()}
-                      onValueChange={(value) => handleProductChange(tab.id, value)}
-                      onOpenChange={(open) => {
-                        if (!open) setProductSearchTerm("");
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("common.product")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="p-2 sticky top-0 bg-white">
-                          <Input
-                            placeholder="Search product"
-                            value={productSearchTerm}
-                            onChange={(e) => setProductSearchTerm(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                          />
-                        </div>
-                        {(() => {
-                          const options = [...allProducts];
-                          const sel = tab.selectedProduct as any;
-                          if (sel && !options.some((p: any) => p.id === sel.id)) {
-                            options.unshift(sel);
-                          }
-                          return options.map((product: any) => (
-                            <SelectItem key={product.id} value={String(product.id)}>
-                              {product.product_name}
-                            </SelectItem>
-                          ));
-                        })()}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Currency */}
-                  <div className="space-y-2">
-                    <Label htmlFor={`currency-${tab.id}`}>
-                      {t("common.currency")} *
-                    </Label>
-                    <Select
-                      value={tab.form.currency?.toString()}
-                      onValueChange={(value) =>
-                        updateStockTabField(tab.id, "currency", value)
-                      }
-                      disabled={currenciesLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("common.select_currency")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currencies.map((currency) => (
-                          <SelectItem key={currency.id} value={String(currency.id)}>
-                            {currency.name} ({currency.short_name})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Purchase Unit */}
-                  <div className="space-y-2">
-                    <Label htmlFor={`purchase_unit-${tab.id}`}>
-                      {t("common.purchase_unit")} *
-                    </Label>
-                    {tab.stockId && stocksData ? (
-                      /* For existing stocks, show the purchase unit from stock data */
-                      <div className="px-3 py-2 border rounded-md bg-gray-100">
-                        {(() => {
-                          const stocks = Array.isArray(stocksData) ? stocksData : stocksData?.results || [];
-                          const stock = stocks.find((s) => s.id === tab.stockId);
-                          return stock?.purchase_unit?.short_name || t("common.purchase_unit");
-                        })()}
-                      </div>
-                    ) : (
-                      <Select
-                        value={tab.form.purchase_unit?.toString()}
-                        onValueChange={(value) => {
-                          updateStockTabField(tab.id, "purchase_unit", value);
-                        }}
-                        disabled={measurementsLoading || !tab.selectedProduct}
+                    {stockItems.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeStockItem(item.id)}
+                        title="Delete"
                       >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={t("common.select_purchase_unit")}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tab.selectedProduct?.available_units?.map(
-                            (unit: any) => (
-                              <SelectItem key={unit.id} value={String(unit.id)}>
-                                {unit.short_name}
-                                {unit.is_base ? " (base)" : ""}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
+                        <X className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </div>
 
-                {/* Stock Name Field - Show only for category Лист (id: 3) */}
-                {tab.selectedProduct?.category_read?.id === 3 && (
-                  <div className="space-y-2 mt-4">
-                    <Label htmlFor={`stock_name-${tab.id}`}>
-                      Stock Name
-                    </Label>
-                    <Input
-                      id={`stock_name-${tab.id}`}
-                      type="text"
-                      value={tab.form.stock_name || ""}
-                      onChange={(e) => {
-                        updateStockTabField(tab.id, "stock_name", e.target.value);
-                      }}
-                      placeholder="Enter stock name"
-                    />
-                  </div>
-                )}
-
-                {/* Dynamic Fields */}
-                {tab.isCalculated ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                    {tab.dynamicFieldsOrder
-                      .filter(
-                        (fieldName) =>
-                          tab.dynamicFields[fieldName] &&
-                          tab.dynamicFields[fieldName].show,
-                      )
-                      .map((fieldName) => {
-                        const fieldData = tab.dynamicFields[fieldName];
-                        return (
-                          <div key={fieldName} className="space-y-2">
-                            <Label htmlFor={`${fieldName}-${tab.id}`}>
-                              {fieldData.label}
-                            </Label>
-                            <Input
-                              id={`${fieldName}-${tab.id}`}
-                              type="number"
-                              step="0.01"
-                              value={tab.form[fieldName as keyof StockItemFormValues] || ""}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                console.log(`Field ${fieldName} changed to ${value}, editable: ${fieldData.editable}`);
-                                updateStockTabField(
-                                  tab.id,
-                                  fieldName as keyof StockItemFormValues,
-                                  value,
-                                );
-                                if (fieldData.editable) {
-                                  console.log(`Calling calculateTabFields for ${fieldName}`);
-                                  calculateTabFields(tab.id, fieldName, value);
-                                } else {
-                                  console.log(`Field ${fieldName} is not editable, skipping calculation`);
-                                }
-                              }}
-                              readOnly={!fieldData.editable}
-                              className={
-                                !fieldData.editable
-                                  ? "bg-gray-100 cursor-not-allowed"
-                                  : ""
+                {/* Item Content */}
+                {item.isExpanded && (
+                  <div className="p-4 space-y-4">
+                    {/* Product Selection Fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Product */}
+                      <div className="space-y-2">
+                        <Label htmlFor={`product-${item.id}`}>
+                          {t("common.product")} *
+                        </Label>
+                        <Select
+                          value={item.form.product?.toString()}
+                          onValueChange={(value) => handleProductChange(item.id, value)}
+                          onOpenChange={(open) => {
+                            if (!open) setProductSearchTerm("");
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("common.product")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2 sticky top-0 bg-white">
+                              <Input
+                                placeholder="Search product"
+                                value={productSearchTerm}
+                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                              />
+                            </div>
+                            {(() => {
+                              const options = [...allProducts];
+                              const sel = item.selectedProduct as any;
+                              if (sel && !options.some((p: any) => p.id === sel.id)) {
+                                options.unshift(sel);
                               }
-                            />
+                              return options.map((product: any) => (
+                                <SelectItem key={product.id} value={String(product.id)}>
+                                  {product.product_name}
+                                </SelectItem>
+                              ));
+                            })()}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Currency */}
+                      <div className="space-y-2">
+                        <Label htmlFor={`currency-${item.id}`}>
+                          {t("common.currency")} *
+                        </Label>
+                        <Select
+                          value={item.form.currency?.toString()}
+                          onValueChange={(value) =>
+                            updateStockItemField(item.id, "currency", value)
+                          }
+                          disabled={currenciesLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("common.select_currency")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {currencies.map((currency) => (
+                              <SelectItem key={currency.id} value={String(currency.id)}>
+                                {currency.name} ({currency.short_name})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Purchase Unit */}
+                      <div className="space-y-2">
+                        <Label htmlFor={`purchase_unit-${item.id}`}>
+                          {t("common.purchase_unit")} *
+                        </Label>
+                        {item.stockId && stocksData ? (
+                          /* For existing stocks, show the purchase unit from stock data */
+                          <div className="px-3 py-2 border rounded-md bg-gray-100">
+                            {(() => {
+                              const stocks = Array.isArray(stocksData) ? stocksData : stocksData?.results || [];
+                              const stock = stocks.find((s) => s.id === item.stockId);
+                              return stock?.purchase_unit?.short_name || t("common.purchase_unit");
+                            })()}
                           </div>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                    <div className="col-span-2 text-sm text-muted-foreground text-center py-4">
-                      {t("common.please_select_required_fields")}
+                        ) : (
+                          <Select
+                            value={item.form.purchase_unit?.toString()}
+                            onValueChange={(value) => {
+                              updateStockItemField(item.id, "purchase_unit", value);
+                            }}
+                            disabled={measurementsLoading || !item.selectedProduct}
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={t("common.select_purchase_unit")}
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {item.selectedProduct?.available_units?.map(
+                                (unit: any) => (
+                                  <SelectItem key={unit.id} value={String(unit.id)}>
+                                    {unit.short_name}
+                                    {unit.is_base ? " (base)" : ""}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Stock Name Field - Show only for category Лист (id: 3) */}
+                    {item.selectedProduct?.category_read?.id === 3 && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`stock_name-${item.id}`}>
+                          Stock Name
+                        </Label>
+                        <Input
+                          id={`stock_name-${item.id}`}
+                          type="text"
+                          value={item.form.stock_name || ""}
+                          onChange={(e) => {
+                            updateStockItemField(item.id, "stock_name", e.target.value);
+                          }}
+                          placeholder="Enter stock name"
+                        />
+                      </div>
+                    )}
+
+                    {/* Dynamic Fields */}
+                    {item.isCalculated ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+                        {item.dynamicFieldsOrder
+                          .filter(
+                            (fieldName: string) =>
+                              item.dynamicFields[fieldName] &&
+                              item.dynamicFields[fieldName].show,
+                          )
+                          .map((fieldName: string) => {
+                            const fieldData = item.dynamicFields[fieldName];
+                            return (
+                              <div key={fieldName} className="space-y-2">
+                                <Label htmlFor={`${fieldName}-${item.id}`}>
+                                  {fieldData.label}
+                                </Label>
+                                <Input
+                                  id={`${fieldName}-${item.id}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={item.form[fieldName as keyof StockItemFormValues] || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    console.log(`Field ${fieldName} changed to ${value}, editable: ${fieldData.editable}`);
+                                    updateStockItemField(
+                                      item.id,
+                                      fieldName as keyof StockItemFormValues,
+                                      value,
+                                    );
+                                    if (fieldData.editable) {
+                                      console.log(`Calling calculateItemFields for ${fieldName}`);
+                                      calculateItemFields(item.id, fieldName, value);
+                                    } else {
+                                      console.log(`Field ${fieldName} is not editable, skipping calculation`);
+                                    }
+                                  }}
+                                  readOnly={!fieldData.editable}
+                                  className={
+                                    !fieldData.editable
+                                      ? "bg-gray-100 cursor-not-allowed"
+                                      : ""
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+                        <div className="col-span-2 text-sm text-muted-foreground text-center py-4">
+                          {t("common.please_select_required_fields")}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-
-              </TabsContent>
+              </div>
             ))}
-          </Tabs>
+          </div>
 
-          {/* Submit Buttons - After All Tabs */}
+          {/* Submit Buttons */}
           <div className="mt-6 flex justify-end gap-4 border-t pt-4">
             <Button
               type="button"
@@ -1338,6 +1672,34 @@ export default function EditStockEntry() {
           </div>
         </div>
       </div>
+
+      {/* Restore Draft Dialog */}
+      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <DialogContent>
+          <DialogTitle>Restore Draft?</DialogTitle>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              A saved draft from {draftTimestamp ? new Date(draftTimestamp).toLocaleString() : "earlier"} was found. Would you like to restore it?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={startFresh}
+              >
+                Start Fresh
+              </Button>
+              <Button
+                type="button"
+                onClick={restoreDraft}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restore Draft
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Product Dialog */}
       <Dialog open={createProductOpen} onOpenChange={setCreateProductOpen}>

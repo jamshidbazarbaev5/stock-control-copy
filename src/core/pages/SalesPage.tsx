@@ -63,6 +63,7 @@ const COLUMN_CONFIG = [
   { key: "sale_id", label: "ID продажи" },
   { key: "store_read", label: "Магазин" },
   { key: "sale_payments", label: "Способ оплаты" },
+  { key: "worker", label: "Работник" },
   { key: "sale_items", label: "Товары" },
   { key: "quantity", label: "Количество" },
   { key: "total_amount", label: "Общая сумма" },
@@ -757,6 +758,11 @@ export default function SalesPage() {
           ))}
         </div>
       ),
+    },
+    {
+      header:t("table.worker"),
+      accessorKey: "worker",
+      cell: (row: any) => (row?.worker_read?.name)
     },
     {
       header: t("table.items"),
