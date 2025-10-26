@@ -324,7 +324,7 @@ export default function CreateStock() {
       // Restore stock items
       setStockItems(draft.items);
 
-      toast.success("Draft restored successfully");
+      toast.success(t("common.draft_restored_successfully"));
       setShowDraftDialog(false);
       setHasDraft(false);
     }
@@ -336,7 +336,7 @@ export default function CreateStock() {
     setHasDraft(false);
     setDraftTimestamp(null);
     setShowDraftDialog(false);
-    toast.info("Draft cleared");
+    toast.info(t("common.draft_cleared"));
   };
 
   // Start fresh (ignore draft)
@@ -394,13 +394,13 @@ export default function CreateStock() {
     };
 
     setStockItems([...stockItems, duplicated]);
-    toast.success("Item duplicated");
+    toast.success(t("common.item_duplicated"));
   };
 
   // Remove stock item
   const removeStockItem = (itemId: string) => {
     if (stockItems.length === 1) {
-      toast.error("You must have at least one stock item");
+      toast.error(t("common.must_have_one_item"));
       return;
     }
     setStockItems(stockItems.filter((item) => item.id !== itemId));
@@ -829,7 +829,7 @@ export default function CreateStock() {
     if (!item) return;
 
     if (!item.form.purchase_unit || !item.selectedProduct) {
-      toast.error("Please select a product and purchase unit first");
+      toast.error(t("common.select_product_and_unit_first"));
       return;
     }
 
@@ -846,7 +846,7 @@ export default function CreateStock() {
 
     const calculationInput = Number(item.form.calculation_input);
     if (!calculationInput || isNaN(calculationInput)) {
-      toast.error("Please enter a valid number for calculation");
+      toast.error(t("common.enter_valid_number"));
       return;
     }
 
@@ -888,24 +888,24 @@ export default function CreateStock() {
         if (i.id === item.id) {
           const updatedForm = {
             ...i.form,
-            quantity: resultValue,
+            purchase_unit_quantity: resultValue,
           };
 
-          // Also update dynamicFields if quantity exists there
+          // Also update dynamicFields if purchase_unit_quantity exists there
           const updatedDynamicFields = { ...i.dynamicFields };
-          if (updatedDynamicFields.quantity) {
+          if (updatedDynamicFields.purchase_unit_quantity) {
             console.log(
-              "Updating dynamicFields.quantity from:",
-              updatedDynamicFields.quantity.value,
+              "Updating dynamicFields.purchase_unit_quantity from:",
+              updatedDynamicFields.purchase_unit_quantity.value,
               "to:",
               resultValue,
             );
-            updatedDynamicFields.quantity = {
-              ...updatedDynamicFields.quantity,
+            updatedDynamicFields.purchase_unit_quantity = {
+              ...updatedDynamicFields.purchase_unit_quantity,
               value: resultValue,
             };
           } else {
-            console.log("No quantity field in dynamicFields");
+            console.log("No purchase_unit_quantity field in dynamicFields");
           }
 
           const updatedItem = {
@@ -924,12 +924,12 @@ export default function CreateStock() {
     // If item is calculated, also trigger field recalculation
     if (item.isCalculated) {
       setTimeout(() => {
-        calculateItemFields(item.id, "quantity", resultValue);
+        calculateItemFields(item.id, "purchase_unit_quantity", resultValue);
       }, 100);
     }
 
     toast.success(
-      `Calculated: ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
+      `${t("common.calculated_result")} ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
     );
 
     // Close modal and reset
@@ -1278,7 +1278,7 @@ export default function CreateStock() {
                   onClick={removeSelectedItems}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete ({selectedItems.size})
+                  Удалить ({selectedItems.size})
                 </Button>
               )}
               <Button
@@ -1287,7 +1287,7 @@ export default function CreateStock() {
                 size="sm"
                 onClick={() => toggleAllExpansion(false)}
               >
-                Collapse All
+
               </Button>
               <Button
                 type="button"
@@ -1295,7 +1295,7 @@ export default function CreateStock() {
                 size="sm"
                 onClick={() => toggleAllExpansion(true)}
               >
-                Expand All
+                развернуть
               </Button>
               <Button type="button" onClick={addStockItem}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -1349,7 +1349,7 @@ export default function CreateStock() {
                     </span>
                     <span className="font-semibold text-lg">
                       {item.selectedProduct?.product_name ||
-                        "Select product..."}
+                        t("common.select_product_placeholder")}
                     </span>
                     {item.isCalculated && (
                       <div className="flex items-center gap-2 text-sm">
@@ -1368,7 +1368,7 @@ export default function CreateStock() {
                     {item.isCalculating && (
                       <div className="flex items-center gap-2 text-sm text-blue-600">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Calculating...</span>
+                        <span>{t("common.calculating")}</span>
                       </div>
                     )}
                     {!item.isCalculated &&
@@ -1376,7 +1376,7 @@ export default function CreateStock() {
                       item.form.product && (
                         <div className="flex items-center gap-2 text-sm text-amber-600">
                           <AlertCircle className="h-4 w-4" />
-                          <span>Incomplete</span>
+                          <span>{t("common.incomplete")}</span>
                         </div>
                       )}
                   </div>
@@ -1387,7 +1387,7 @@ export default function CreateStock() {
                       variant="ghost"
                       size="sm"
                       onClick={() => duplicateStockItem(item.id)}
-                      title="Duplicate"
+                      title={t("common.duplicate")}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -1397,7 +1397,7 @@ export default function CreateStock() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeStockItem(item.id)}
-                        title="Delete"
+                        title={t("common.delete")}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -1430,7 +1430,9 @@ export default function CreateStock() {
                           <SelectContent>
                             <div className="p-2 sticky top-0 bg-white z-10 border-b">
                               <Input
-                                placeholder="Search product"
+                                placeholder={t(
+                                  "common.search_product_placeholder",
+                                )}
                                 value={productSearchTerm}
                                 onChange={(e) =>
                                   setProductSearchTerm(e.target.value)
@@ -1580,7 +1582,7 @@ export default function CreateStock() {
 
                         {/* Calculation Button for Лист category */}
                         <div className="space-y-2">
-                          <Label>Quantity Calculator</Label>
+                          <Label>калькулятор</Label>
                           <Button
                             type="button"
                             onClick={() => openCalculationModal(item.id)}
@@ -1588,7 +1590,7 @@ export default function CreateStock() {
                             variant="outline"
                             className="w-full"
                           >
-                            Calculate Quantity
+                            калькулятор
                           </Button>
                         </div>
                       </div>
@@ -1771,14 +1773,14 @@ export default function CreateStock() {
       {/* Restore Draft Dialog */}
       <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
         <DialogContent>
-          <DialogTitle>Restore Draft?</DialogTitle>
+          <DialogTitle>{t("common.restore_draft")}</DialogTitle>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              You have unsaved work from{" "}
+              {t("common.unsaved_work_message")}{" "}
               {draftTimestamp
                 ? new Date(draftTimestamp).toLocaleString()
-                : "a previous session"}
-              . Would you like to restore it?
+                : t("common.a_previous_session")}
+              . {t("common.would_you_like_to_restore")}
             </p>
 
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
@@ -1786,11 +1788,10 @@ export default function CreateStock() {
                 <Save className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <p className="font-medium text-blue-900">
-                    Draft saved automatically
+                    {t("common.draft_saved_automatically")}
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Your form data is saved automatically while you work. You
-                    can safely navigate away and return later.
+                    {t("common.draft_auto_save_description")}
                   </p>
                 </div>
               </div>
@@ -1803,10 +1804,10 @@ export default function CreateStock() {
                 onClick={startFresh}
                 className="flex-1"
               >
-                Start Fresh
+                {t("common.start_fresh")}
               </Button>
               <Button type="button" onClick={restoreDraft} className="flex-1">
-                Restore Draft
+                {t("common.restore_draft_button")}
               </Button>
             </div>
           </div>
@@ -1819,7 +1820,7 @@ export default function CreateStock() {
         onOpenChange={setCalculationModalOpen}
       >
         <DialogContent className="sm:max-w-md">
-          <DialogTitle>Calculate Quantity</DialogTitle>
+          <DialogTitle>{t("common.calculate_quantity")}</DialogTitle>
           <div className="space-y-4">
             {activeCalculationItemId &&
               (() => {
@@ -1842,20 +1843,24 @@ export default function CreateStock() {
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Product:</span>
+                          <span className="text-gray-600">
+                            {t("common.product_label")}
+                          </span>
                           <span className="font-medium">
                             {item.selectedProduct?.product_name}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Purchase Unit:</span>
+                          <span className="text-gray-600">
+                            {t("common.purchase_unit_label")}
+                          </span>
                           <span className="font-medium">
                             {selectedUnit?.short_name}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">
-                            Conversion Number:
+                            {t("common.conversion_number")}
                           </span>
                           <span className="font-bold text-blue-600">
                             {conversionNumber
@@ -1867,7 +1872,9 @@ export default function CreateStock() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="calculation_input">Enter Value</Label>
+                      <Label htmlFor="calculation_input">
+                        {t("common.enter_value")}
+                      </Label>
                       <Input
                         id="calculation_input"
                         type="number"
@@ -1880,7 +1887,7 @@ export default function CreateStock() {
                             e.target.value,
                           );
                         }}
-                        placeholder="Enter number"
+                        placeholder={t("common.enter_number")}
                         autoFocus
                         onKeyDown={(e) => {
                           if (
@@ -1895,8 +1902,8 @@ export default function CreateStock() {
 
                     <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                       <p className="text-sm text-amber-800">
-                        <strong>Formula:</strong>{" "}
-                        {item.form.calculation_input || "Input"} ÷{" "}
+                        <strong>{t("common.formula")}</strong>{" "}
+                        {item.form.calculation_input || t("common.input")} ÷{" "}
                         {conversionNumber
                           ? Number(conversionNumber).toFixed(2)
                           : "N/A"}
@@ -1922,7 +1929,7 @@ export default function CreateStock() {
                         }}
                         className="flex-1"
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                       <Button
                         type="button"
@@ -1930,7 +1937,7 @@ export default function CreateStock() {
                         disabled={!item.form.calculation_input}
                         className="flex-1"
                       >
-                        Calculate
+                        {t("common.calculate")}
                       </Button>
                     </div>
                   </>
