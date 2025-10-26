@@ -4,7 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { Printer, Settings, Settings2 } from "lucide-react";
 import { ResourceTable } from "../helpers/ResourseTable";
-import { type Sale, useGetSales, useDeleteSale } from "../api/sale";
+import {
+  type Sale,
+  useGetSales,
+  useDeleteSale,
+  type SalesResponse,
+} from "../api/sale";
 import { type Refund, type RefundItem, useCreateRefund } from "../api/refund";
 // import { useGetProducts } from '../api/product';
 import { toast } from "sonner";
@@ -33,6 +38,9 @@ import {
   Landmark,
 } from "lucide-react";
 import { type Store, useGetStores } from "@/core/api/store.ts";
+import { useGetUsers } from "@/core/api/user";
+import { shiftsApi } from "@/core/api/shift";
+import { useQuery } from "@tanstack/react-query";
 import "../../expanded-row-dark.css";
 import {
   findRecyclingForStock,
@@ -113,7 +121,9 @@ export default function SalesPage() {
     Record<number, string>
   >({});
   const [refundNotes, setRefundNotes] = useState("");
-  const [refundPayments, setRefundPayments] = useState<Array<{payment_method: string; amount: string}>>([]);
+  const [refundPayments, setRefundPayments] = useState<
+    Array<{ payment_method: string; amount: string }>
+  >([]);
   const createRefund = useCreateRefund();
 
   // Save column visibility to localStorage
@@ -161,23 +171,44 @@ export default function SalesPage() {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [productName, setProductName] = useState<string>("");
   const [saleId, setSaleId] = useState<string>("");
+  const [selectedShift, setSelectedShift] = useState<string>("all");
+  const [selectedSoldBy, setSelectedSoldBy] = useState<string>("all");
 
   // Reset to page 1 when any filter changes
   useEffect(() => {
     setPage(1);
-  }, [startDate, endDate, creditStatus, selectedStore, productName, saleId]);
+  }, [
+    startDate,
+    endDate,
+    creditStatus,
+    selectedStore,
+    productName,
+    saleId,
+    selectedShift,
+    selectedSoldBy,
+  ]);
 
   const { data: storesData } = useGetStores({});
+  const { data: usersData } = useGetUsers({});
+  const { data: shiftsData } = useQuery({
+    queryKey: ["shifts"],
+    queryFn: async () => {
+      const response = await shiftsApi.getAll();
+      return response.data;
+    },
+  });
+
   const { data: salesData, isLoading } = useGetSales({
     params: {
       page,
-      // product: selectedProduct !== "all" ? selectedProduct : undefined,
       store: selectedStore === "all" ? undefined : selectedStore,
       start_date: startDate || undefined,
-      product: productName || undefined, // Send as product_name
+      product: productName || undefined,
       end_date: endDate || undefined,
       on_credit: creditStatus !== "all" ? creditStatus === "true" : undefined,
       sale_id: saleId || undefined,
+      shift_id: selectedShift === "all" ? undefined : selectedShift,
+      sold_by: selectedSoldBy === "all" ? undefined : selectedSoldBy,
     },
   });
   const getPaginatedData = <T extends { id?: number }>(
@@ -189,6 +220,8 @@ export default function SalesPage() {
   // const { data: productsData } = useGetProducts({});
   // const products = Array.isArray(productsData) ? productsData : productsData?.results || [];
   const stores = getPaginatedData<Store>(storesData);
+  const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
+  const shifts = shiftsData?.results || [];
   const deleteSale = useDeleteSale();
 
   // Get sales array and total count
@@ -196,6 +229,16 @@ export default function SalesPage() {
   const totalCount = Array.isArray(salesData)
     ? sales.length
     : salesData?.count || 0;
+
+  // Extract totals data from API response
+  const totalsData = !Array.isArray(salesData)
+    ? (salesData as SalesResponse)
+    : null;
+  const totalSumAll = totalsData?.total_sum_all || 0;
+  const totalSumPage = totalsData?.total_sum_page || 0;
+  const totalPaymentsAll = totalsData?.total_payments_all || {};
+  const totalPaymentsPage = totalsData?.total_payments_page || {};
+  const totalDebtSum = totalsData?.total_debt_sum || 0;
 
   // Fetch recycling data
   const { data: recyclingData } = useGetRecyclings({});
@@ -290,7 +333,7 @@ export default function SalesPage() {
     console.groupEnd();
   };
 
-  const formatCurrency = (amount: string | undefined) => {
+  const formatCurrency = (amount: string | number | undefined) => {
     return new Intl.NumberFormat("ru-RU").format(Number(amount));
   };
 
@@ -352,13 +395,14 @@ export default function SalesPage() {
   };
 
   const handleClearFilters = () => {
-    // setSelectedProduct("all");
     setStartDate("");
     setEndDate("");
     setCreditStatus("all");
     setSelectedStore("all");
     setProductName("");
     setSaleId("");
+    setSelectedShift("all");
+    setSelectedSoldBy("all");
     setPage(1);
   };
 
@@ -401,13 +445,25 @@ export default function SalesPage() {
 
     // Validate refund payments
     if (refundPayments.length === 0) {
-      toast.error(t("errors.refund_payments_required", "Добавьте хотя бы один способ возврата"));
+      toast.error(
+        t(
+          "errors.refund_payments_required",
+          "Добавьте хотя бы один способ возврата",
+        ),
+      );
       return;
     }
 
-    const invalidPayments = refundPayments.some(p => !p.amount || parseFloat(p.amount) <= 0);
+    const invalidPayments = refundPayments.some(
+      (p) => !p.amount || parseFloat(p.amount) <= 0,
+    );
     if (invalidPayments) {
-      toast.error(t("errors.invalid_payment_amounts", "Укажите корректные суммы для всех способов возврата"));
+      toast.error(
+        t(
+          "errors.invalid_payment_amounts",
+          "Укажите корректные суммы для всех способов возврата",
+        ),
+      );
       return;
     }
 
@@ -471,36 +527,36 @@ export default function SalesPage() {
             </h3>
             <div className="space-y-1">
               <div className="dark:bg-expanded-row-dark bg-gray-50 p-2 rounded border-l-4 border-purple-400 transition-all duration-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-500 font-medium">Имя:</span>
-                      <p className="font-medium text-gray-700 text-sm break-words">
-                        {row.worker_read.name}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 font-medium">Телефон:</span>
-                      <p className="font-medium text-gray-700 text-sm break-words">
-                        {row.worker_read.phone_number}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 font-medium">Роль:</span>
-                      <p className="font-medium text-gray-700 text-sm break-words">
-                        {row.worker_read.role}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 font-medium">Смена:</span>
-                      <p className="font-medium text-sm">
-                        {row.worker_read.has_active_shift ? (
-                          <span className="text-green-600">✓ Активна</span>
-                        ) : (
-                          <span className="text-gray-500">Неактивна</span>
-                        )}
-                      </p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-500 font-medium">Имя:</span>
+                    <p className="font-medium text-gray-700 text-sm break-words">
+                      {row.worker_read.name}
+                    </p>
                   </div>
+                  <div>
+                    <span className="text-gray-500 font-medium">Телефон:</span>
+                    <p className="font-medium text-gray-700 text-sm break-words">
+                      {row.worker_read.phone_number}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-medium">Роль:</span>
+                    <p className="font-medium text-gray-700 text-sm break-words">
+                      {row.worker_read.role}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-medium">Смена:</span>
+                    <p className="font-medium text-sm">
+                      {row.worker_read.has_active_shift ? (
+                        <span className="text-green-600">✓ Активна</span>
+                      ) : (
+                        <span className="text-gray-500">Неактивна</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -616,10 +672,13 @@ export default function SalesPage() {
                           {new Date(refund.created_at).toLocaleDateString()}
                         </span>
                         <span className="text-gray-500 text-[10px]">
-                          {new Date(refund.created_at).toLocaleTimeString('ru-RU', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
+                          {new Date(refund.created_at).toLocaleTimeString(
+                            "ru-RU",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
                         </span>
                         {refund.refunded_by && (
                           <span className="text-blue-600 text-[10px] bg-blue-100 px-1 py-0.5 rounded">
@@ -636,28 +695,36 @@ export default function SalesPage() {
                         "{refund.notes}"
                       </p>
                     )}
-                    {refund.refund_payments && refund.refund_payments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {refund.refund_payments.map((p: any, i: number) => (
-                          <div key={i} className="inline-flex items-center gap-1 bg-white border border-red-200 px-2 py-0.5 rounded text-xs">
-                            {p.payment_method === "Наличные" && (
-                              <Wallet className="h-3.5 w-3.5 text-green-600" />
-                            )}
-                            {p.payment_method === "Карта" && (
-                              <CreditCard className="h-3.5 w-3.5 text-blue-600" />
-                            )}
-                            {p.payment_method === "Click" && (
-                              <SmartphoneNfc className="h-3.5 w-3.5 text-purple-600" />
-                            )}
-                            {p.payment_method === "Перечисление" && (
-                              <Landmark className="h-3.5 w-3.5 text-orange-500" />
-                            )}
-                            <span className="text-gray-700">{p.payment_method}:</span>
-                            <span className="font-medium text-red-700">- {formatCurrency(p.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {refund.refund_payments &&
+                      refund.refund_payments.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {refund.refund_payments.map((p: any, i: number) => (
+                            <div
+                              key={i}
+                              className="inline-flex items-center gap-1 bg-white border border-red-200 px-2 py-0.5 rounded text-xs"
+                            >
+                              {p.payment_method === "Наличные" && (
+                                <Wallet className="h-3.5 w-3.5 text-green-600" />
+                              )}
+                              {p.payment_method === "Карта" && (
+                                <CreditCard className="h-3.5 w-3.5 text-blue-600" />
+                              )}
+                              {p.payment_method === "Click" && (
+                                <SmartphoneNfc className="h-3.5 w-3.5 text-purple-600" />
+                              )}
+                              {p.payment_method === "Перечисление" && (
+                                <Landmark className="h-3.5 w-3.5 text-orange-500" />
+                              )}
+                              <span className="text-gray-700">
+                                {p.payment_method}:
+                              </span>
+                              <span className="font-medium text-red-700">
+                                - {formatCurrency(p.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                   </div>
                   <div className="space-y-1">
                     {refund.refund_items.map((refundItem, itemIndex) => (
@@ -760,9 +827,9 @@ export default function SalesPage() {
       ),
     },
     {
-      header:t("table.worker"),
+      header: t("table.worker"),
       accessorKey: "worker",
-      cell: (row: any) => (row?.worker_read?.name)
+      cell: (row: any) => row?.worker_read?.name,
     },
     {
       header: t("table.items"),
@@ -972,11 +1039,16 @@ export default function SalesPage() {
         <h2 className="text-base sm:text-lg font-medium">
           {t("common.filters")}
         </h2>
-        <Button variant="outline" size="sm" onClick={handleClearFilters} className="w-full sm:w-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClearFilters}
+          className="w-full sm:w-auto"
+        >
           {t("common.reset") || "Сбросить"}
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 mb-5">
         <div className="space-y-2">
           <label className="text-sm font-medium">
             {t("forms.type_product_name")}
@@ -990,9 +1062,7 @@ export default function SalesPage() {
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">
-            ID продажи
-          </label>
+          <label className="text-sm font-medium">ID продажи</label>
           <Input
             type="text"
             value={saleId}
@@ -1059,6 +1129,42 @@ export default function SalesPage() {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Смена</label>
+          <Select value={selectedShift} onValueChange={setSelectedShift}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Выберите смену" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все смены</SelectItem>
+              {shifts?.map((shift) => (
+                <SelectItem key={shift.id} value={shift.id.toString()}>
+                  Смена #{shift.id} - {shift.cashier.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Продавец</label>
+          <Select value={selectedSoldBy} onValueChange={setSelectedSoldBy}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Выберите продавца" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все продавцы</SelectItem>
+              {users?.map((user) =>
+                user.id ? (
+                  <SelectItem key={user.id} value={user.id.toString()}>
+                    {user.name} ({user.role})
+                  </SelectItem>
+                ) : null,
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       {/* </Card> */}
 
@@ -1095,6 +1201,141 @@ export default function SalesPage() {
           </div>
         </Card>
       </div>
+
+      {/* Totals Summary Section */}
+      {totalsData && (
+        <Card className="p-4 sm:p-6 mb-4">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Итоги</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Sum All */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Landmark className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Общая сумма (все)
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(totalSumAll)} UZS
+                </p>
+              </div>
+
+              {/* Total Sum Page */}
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Сумма на странице
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-700">
+                  {formatCurrency(totalSumPage)} UZS
+                </p>
+              </div>
+
+              {/* Total Debt */}
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Общий долг
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-amber-700">
+                  {formatCurrency(totalDebtSum)} UZS
+                </p>
+              </div>
+
+              {/* Placeholder for balance */}
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="h-5 w-5 text-purple-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Всего записей
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-purple-700">
+                  {totalCount}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Methods - All Pages */}
+            <div className="mt-6">
+              <h4 className="text-md font-semibold text-gray-700 mb-3">
+                Способы оплаты (все страницы)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(totalPaymentsAll).map(([method, amount]) => (
+                  <div
+                    key={method}
+                    className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center gap-2">
+                      {method === "Наличные" && (
+                        <Wallet className="h-5 w-5 text-green-600" />
+                      )}
+                      {method === "Карта" && (
+                        <CreditCard className="h-5 w-5 text-blue-600" />
+                      )}
+                      {method === "Click" && (
+                        <SmartphoneNfc className="h-5 w-5 text-purple-600" />
+                      )}
+                      {!["Наличные", "Карта", "Click"].includes(method) && (
+                        <Landmark className="h-5 w-5 text-gray-600" />
+                      )}
+                      <span className="font-medium text-gray-700">
+                        {method}
+                      </span>
+                    </div>
+                    <span className="font-bold text-gray-900">
+                      {formatCurrency(amount)} UZS
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment Methods - Current Page */}
+            <div className="mt-4">
+              <h4 className="text-md font-semibold text-gray-700 mb-3">
+                Способы оплаты (текущая страница)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(totalPaymentsPage).map(([method, amount]) => (
+                  <div
+                    key={method}
+                    className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center gap-2">
+                      {method === "Наличные" && (
+                        <Wallet className="h-5 w-5 text-green-600" />
+                      )}
+                      {method === "Карта" && (
+                        <CreditCard className="h-5 w-5 text-blue-600" />
+                      )}
+                      {method === "Click" && (
+                        <SmartphoneNfc className="h-5 w-5 text-purple-600" />
+                      )}
+                      {!["Наличные", "Карта", "Click"].includes(method) && (
+                        <Landmark className="h-5 w-5 text-gray-600" />
+                      )}
+                      <span className="font-medium text-gray-700">
+                        {method}
+                      </span>
+                    </div>
+                    <span className="font-bold text-gray-900">
+                      {formatCurrency(amount)} UZS
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/*<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>*/}
       {/*  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">*/}
@@ -1401,23 +1642,43 @@ export default function SalesPage() {
 
                                   // Auto-calculate and update refund payment amount
                                   if (numValue > 0) {
-                                    const refundAmount = (parseFloat(item?.price_per_unit || "0") * numValue).toFixed(2);
+                                    const refundAmount = (
+                                      parseFloat(item?.price_per_unit || "0") *
+                                      numValue
+                                    ).toFixed(2);
                                     setRefundPayments((prev) => {
                                       const updated = [...prev];
                                       if (updated.length === 0) {
-                                        updated.push({ payment_method: "Наличные", amount: refundAmount });
+                                        updated.push({
+                                          payment_method: "Наличные",
+                                          amount: refundAmount,
+                                        });
                                       } else {
                                         // Calculate total from all refund items
                                         let totalRefundAmount = 0;
-                                        Object.entries(refundQuantities).forEach(([saleItemId, qty]) => {
-                                          const foundItem = selectedSaleForRefund.sale_items?.find(si => si.id?.toString() === saleItemId);
+                                        Object.entries(
+                                          refundQuantities,
+                                        ).forEach(([saleItemId, qty]) => {
+                                          const foundItem =
+                                            selectedSaleForRefund.sale_items?.find(
+                                              (si) =>
+                                                si.id?.toString() ===
+                                                saleItemId,
+                                            );
                                           if (foundItem && qty) {
-                                            totalRefundAmount += parseFloat(foundItem.price_per_unit || "0") * parseFloat(qty);
+                                            totalRefundAmount +=
+                                              parseFloat(
+                                                foundItem.price_per_unit || "0",
+                                              ) * parseFloat(qty);
                                           }
                                         });
                                         // Add current item amount
-                                        totalRefundAmount += parseFloat(item?.price_per_unit || "0") * numValue;
-                                        updated[0].amount = totalRefundAmount.toFixed(2);
+                                        totalRefundAmount +=
+                                          parseFloat(
+                                            item?.price_per_unit || "0",
+                                          ) * numValue;
+                                        updated[0].amount =
+                                          totalRefundAmount.toFixed(2);
                                       }
                                       return updated;
                                     });
@@ -1438,23 +1699,33 @@ export default function SalesPage() {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-gray-700">
-                      {t("common.refund_payments", "Методы возврата")} 
+                      {t("common.refund_payments", "Методы возврата")}
                       <span className="text-red-500">*</span>
                     </h3>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setRefundPayments([...refundPayments, { payment_method: "Наличные", amount: "" }])}
+                      onClick={() =>
+                        setRefundPayments([
+                          ...refundPayments,
+                          { payment_method: "Наличные", amount: "" },
+                        ])
+                      }
                     >
                       + Добавить платёж
                     </Button>
                   </div>
                   <div className="space-y-3">
                     {refundPayments.map((payment, index) => (
-                      <div key={index} className="grid grid-cols-[200px_1fr_auto] gap-3 items-center bg-gray-50 p-4 rounded-lg">
+                      <div
+                        key={index}
+                        className="grid grid-cols-[200px_1fr_auto] gap-3 items-center bg-gray-50 p-4 rounded-lg"
+                      >
                         <div>
-                          <label className="text-xs text-gray-500 mb-1 block">Метод платежа</label>
+                          <label className="text-xs text-gray-500 mb-1 block">
+                            Метод платежа
+                          </label>
                           <Select
                             value={payment.payment_method}
                             onValueChange={(value) => {
@@ -1470,12 +1741,16 @@ export default function SalesPage() {
                               <SelectItem value="Наличные">Наличные</SelectItem>
                               <SelectItem value="Карта">Карта</SelectItem>
                               <SelectItem value="Click">Click</SelectItem>
-                              <SelectItem value="Перечисление">Перечисление</SelectItem>
+                              <SelectItem value="Перечисление">
+                                Перечисление
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <label className="text-xs text-gray-500 mb-1 block">Сумма</label>
+                          <label className="text-xs text-gray-500 mb-1 block">
+                            Сумма
+                          </label>
                           <Input
                             type="number"
                             value={payment.amount}
@@ -1497,7 +1772,9 @@ export default function SalesPage() {
                             size="sm"
                             onClick={() => {
                               if (refundPayments.length > 1) {
-                                const updated = refundPayments.filter((_, i) => i !== index);
+                                const updated = refundPayments.filter(
+                                  (_, i) => i !== index,
+                                );
                                 setRefundPayments(updated);
                               }
                             }}
@@ -1539,7 +1816,7 @@ export default function SalesPage() {
                 setRefundQuantities({});
                 setRefundNotes("");
                 setRefundPayments([]);
-                }}
+              }}
             >
               {t("common.cancel")}
             </Button>

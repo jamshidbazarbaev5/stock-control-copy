@@ -27,18 +27,18 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { Checkbox } from "../../components/ui/checkbox";
-import { 
-  Plus, 
-  X, 
-  ChevronDown, 
-  ChevronRight, 
-  Copy, 
-  Trash2, 
-  CheckCircle2, 
+import {
+  Plus,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Trash2,
+  CheckCircle2,
   AlertCircle,
   Loader2,
   Save,
-  RotateCcw
+  RotateCcw,
 } from "lucide-react";
 
 interface CommonFormValues {
@@ -64,6 +64,7 @@ interface StockItemFormValues {
   base_unit_in_uzs?: number | string;
   base_unit_in_currency?: number | string;
   stock_name?: string;
+  calculation_input?: number | string;
 }
 
 interface StockItem {
@@ -113,7 +114,10 @@ const formatNumberForAPI = (value: any): number | undefined => {
 };
 
 // LocalStorage helper functions
-const saveToLocalStorage = (commonData: CommonFormValues, items: StockItem[]) => {
+const saveToLocalStorage = (
+  commonData: CommonFormValues,
+  items: StockItem[],
+) => {
   try {
     const draft = {
       commonData,
@@ -126,11 +130,14 @@ const saveToLocalStorage = (commonData: CommonFormValues, items: StockItem[]) =>
   }
 };
 
-const loadFromLocalStorage = (): { commonData: CommonFormValues; items: StockItem[] } | null => {
+const loadFromLocalStorage = (): {
+  commonData: CommonFormValues;
+  items: StockItem[];
+} | null => {
   try {
     const draft = localStorage.getItem(LOCALSTORAGE_KEY);
     if (!draft) return null;
-    
+
     const parsed = JSON.parse(draft);
     return {
       commonData: parsed.commonData,
@@ -154,7 +161,7 @@ const getDraftTimestamp = (): string | null => {
   try {
     const draft = localStorage.getItem(LOCALSTORAGE_KEY);
     if (!draft) return null;
-    
+
     const parsed = JSON.parse(draft);
     return parsed.timestamp;
   } catch (error) {
@@ -166,7 +173,9 @@ export default function CreateStock() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [productSearchTerm, setProductSearchTerm] = useState("");
-  const [activeSearchIndex, setActiveSearchIndex] = useState<string | null>(null);
+  const [activeSearchIndex, setActiveSearchIndex] = useState<string | null>(
+    null,
+  );
   const searchRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // Barcode scanner state
@@ -174,7 +183,7 @@ export default function CreateStock() {
   const [isScanning, setIsScanning] = useState(false);
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [productPage, _setProductPage] = useState(1);
-  
+
   // Stock items state
   const [stockItems, setStockItems] = useState<StockItem[]>([
     {
@@ -193,6 +202,7 @@ export default function CreateStock() {
         base_unit_in_uzs: "",
         base_unit_in_currency: "",
         stock_name: "",
+        calculation_input: "",
       },
       dynamicFields: {},
       dynamicFieldsOrder: [],
@@ -208,6 +218,10 @@ export default function CreateStock() {
   const [hasDraft, setHasDraft] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<string | null>(null);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [calculationModalOpen, setCalculationModalOpen] = useState(false);
+  const [activeCalculationItemId, setActiveCalculationItemId] = useState<
+    string | null
+  >(null);
 
   // API hooks
   const createProduct = useCreateProduct();
@@ -263,8 +277,8 @@ export default function CreateStock() {
     ? currenciesData
     : currenciesData?.results || [];
   const allProducts = Array.isArray(productsData)
-      ? productsData
-      : productsData?.results || [];
+    ? productsData
+    : productsData?.results || [];
 
   // Check for saved draft on mount
   useEffect(() => {
@@ -280,20 +294,20 @@ export default function CreateStock() {
   useEffect(() => {
     // Don't save if we haven't loaded initial data or during submission
     if (isSubmitting) return;
-    
+
     const commonValues = commonForm.getValues();
-    
+
     // Only save if there's meaningful data
-    const hasData = 
-      commonValues.store || 
-      commonValues.supplier || 
-      stockItems.some(item => item.form.product);
-    
+    const hasData =
+      commonValues.store ||
+      commonValues.supplier ||
+      stockItems.some((item) => item.form.product);
+
     if (hasData) {
       const timeoutId = setTimeout(() => {
         saveToLocalStorage(commonValues, stockItems);
       }, 1000); // Debounce saves by 1 second
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [stockItems, commonForm.watch(), isSubmitting]);
@@ -306,10 +320,10 @@ export default function CreateStock() {
       Object.entries(draft.commonData).forEach(([key, value]) => {
         commonForm.setValue(key as keyof CommonFormValues, value);
       });
-      
+
       // Restore stock items
       setStockItems(draft.items);
-      
+
       toast.success("Draft restored successfully");
       setShowDraftDialog(false);
       setHasDraft(false);
@@ -352,6 +366,7 @@ export default function CreateStock() {
           base_unit_in_uzs: "",
           base_unit_in_currency: "",
           stock_name: "",
+          calculation_input: "",
         },
         dynamicFields: {},
         dynamicFieldsOrder: [],
@@ -368,7 +383,7 @@ export default function CreateStock() {
   const duplicateStockItem = (itemId: string) => {
     const item = stockItems.find((i) => i.id === itemId);
     if (!item) return;
-    
+
     const newId = `item-${Date.now()}`;
     const duplicated: StockItem = {
       ...item,
@@ -377,7 +392,7 @@ export default function CreateStock() {
       isCalculated: false,
       isCalculating: false,
     };
-    
+
     setStockItems([...stockItems, duplicated]);
     toast.success("Item duplicated");
   };
@@ -415,8 +430,8 @@ export default function CreateStock() {
   const toggleItemExpansion = (itemId: string) => {
     setStockItems(
       stockItems.map((item) =>
-        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item
-      )
+        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item,
+      ),
     );
   };
 
@@ -469,9 +484,7 @@ export default function CreateStock() {
 
       // Set calculating state
       setStockItems((items) =>
-        items.map((i) =>
-          i.id === itemId ? { ...i, isCalculating: true } : i
-        )
+        items.map((i) => (i.id === itemId ? { ...i, isCalculating: true } : i)),
       );
 
       try {
@@ -517,7 +530,10 @@ export default function CreateStock() {
               // Populate form with calculated values
               Object.entries(response.dynamic_fields).forEach(
                 ([fieldName, fieldData]) => {
-                  if (fieldData.value !== null && fieldData.value !== undefined) {
+                  if (
+                    fieldData.value !== null &&
+                    fieldData.value !== undefined
+                  ) {
                     const rawValue = formatFieldValue(fieldData.value);
                     const displayValue = formatNumberDisplay(rawValue);
                     updatedForm[fieldName as keyof StockItemFormValues] =
@@ -545,8 +561,8 @@ export default function CreateStock() {
         // Reset calculating state on error
         setStockItems((items) =>
           items.map((i) =>
-            i.id === itemId ? { ...i, isCalculating: false } : i
-          )
+            i.id === itemId ? { ...i, isCalculating: false } : i,
+          ),
         );
       }
     },
@@ -570,7 +586,6 @@ export default function CreateStock() {
     }
     return String(value);
   };
-
 
   // Handle click outside to close search results
   useEffect(() => {
@@ -732,14 +747,14 @@ export default function CreateStock() {
             .then((product) => {
               if (product) {
                 // Add new item with scanned product or use first empty item
-                const firstEmptyItem = stockItems.find(i => !i.form.product);
+                const firstEmptyItem = stockItems.find((i) => !i.form.product);
                 const targetItemId = firstEmptyItem?.id || `item-${Date.now()}`;
-                
+
                 if (!firstEmptyItem) {
                   // Create new item
                   addStockItem();
                 }
-                
+
                 setTimeout(() => {
                   handleProductChange(targetItemId, String(product.id));
                   toast.success(
@@ -785,13 +800,154 @@ export default function CreateStock() {
     };
   }, [scanBuffer, stockItems]);
 
+  // Get conversion number from measurement array
+  const getConversionNumber = (
+    product: any,
+    purchaseUnitId: number,
+  ): number | null => {
+    if (!product?.measurement || !Array.isArray(product.measurement)) {
+      return null;
+    }
+
+    // Find the measurement that has the purchase unit as from_unit or to_unit
+    const measurement = product.measurement.find((m: any) => {
+      return (
+        m.from_unit?.id === purchaseUnitId || m.to_unit?.id === purchaseUnitId
+      );
+    });
+
+    if (measurement && measurement.number) {
+      return Number(measurement.number);
+    }
+
+    return null;
+  };
+
+  // Open calculation modal
+  const openCalculationModal = (itemId: string) => {
+    const item = stockItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    if (!item.form.purchase_unit || !item.selectedProduct) {
+      toast.error("Please select a product and purchase unit first");
+      return;
+    }
+
+    setActiveCalculationItemId(itemId);
+    setCalculationModalOpen(true);
+  };
+
+  // Handle calculation for Лист category
+  const handleCalculateQuantity = () => {
+    if (!activeCalculationItemId) return;
+
+    const item = stockItems.find((i) => i.id === activeCalculationItemId);
+    if (!item) return;
+
+    const calculationInput = Number(item.form.calculation_input);
+    if (!calculationInput || isNaN(calculationInput)) {
+      toast.error("Please enter a valid number for calculation");
+      return;
+    }
+
+    // Find the selected purchase unit
+    const selectedUnit = item.selectedProduct.available_units?.find(
+      (unit: any) => unit.id === Number(item.form.purchase_unit),
+    );
+
+    if (!selectedUnit) {
+      toast.error("Selected purchase unit not found");
+      return;
+    }
+
+    // Get the conversion number from the measurement array
+    const conversionNumber = getConversionNumber(
+      item.selectedProduct,
+      selectedUnit.id,
+    );
+    if (!conversionNumber || isNaN(conversionNumber)) {
+      toast.error("Conversion number not found for this unit");
+      return;
+    }
+
+    // Calculate: input / conversion_number
+    const result = calculationInput / conversionNumber;
+    const resultValue = result.toFixed(2);
+
+    console.log("=== Calculation Debug ===");
+    console.log("Input:", calculationInput);
+    console.log("Conversion Number:", conversionNumber);
+    console.log("Result:", resultValue);
+    console.log("Item before update:", item);
+    console.log("Item isCalculated:", item.isCalculated);
+    console.log("Item dynamicFields:", item.dynamicFields);
+
+    // Update the state comprehensively
+    setStockItems((items) =>
+      items.map((i) => {
+        if (i.id === item.id) {
+          const updatedForm = {
+            ...i.form,
+            quantity: resultValue,
+          };
+
+          // Also update dynamicFields if quantity exists there
+          const updatedDynamicFields = { ...i.dynamicFields };
+          if (updatedDynamicFields.quantity) {
+            console.log(
+              "Updating dynamicFields.quantity from:",
+              updatedDynamicFields.quantity.value,
+              "to:",
+              resultValue,
+            );
+            updatedDynamicFields.quantity = {
+              ...updatedDynamicFields.quantity,
+              value: resultValue,
+            };
+          } else {
+            console.log("No quantity field in dynamicFields");
+          }
+
+          const updatedItem = {
+            ...i,
+            form: updatedForm,
+            dynamicFields: updatedDynamicFields,
+          };
+
+          console.log("Updated item:", updatedItem);
+          return updatedItem;
+        }
+        return i;
+      }),
+    );
+
+    // If item is calculated, also trigger field recalculation
+    if (item.isCalculated) {
+      setTimeout(() => {
+        calculateItemFields(item.id, "quantity", resultValue);
+      }, 100);
+    }
+
+    toast.success(
+      `Calculated: ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
+    );
+
+    // Close modal and reset
+    setCalculationModalOpen(false);
+    setActiveCalculationItemId(null);
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
 
       // Validate common fields
       const commonValues = commonForm.getValues();
-      if (!commonValues.store || !commonValues.supplier || !commonValues.date_of_arrived) {
+      if (
+        !commonValues.store ||
+        !commonValues.supplier ||
+        !commonValues.date_of_arrived
+      ) {
         toast.error("Please fill all required common fields");
         return;
       }
@@ -828,8 +984,10 @@ export default function CreateStock() {
           quantity: formatNumberForAPI(item.form.quantity) || 0,
           purchase_unit_quantity:
             formatNumberForAPI(item.form.purchase_unit_quantity) || 0,
-          price_per_unit_uz: formatNumberForAPI(item.form.price_per_unit_uz) || 0,
-          total_price_in_uz: formatNumberForAPI(item.form.total_price_in_uz) || 0,
+          price_per_unit_uz:
+            formatNumberForAPI(item.form.price_per_unit_uz) || 0,
+          total_price_in_uz:
+            formatNumberForAPI(item.form.total_price_in_uz) || 0,
           price_per_unit_currency:
             formatNumberForAPI(item.form.price_per_unit_currency) || 0,
           total_price_in_currency:
@@ -864,10 +1022,10 @@ export default function CreateStock() {
 
       console.log("Submitting payload:", payload);
       await createBulkStockEntry(payload);
-      
+
       // Clear localStorage on successful submission
       clearLocalStorage();
-      
+
       toast.success("Stock entries created successfully");
       navigate("/stock");
     } catch (error) {
@@ -895,11 +1053,12 @@ export default function CreateStock() {
     if (totalUZS > 0) {
       const currentDebt = commonForm.getValues("amount_of_debt");
       // Only auto-set if user hasn't manually entered a value
-      if (!currentDebt || Number(currentDebt) === 0 || Number(currentDebt) < totalUZS) {
-        commonForm.setValue(
-          "amount_of_debt",
-          totalUZS.toFixed(2),
-        );
+      if (
+        !currentDebt ||
+        Number(currentDebt) === 0 ||
+        Number(currentDebt) < totalUZS
+      ) {
+        commonForm.setValue("amount_of_debt", totalUZS.toFixed(2));
       }
     }
   }, [isDebt, stockItems]);
@@ -922,7 +1081,12 @@ export default function CreateStock() {
         getFieldConfiguration(item.id);
       }
     });
-  }, [stockItems, commonForm.watch("store"), commonForm.watch("supplier"), commonForm.watch("date_of_arrived")]);
+  }, [
+    stockItems,
+    commonForm.watch("store"),
+    commonForm.watch("supplier"),
+    commonForm.watch("date_of_arrived"),
+  ]);
 
   const handleCreateProductSubmit = async (data: CreateProductForm) => {
     try {
@@ -988,7 +1152,9 @@ export default function CreateStock() {
 
         {/* Common Fields Section */}
         <div className="p-6 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold mb-4">{t("common.common_information")}</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            {t("common.common_information")}
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Store */}
@@ -996,7 +1162,9 @@ export default function CreateStock() {
               <Label htmlFor="store">{t("common.store")} *</Label>
               <Select
                 value={commonForm.watch("store")?.toString()}
-                onValueChange={(value) => commonForm.setValue("store", Number(value))}
+                onValueChange={(value) =>
+                  commonForm.setValue("store", Number(value))
+                }
                 disabled={storesLoading}
               >
                 <SelectTrigger>
@@ -1036,7 +1204,6 @@ export default function CreateStock() {
                     ))}
                   </SelectContent>
                 </Select>
-
               </div>
             </div>
 
@@ -1161,7 +1328,7 @@ export default function CreateStock() {
                       });
                     }}
                   />
-                  
+
                   <Button
                     type="button"
                     variant="ghost"
@@ -1177,16 +1344,24 @@ export default function CreateStock() {
                   </Button>
 
                   <div className="flex-1 flex items-center gap-4">
-                    <span className="font-medium text-gray-600">#{index + 1}</span>
+                    <span className="font-medium text-gray-600">
+                      #{index + 1}
+                    </span>
                     <span className="font-semibold text-lg">
-                      {item.selectedProduct?.product_name || "Select product..."}
+                      {item.selectedProduct?.product_name ||
+                        "Select product..."}
                     </span>
                     {item.isCalculated && (
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-green-700 font-medium">
-                          {item.form.quantity} {item.selectedProduct?.available_units?.[0]?.short_name} · 
-                          {" "}{formatNumberDisplay(item.form.total_price_in_uz)} UZS
+                          {item.form.quantity}{" "}
+                          {
+                            item.selectedProduct?.available_units?.[0]
+                              ?.short_name
+                          }{" "}
+                          · {formatNumberDisplay(item.form.total_price_in_uz)}{" "}
+                          UZS
                         </span>
                       </div>
                     )}
@@ -1196,12 +1371,14 @@ export default function CreateStock() {
                         <span>Calculating...</span>
                       </div>
                     )}
-                    {!item.isCalculated && !item.isCalculating && item.form.product && (
-                      <div className="flex items-center gap-2 text-sm text-amber-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Incomplete</span>
-                      </div>
-                    )}
+                    {!item.isCalculated &&
+                      !item.isCalculating &&
+                      item.form.product && (
+                        <div className="flex items-center gap-2 text-sm text-amber-600">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>Incomplete</span>
+                        </div>
+                      )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1240,7 +1417,9 @@ export default function CreateStock() {
                         </Label>
                         <Select
                           value={item.form.product?.toString()}
-                          onValueChange={(value) => handleProductChange(item.id, value)}
+                          onValueChange={(value) =>
+                            handleProductChange(item.id, value)
+                          }
                           onOpenChange={(open) => {
                             if (!open) setProductSearchTerm("");
                           }}
@@ -1253,7 +1432,9 @@ export default function CreateStock() {
                               <Input
                                 placeholder="Search product"
                                 value={productSearchTerm}
-                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                onChange={(e) =>
+                                  setProductSearchTerm(e.target.value)
+                                }
                                 onKeyDown={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
@@ -1264,7 +1445,10 @@ export default function CreateStock() {
                               {(() => {
                                 const options = [...allProducts];
                                 const sel = item.selectedProduct as any;
-                                if (sel && !options.some((p: any) => p.id === sel.id)) {
+                                if (
+                                  sel &&
+                                  !options.some((p: any) => p.id === sel.id)
+                                ) {
                                   options.unshift(sel);
                                 }
                                 return options.length > 0 ? (
@@ -1275,13 +1459,17 @@ export default function CreateStock() {
                                       className="cursor-pointer hover:bg-blue-50 active:bg-blue-100 transition-all duration-150"
                                     >
                                       <div className="flex justify-between items-center gap-2 w-full">
-                                        <span className="font-medium text-sm">{product.product_name}</span>
+                                        <span className="font-medium text-sm">
+                                          {product.product_name}
+                                        </span>
                                         {product.quantity && (
                                           <span className="text-xs font-semibold whitespace-nowrap">
-                                            {typeof product.quantity === "string"
+                                            {typeof product.quantity ===
+                                            "string"
                                               ? parseFloat(product.quantity)
                                               : product.quantity || 0}{" "}
-                                            {product.available_units?.[0]?.short_name || "шт"}
+                                            {product.available_units?.[0]
+                                              ?.short_name || "шт"}
                                           </span>
                                         )}
                                       </div>
@@ -1311,11 +1499,16 @@ export default function CreateStock() {
                           disabled={currenciesLoading}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={t("common.select_currency")} />
+                            <SelectValue
+                              placeholder={t("common.select_currency")}
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {currencies.map((currency) => (
-                              <SelectItem key={currency.id} value={String(currency.id)}>
+                              <SelectItem
+                                key={currency.id}
+                                value={String(currency.id)}
+                              >
                                 {currency.name} ({currency.short_name})
                               </SelectItem>
                             ))}
@@ -1331,9 +1524,15 @@ export default function CreateStock() {
                         <Select
                           value={item.form.purchase_unit?.toString()}
                           onValueChange={(value) => {
-                            updateStockItemField(item.id, "purchase_unit", value);
+                            updateStockItemField(
+                              item.id,
+                              "purchase_unit",
+                              value,
+                            );
                           }}
-                          disabled={measurementsLoading || !item.selectedProduct}
+                          disabled={
+                            measurementsLoading || !item.selectedProduct
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue
@@ -1343,7 +1542,10 @@ export default function CreateStock() {
                           <SelectContent>
                             {item.selectedProduct?.available_units?.map(
                               (unit: any) => (
-                                <SelectItem key={unit.id} value={String(unit.id)}>
+                                <SelectItem
+                                  key={unit.id}
+                                  value={String(unit.id)}
+                                >
                                   {unit.short_name}
                                   {unit.is_base ? " (base)" : ""}
                                 </SelectItem>
@@ -1356,19 +1558,39 @@ export default function CreateStock() {
 
                     {/* Stock Name Field - Show only for category Лист (id: 3) */}
                     {item.selectedProduct?.category_read?.id === 3 && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`stock_name-${item.id}`}>
-                          Партия
-                        </Label>
-                        <Input
-                          id={`stock_name-${item.id}`}
-                          type="text"
-                          value={item.form.stock_name || ""}
-                          onChange={(e) => {
-                            updateStockItemField(item.id, "stock_name", e.target.value);
-                          }}
-                          placeholder="Партия"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`stock_name-${item.id}`}>
+                            Партия
+                          </Label>
+                          <Input
+                            id={`stock_name-${item.id}`}
+                            type="text"
+                            value={item.form.stock_name || ""}
+                            onChange={(e) => {
+                              updateStockItemField(
+                                item.id,
+                                "stock_name",
+                                e.target.value,
+                              );
+                            }}
+                            placeholder="Партия"
+                          />
+                        </div>
+
+                        {/* Calculation Button for Лист category */}
+                        <div className="space-y-2">
+                          <Label>Quantity Calculator</Label>
+                          <Button
+                            type="button"
+                            onClick={() => openCalculationModal(item.id)}
+                            disabled={!item.form.purchase_unit}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            Calculate Quantity
+                          </Button>
+                        </div>
                       </div>
                     )}
 
@@ -1392,7 +1614,11 @@ export default function CreateStock() {
                                   id={`${fieldName}-${item.id}`}
                                   type="number"
                                   step="0.01"
-                                  value={item.form[fieldName as keyof StockItemFormValues] || ""}
+                                  value={
+                                    item.form[
+                                      fieldName as keyof StockItemFormValues
+                                    ] || ""
+                                  }
                                   onChange={(e) => {
                                     const value = e.target.value;
                                     updateStockItemField(
@@ -1401,7 +1627,11 @@ export default function CreateStock() {
                                       value,
                                     );
                                     if (fieldData.editable) {
-                                      calculateItemFields(item.id, fieldName, value);
+                                      calculateItemFields(
+                                        item.id,
+                                        fieldName,
+                                        value,
+                                      );
                                     }
                                   }}
                                   readOnly={!fieldData.editable}
@@ -1544,17 +1774,23 @@ export default function CreateStock() {
           <DialogTitle>Restore Draft?</DialogTitle>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              You have unsaved work from {draftTimestamp ? new Date(draftTimestamp).toLocaleString() : 'a previous session'}.
-              Would you like to restore it?
+              You have unsaved work from{" "}
+              {draftTimestamp
+                ? new Date(draftTimestamp).toLocaleString()
+                : "a previous session"}
+              . Would you like to restore it?
             </p>
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <div className="flex items-start gap-3">
                 <Save className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">Draft saved automatically</p>
+                  <p className="font-medium text-blue-900">
+                    Draft saved automatically
+                  </p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Your form data is saved automatically while you work. You can safely navigate away and return later.
+                    Your form data is saved automatically while you work. You
+                    can safely navigate away and return later.
                   </p>
                 </div>
               </div>
@@ -1569,14 +1805,137 @@ export default function CreateStock() {
               >
                 Start Fresh
               </Button>
-              <Button
-                type="button"
-                onClick={restoreDraft}
-                className="flex-1"
-              >
+              <Button type="button" onClick={restoreDraft} className="flex-1">
                 Restore Draft
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quantity Calculation Modal */}
+      <Dialog
+        open={calculationModalOpen}
+        onOpenChange={setCalculationModalOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>Calculate Quantity</DialogTitle>
+          <div className="space-y-4">
+            {activeCalculationItemId &&
+              (() => {
+                const item = stockItems.find(
+                  (i) => i.id === activeCalculationItemId,
+                );
+                if (!item) return null;
+
+                const selectedUnit =
+                  item.selectedProduct?.available_units?.find(
+                    (u: any) => u.id === Number(item.form.purchase_unit),
+                  );
+                const conversionNumber = getConversionNumber(
+                  item.selectedProduct,
+                  Number(item.form.purchase_unit),
+                );
+
+                return (
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Product:</span>
+                          <span className="font-medium">
+                            {item.selectedProduct?.product_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Purchase Unit:</span>
+                          <span className="font-medium">
+                            {selectedUnit?.short_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">
+                            Conversion Number:
+                          </span>
+                          <span className="font-bold text-blue-600">
+                            {conversionNumber
+                              ? Number(conversionNumber).toFixed(2)
+                              : "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="calculation_input">Enter Value</Label>
+                      <Input
+                        id="calculation_input"
+                        type="number"
+                        step="0.01"
+                        value={item.form.calculation_input || ""}
+                        onChange={(e) => {
+                          updateStockItemField(
+                            item.id,
+                            "calculation_input",
+                            e.target.value,
+                          );
+                        }}
+                        placeholder="Enter number"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            item.form.calculation_input
+                          ) {
+                            handleCalculateQuantity();
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                      <p className="text-sm text-amber-800">
+                        <strong>Formula:</strong>{" "}
+                        {item.form.calculation_input || "Input"} ÷{" "}
+                        {conversionNumber
+                          ? Number(conversionNumber).toFixed(2)
+                          : "N/A"}
+                        {item.form.calculation_input && conversionNumber && (
+                          <span className="block mt-1 font-bold text-amber-900">
+                            ={" "}
+                            {(
+                              Number(item.form.calculation_input) /
+                              Number(conversionNumber)
+                            ).toFixed(2)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setCalculationModalOpen(false);
+                          setActiveCalculationItemId(null);
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleCalculateQuantity}
+                        disabled={!item.form.calculation_input}
+                        className="flex-1"
+                      >
+                        Calculate
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
         </DialogContent>
       </Dialog>

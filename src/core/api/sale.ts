@@ -180,13 +180,33 @@ const useCreateSale = () => {
 };
 
 // Custom GET hooks using the correct /sales/ endpoint
+export interface SalesResponse {
+  results: Sale[];
+  count: number;
+  total_sum_all: number;
+  total_sum_page: number;
+  total_payments_all: Record<string, number>;
+  total_payments_page: Record<string, number>;
+  total_debt_sum: number;
+  page_size: number;
+  current_page: number;
+  total_pages: number;
+  page_range: number[];
+  links: {
+    first: string | null;
+    last: string | null;
+    next: string | null;
+    previous: string | null;
+  };
+}
+
 export const useGetSales = (options?: { params?: Record<string, any> }) => {
   return useQuery({
     queryKey: ["sales", options?.params],
     queryFn: async () => {
-      const response = await api.get<
-        Sale[] | { results: Sale[]; count: number }
-      >(SALE_LIST_URL, { params: options?.params });
+      const response = await api.get<Sale[] | SalesResponse>(SALE_LIST_URL, {
+        params: options?.params,
+      });
       return response.data;
     },
   });

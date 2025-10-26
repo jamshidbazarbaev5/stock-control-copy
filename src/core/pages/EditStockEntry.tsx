@@ -1,6 +1,11 @@
 import { useNavigate, useParams } from "react-router-dom";
 import type { DynamicField, StockItemEntry } from "../api/stock";
-import { calculateStock, useUpdateStockEntry, useGetStockEntry, useGetStocks } from "../api/stock";
+import {
+  calculateStock,
+  useUpdateStockEntry,
+  useGetStockEntry,
+  useGetStocks,
+} from "../api/stock";
 import {
   useCreateProduct,
   useGetProducts,
@@ -27,18 +32,18 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { Checkbox } from "../../components/ui/checkbox";
-import { 
-  Plus, 
-  X, 
-  ChevronDown, 
-  ChevronRight, 
-  Copy, 
-  Trash2, 
-  CheckCircle2, 
+import {
+  Plus,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Trash2,
+  CheckCircle2,
   AlertCircle,
   Loader2,
   Save,
-  RotateCcw
+  RotateCcw,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -65,6 +70,7 @@ interface StockItemFormValues {
   base_unit_in_uzs?: number | string;
   base_unit_in_currency?: number | string;
   stock_name?: string;
+  calculation_input?: number | string;
 }
 
 interface StockItem {
@@ -115,26 +121,36 @@ const formatNumberForAPI = (value: any): number | undefined => {
 };
 
 // LocalStorage helper functions
-const getLocalStorageKey = (stockEntryId: string) => `${LOCALSTORAGE_KEY_PREFIX}${stockEntryId}`;
+const getLocalStorageKey = (stockEntryId: string) =>
+  `${LOCALSTORAGE_KEY_PREFIX}${stockEntryId}`;
 
-const saveToLocalStorage = (stockEntryId: string, commonData: CommonFormValues, items: StockItem[]) => {
+const saveToLocalStorage = (
+  stockEntryId: string,
+  commonData: CommonFormValues,
+  items: StockItem[],
+) => {
   try {
     const draft = {
       commonData,
       items,
       timestamp: new Date().toISOString(),
     };
-    localStorage.setItem(getLocalStorageKey(stockEntryId), JSON.stringify(draft));
+    localStorage.setItem(
+      getLocalStorageKey(stockEntryId),
+      JSON.stringify(draft),
+    );
   } catch (error) {
     console.error("Failed to save draft to localStorage:", error);
   }
 };
 
-const loadFromLocalStorage = (stockEntryId: string): { commonData: CommonFormValues; items: StockItem[] } | null => {
+const loadFromLocalStorage = (
+  stockEntryId: string,
+): { commonData: CommonFormValues; items: StockItem[] } | null => {
   try {
     const draft = localStorage.getItem(getLocalStorageKey(stockEntryId));
     if (!draft) return null;
-    
+
     const parsed = JSON.parse(draft);
     return {
       commonData: parsed.commonData,
@@ -158,7 +174,7 @@ const getDraftTimestamp = (stockEntryId: string): string | null => {
   try {
     const draft = localStorage.getItem(getLocalStorageKey(stockEntryId));
     if (!draft) return null;
-    
+
     const parsed = JSON.parse(draft);
     return parsed.timestamp;
   } catch (error) {
@@ -169,7 +185,10 @@ const getDraftTimestamp = (stockEntryId: string): string | null => {
 export default function EditStockEntry() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { supplierId, stockEntryId } = useParams<{ supplierId: string; stockEntryId: string }>();
+  const { supplierId, stockEntryId } = useParams<{
+    supplierId: string;
+    stockEntryId: string;
+  }>();
   const [productSearchTerm, setProductSearchTerm] = useState("");
   const [productPage, _setProductPage] = useState(1);
 
@@ -187,22 +206,30 @@ export default function EditStockEntry() {
   const [hasDraft, setHasDraft] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<string | null>(null);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [calculationModalOpen, setCalculationModalOpen] = useState(false);
+  const [activeCalculationItemId, setActiveCalculationItemId] = useState<
+    string | null
+  >(null);
 
   // API hooks
   const createProduct = useCreateProduct();
   const createSupplier = useCreateSupplier();
   const updateStockEntry = useUpdateStockEntry();
-  const { data: stockEntryData, isLoading: stockEntryLoading } = useGetStockEntry(
-    Number(stockEntryId),
-  );
+  const { data: stockEntryData, isLoading: stockEntryLoading } =
+    useGetStockEntry(Number(stockEntryId));
   const { data: stocksData, isLoading: stocksLoading } = useGetStocks({
     params: { stock_entry: stockEntryId },
   });
   const { data: storesData, isLoading: storesLoading } = useGetStores({});
-  const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliers({});
-  const { data: categoriesData, isLoading: categoriesLoading } = useGetCategories({});
-  const { data: currenciesData, isLoading: currenciesLoading } = useGetCurrencies({});
-  const { data: _measurementsData, isLoading: measurementsLoading } = useGetMeasurements({});
+  const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliers(
+    {},
+  );
+  const { data: categoriesData, isLoading: categoriesLoading } =
+    useGetCategories({});
+  const { data: currenciesData, isLoading: currenciesLoading } =
+    useGetCurrencies({});
+  const { data: _measurementsData, isLoading: measurementsLoading } =
+    useGetMeasurements({});
   const { data: productsData } = useGetProducts({
     params: {
       page: productPage,
@@ -248,17 +275,24 @@ export default function EditStockEntry() {
   useEffect(() => {
     if (stockEntryData && stocksData && !stockEntryLoading && !stocksLoading) {
       const entry = stockEntryData;
-      const stocks = Array.isArray(stocksData) ? stocksData : stocksData?.results || [];
+      const stocks = Array.isArray(stocksData)
+        ? stocksData
+        : stocksData?.results || [];
 
       // Set common form values
       commonForm.setValue("store", entry.store.id);
       commonForm.setValue("supplier", entry.supplier.id);
-      
+
       // Parse datetime and convert to local time format
       const date = new Date(entry.date_of_arrived);
-      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-      commonForm.setValue("date_of_arrived", localDate.toISOString().slice(0, 16));
-      
+      const localDate = new Date(
+        date.getTime() - date.getTimezoneOffset() * 60000,
+      );
+      commonForm.setValue(
+        "date_of_arrived",
+        localDate.toISOString().slice(0, 16),
+      );
+
       commonForm.setValue("is_debt", entry.is_debt);
       if (entry.amount_of_debt) {
         commonForm.setValue("amount_of_debt", entry.amount_of_debt);
@@ -272,9 +306,12 @@ export default function EditStockEntry() {
         // Extract exchange_rate ID properly
         let exchangeRateValue: any = "";
         if (stock.exchange_rate) {
-          if (typeof stock.exchange_rate === 'object' && stock.exchange_rate !== null) {
+          if (
+            typeof stock.exchange_rate === "object" &&
+            stock.exchange_rate !== null
+          ) {
             // Check if it has an 'id' property
-            if ('id' in stock.exchange_rate) {
+            if ("id" in stock.exchange_rate) {
               exchangeRateValue = (stock.exchange_rate as any).id;
             }
           } else {
@@ -282,9 +319,14 @@ export default function EditStockEntry() {
           }
         }
 
-        console.log('Loading stock data:', stock);
-        console.log('Exchange rate:', stock.exchange_rate, 'Extracted:', exchangeRateValue);
-        console.log('Form values:', {
+        console.log("Loading stock data:", stock);
+        console.log(
+          "Exchange rate:",
+          stock.exchange_rate,
+          "Extracted:",
+          exchangeRateValue,
+        );
+        console.log("Form values:", {
           purchase_unit_quantity: stock.purchase_unit_quantity,
           quantity: stock.quantity,
           price_per_unit_currency: stock.price_per_unit_currency,
@@ -313,6 +355,7 @@ export default function EditStockEntry() {
             base_unit_in_uzs: stock.base_unit_in_uzs || "",
             base_unit_in_currency: stock.base_unit_in_currency || "",
             stock_name: stock.stock_name || "",
+            calculation_input: "",
           },
           dynamicFields: {},
           dynamicFieldsOrder: [],
@@ -327,7 +370,7 @@ export default function EditStockEntry() {
       if (items.length > 0) {
         setStockItems(items);
       }
-      
+
       setIsLoading(false);
     }
   }, [stockEntryData, stocksData, stockEntryLoading, stocksLoading]);
@@ -335,7 +378,7 @@ export default function EditStockEntry() {
   // Check for saved draft on mount
   useEffect(() => {
     if (!stockEntryId) return;
-    
+
     const timestamp = getDraftTimestamp(stockEntryId);
     if (timestamp) {
       setHasDraft(true);
@@ -347,20 +390,20 @@ export default function EditStockEntry() {
   // Auto-save to localStorage whenever data changes
   useEffect(() => {
     if (!stockEntryId || isSubmitting || isLoading) return;
-    
+
     const commonValues = commonForm.getValues();
-    
-    const hasData = 
-      commonValues.store || 
-      commonValues.supplier || 
-      stockItems.some(item => item.form.product);
-    
+
+    const hasData =
+      commonValues.store ||
+      commonValues.supplier ||
+      stockItems.some((item) => item.form.product);
+
     if (hasData) {
       const timeoutId = setTimeout(() => {
         saveToLocalStorage(stockEntryId, commonValues, stockItems);
         setHasDraft(true);
       }, 1000);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [stockItems, commonForm.watch(), isSubmitting, isLoading, stockEntryId]);
@@ -368,15 +411,15 @@ export default function EditStockEntry() {
   // Restore draft
   const restoreDraft = () => {
     if (!stockEntryId) return;
-    
+
     const draft = loadFromLocalStorage(stockEntryId);
     if (draft) {
       Object.entries(draft.commonData).forEach(([key, value]) => {
         commonForm.setValue(key as keyof CommonFormValues, value);
       });
-      
+
       setStockItems(draft.items);
-      
+
       toast.success("Draft restored successfully");
       setShowDraftDialog(false);
       setHasDraft(false);
@@ -386,7 +429,7 @@ export default function EditStockEntry() {
   // Clear draft
   const clearDraft = () => {
     if (!stockEntryId) return;
-    
+
     clearLocalStorage(stockEntryId);
     setHasDraft(false);
     setDraftTimestamp(null);
@@ -421,6 +464,7 @@ export default function EditStockEntry() {
           base_unit_in_uzs: "",
           base_unit_in_currency: "",
           stock_name: "",
+          calculation_input: "",
         },
         dynamicFields: {},
         dynamicFieldsOrder: [],
@@ -437,7 +481,7 @@ export default function EditStockEntry() {
   const duplicateStockItem = (itemId: string) => {
     const item = stockItems.find((i) => i.id === itemId);
     if (!item) return;
-    
+
     const newId = `item-${Date.now()}`;
     const duplicated: StockItem = {
       ...item,
@@ -447,7 +491,7 @@ export default function EditStockEntry() {
       isCalculated: false,
       isCalculating: false,
     };
-    
+
     setStockItems([...stockItems, duplicated]);
     toast.success("Item duplicated");
   };
@@ -458,14 +502,14 @@ export default function EditStockEntry() {
       toast.error("You must have at least one stock item");
       return;
     }
-    
+
     const item = stockItems.find((i) => i.id === itemId);
-    
+
     // If this item has a stockId, add it to deleted list
     if (item?.stockId) {
       setDeletedStockIds([...deletedStockIds, item.stockId]);
     }
-    
+
     setStockItems(stockItems.filter((item) => item.id !== itemId));
     setSelectedItems((prev) => {
       const newSet = new Set(prev);
@@ -484,13 +528,15 @@ export default function EditStockEntry() {
       toast.error("You must have at least one stock item");
       return;
     }
-    
+
     // Add stockIds to deleted list
-    const itemsToDelete = stockItems.filter((item) => selectedItems.has(item.id));
+    const itemsToDelete = stockItems.filter((item) =>
+      selectedItems.has(item.id),
+    );
     const newDeletedIds = itemsToDelete
       .filter((item) => item.stockId)
       .map((item) => item.stockId as number);
-    
+
     setDeletedStockIds([...deletedStockIds, ...newDeletedIds]);
     setStockItems(stockItems.filter((item) => !selectedItems.has(item.id)));
     setSelectedItems(new Set());
@@ -501,8 +547,8 @@ export default function EditStockEntry() {
   const toggleItemExpansion = (itemId: string) => {
     setStockItems(
       stockItems.map((item) =>
-        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item
-      )
+        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item,
+      ),
     );
   };
 
@@ -521,7 +567,11 @@ export default function EditStockEntry() {
       items.map((item) => {
         if (item.id === itemId) {
           // If changing product, currency, or purchase_unit, need to recalculate
-          const needsRecalculation = ['product', 'currency', 'purchase_unit'].includes(field);
+          const needsRecalculation = [
+            "product",
+            "currency",
+            "purchase_unit",
+          ].includes(field);
           return {
             ...item,
             form: {
@@ -544,12 +594,10 @@ export default function EditStockEntry() {
 
       const commonValues = commonForm.getValues();
       const { form } = item;
-      
+
       // Set calculating state
       setStockItems((items) =>
-        items.map((i) =>
-          i.id === itemId ? { ...i, isCalculating: true } : i
-        )
+        items.map((i) => (i.id === itemId ? { ...i, isCalculating: true } : i)),
       );
 
       if (
@@ -606,7 +654,10 @@ export default function EditStockEntry() {
               // Populate form with calculated values
               Object.entries(response.dynamic_fields).forEach(
                 ([fieldName, fieldData]) => {
-                  if (fieldData.value !== null && fieldData.value !== undefined) {
+                  if (
+                    fieldData.value !== null &&
+                    fieldData.value !== undefined
+                  ) {
                     const rawValue = formatFieldValue(fieldData.value);
                     const displayValue = formatNumberDisplay(rawValue);
                     updatedForm[fieldName as keyof StockItemFormValues] =
@@ -634,8 +685,8 @@ export default function EditStockEntry() {
         // Reset calculating state on error
         setStockItems((items) =>
           items.map((i) =>
-            i.id === itemId ? { ...i, isCalculating: false } : i
-          )
+            i.id === itemId ? { ...i, isCalculating: false } : i,
+          ),
         );
       }
     },
@@ -645,9 +696,12 @@ export default function EditStockEntry() {
   // Get field configuration but preserve original values (for loading existing data)
   const getFieldConfigurationWithOriginalValues = useCallback(
     async (itemId: string, originalForm: StockItemFormValues) => {
-      console.log('getFieldConfigurationWithOriginalValues called for item:', itemId);
-      console.log('originalForm:', originalForm);
-      
+      console.log(
+        "getFieldConfigurationWithOriginalValues called for item:",
+        itemId,
+      );
+      console.log("originalForm:", originalForm);
+
       const commonValues = commonForm.getValues();
 
       if (
@@ -684,42 +738,53 @@ export default function EditStockEntry() {
 
         const conversionFactorValue =
           response.dynamic_fields.conversion_factor?.value;
-        console.log('Conversion factor from API:', conversionFactorValue);
+        console.log("Conversion factor from API:", conversionFactorValue);
         const conversionFactor =
           typeof conversionFactorValue === "number"
             ? conversionFactorValue
             : Number(conversionFactorValue) || 1;
-        console.log('Parsed conversion factor:', conversionFactor);
+        console.log("Parsed conversion factor:", conversionFactor);
 
         const metadata = {
           conversion_factor: conversionFactor,
           exchange_rate: exchangeRate,
           is_base_currency: response.currency?.is_base || false,
         };
-        console.log('Metadata:', metadata);
+        console.log("Metadata:", metadata);
 
         // Update item with metadata but keep original form values
         setStockItems((items) =>
           items.map((i) => {
             if (i.id === itemId) {
-              console.log('Updating item with preserved values:', originalForm);
-              console.log('Exchange rate from response:', response.dynamic_fields.exchange_rate);
-              
+              console.log("Updating item with preserved values:", originalForm);
+              console.log(
+                "Exchange rate from response:",
+                response.dynamic_fields.exchange_rate,
+              );
+
               // Extract exchange_rate ID from response if not in originalForm
               const finalForm = { ...originalForm };
               if (!finalForm.exchange_rate || finalForm.exchange_rate === "") {
                 const exchangeRateField = response.dynamic_fields.exchange_rate;
                 if (exchangeRateField?.value) {
-                  if (typeof exchangeRateField.value === "object" && (exchangeRateField.value as any).id) {
-                    finalForm.exchange_rate = String((exchangeRateField.value as any).id);
+                  if (
+                    typeof exchangeRateField.value === "object" &&
+                    (exchangeRateField.value as any).id
+                  ) {
+                    finalForm.exchange_rate = String(
+                      (exchangeRateField.value as any).id,
+                    );
                   } else {
                     finalForm.exchange_rate = String(exchangeRateField.value);
                   }
                 }
               }
-              
-              console.log('Final form with exchange_rate:', finalForm.exchange_rate);
-              
+
+              console.log(
+                "Final form with exchange_rate:",
+                finalForm.exchange_rate,
+              );
+
               return {
                 ...i,
                 form: finalForm, // Keep the original loaded values with fixed exchange_rate
@@ -732,7 +797,7 @@ export default function EditStockEntry() {
             return i;
           }),
         );
-        console.log('State updated for item:', itemId);
+        console.log("State updated for item:", itemId);
       } catch (error) {
         console.error("Field configuration error:", error);
         toast.error("Failed to load stock configuration");
@@ -762,7 +827,7 @@ export default function EditStockEntry() {
   // Handle product selection change
   const handleProductChange = (itemId: string, productId: string) => {
     const product = allProducts.find((p) => p.id === Number(productId));
-    console.log('Product changed:', productId, product);
+    console.log("Product changed:", productId, product);
     setStockItems((items) =>
       items.map((item) => {
         if (item.id === itemId) {
@@ -771,7 +836,7 @@ export default function EditStockEntry() {
             product: productId,
             purchase_unit: "", // Reset purchase unit
           };
-          
+
           return {
             ...item,
             selectedProduct: product,
@@ -787,22 +852,28 @@ export default function EditStockEntry() {
   // Calculate fields based on user input
   const calculateItemFields = useCallback(
     (itemId: string, changedField: string, value: any) => {
-      console.log(`calculateItemFields called: item=${itemId}, field=${changedField}, value=${value}`);
+      console.log(
+        `calculateItemFields called: item=${itemId}, field=${changedField}, value=${value}`,
+      );
       const item = stockItems.find((i) => i.id === itemId);
       if (!item) {
-        console.log('Item not found:', itemId);
+        console.log("Item not found:", itemId);
         return;
       }
       if (!item.calculationMetadata) {
-        console.log('No calculation metadata for item:', itemId);
+        console.log("No calculation metadata for item:", itemId);
         return;
       }
 
       const { conversion_factor, exchange_rate, is_base_currency } =
         item.calculationMetadata;
-      console.log('Calculation metadata:', { conversion_factor, exchange_rate, is_base_currency });
+      console.log("Calculation metadata:", {
+        conversion_factor,
+        exchange_rate,
+        is_base_currency,
+      });
       const currentForm = { ...item.form, [changedField]: value };
-      console.log('Current form before calculation:', currentForm);
+      console.log("Current form before calculation:", currentForm);
 
       const qty = Number(currentForm.purchase_unit_quantity) || 0;
       const quantity = Number(currentForm.quantity) || 0;
@@ -839,13 +910,16 @@ export default function EditStockEntry() {
           currentForm.price_per_unit_currency = formatNumberDisplay(
             (Number(currentForm.total_price_in_currency) || 0) / currentQty,
           );
-        } else if (changedField === "purchase_unit_quantity" || changedField === "quantity") {
+        } else if (
+          changedField === "purchase_unit_quantity" ||
+          changedField === "quantity"
+        ) {
           // When quantity changes, recalculate total from per_unit * qty
           currentForm.total_price_in_currency = formatNumberDisplay(
             (Number(currentForm.price_per_unit_currency) || 0) * currentQty,
           );
         }
-        
+
         // Always recalculate UZ prices
         currentForm.price_per_unit_uz = formatNumberDisplay(
           (Number(currentForm.price_per_unit_currency) || 0) * exchange_rate,
@@ -862,7 +936,10 @@ export default function EditStockEntry() {
           currentForm.price_per_unit_uz = formatNumberDisplay(
             (Number(currentForm.total_price_in_uz) || 0) / currentQty,
           );
-        } else if (changedField === "purchase_unit_quantity" || changedField === "quantity") {
+        } else if (
+          changedField === "purchase_unit_quantity" ||
+          changedField === "quantity"
+        ) {
           // When quantity changes, recalculate total from per_unit * qty
           currentForm.total_price_in_uz = formatNumberDisplay(
             (Number(currentForm.price_per_unit_uz) || 0) * currentQty,
@@ -882,7 +959,7 @@ export default function EditStockEntry() {
       }
 
       // Update the item
-      console.log('Final calculated form:', currentForm);
+      console.log("Final calculated form:", currentForm);
       setStockItems((items) =>
         items.map((i) => {
           if (i.id === itemId) {
@@ -894,7 +971,7 @@ export default function EditStockEntry() {
           return i;
         }),
       );
-      console.log('Item state updated');
+      console.log("Item state updated");
     },
     [stockItems],
   );
@@ -924,13 +1001,13 @@ export default function EditStockEntry() {
             .then((product) => {
               if (product) {
                 // Find first empty item or create new one
-                const firstEmptyItem = stockItems.find(i => !i.form.product);
+                const firstEmptyItem = stockItems.find((i) => !i.form.product);
                 const targetItemId = firstEmptyItem?.id || `item-${Date.now()}`;
-                
+
                 if (!firstEmptyItem) {
                   addStockItem();
                 }
-                
+
                 setTimeout(() => {
                   handleProductChange(targetItemId, String(product.id));
                   toast.success(
@@ -976,13 +1053,154 @@ export default function EditStockEntry() {
     };
   }, [scanBuffer, stockItems]);
 
+  // Get conversion number from measurement array
+  const getConversionNumber = (
+    product: any,
+    purchaseUnitId: number,
+  ): number | null => {
+    if (!product?.measurement || !Array.isArray(product.measurement)) {
+      return null;
+    }
+
+    // Find the measurement that has the purchase unit as from_unit or to_unit
+    const measurement = product.measurement.find((m: any) => {
+      return (
+        m.from_unit?.id === purchaseUnitId || m.to_unit?.id === purchaseUnitId
+      );
+    });
+
+    if (measurement && measurement.number) {
+      return Number(measurement.number);
+    }
+
+    return null;
+  };
+
+  // Open calculation modal
+  const openCalculationModal = (itemId: string) => {
+    const item = stockItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    if (!item.form.purchase_unit || !item.selectedProduct) {
+      toast.error("Please select a product and purchase unit first");
+      return;
+    }
+
+    setActiveCalculationItemId(itemId);
+    setCalculationModalOpen(true);
+  };
+
+  // Handle calculation for Лист category
+  const handleCalculateQuantity = () => {
+    if (!activeCalculationItemId) return;
+
+    const item = stockItems.find((i) => i.id === activeCalculationItemId);
+    if (!item) return;
+
+    const calculationInput = Number(item.form.calculation_input);
+    if (!calculationInput || isNaN(calculationInput)) {
+      toast.error("Please enter a valid number for calculation");
+      return;
+    }
+
+    // Find the selected purchase unit
+    const selectedUnit = item.selectedProduct.available_units?.find(
+      (unit: any) => unit.id === Number(item.form.purchase_unit),
+    );
+
+    if (!selectedUnit) {
+      toast.error("Selected purchase unit not found");
+      return;
+    }
+
+    // Get the conversion number from the measurement array
+    const conversionNumber = getConversionNumber(
+      item.selectedProduct,
+      selectedUnit.id,
+    );
+    if (!conversionNumber || isNaN(conversionNumber)) {
+      toast.error("Conversion number not found for this unit");
+      return;
+    }
+
+    // Calculate: input / conversion_number
+    const result = calculationInput / conversionNumber;
+    const resultValue = result.toFixed(2);
+
+    console.log("=== Calculation Debug ===");
+    console.log("Input:", calculationInput);
+    console.log("Conversion Number:", conversionNumber);
+    console.log("Result:", resultValue);
+    console.log("Item before update:", item);
+    console.log("Item isCalculated:", item.isCalculated);
+    console.log("Item dynamicFields:", item.dynamicFields);
+
+    // Update the state comprehensively
+    setStockItems((items) =>
+      items.map((i) => {
+        if (i.id === item.id) {
+          const updatedForm = {
+            ...i.form,
+            quantity: resultValue,
+          };
+
+          // Also update dynamicFields if quantity exists there
+          const updatedDynamicFields = { ...i.dynamicFields };
+          if (updatedDynamicFields.quantity) {
+            console.log(
+              "Updating dynamicFields.quantity from:",
+              updatedDynamicFields.quantity.value,
+              "to:",
+              resultValue,
+            );
+            updatedDynamicFields.quantity = {
+              ...updatedDynamicFields.quantity,
+              value: resultValue,
+            };
+          } else {
+            console.log("No quantity field in dynamicFields");
+          }
+
+          const updatedItem = {
+            ...i,
+            form: updatedForm,
+            dynamicFields: updatedDynamicFields,
+          };
+
+          console.log("Updated item:", updatedItem);
+          return updatedItem;
+        }
+        return i;
+      }),
+    );
+
+    // If item is calculated, also trigger field recalculation
+    if (item.isCalculated) {
+      setTimeout(() => {
+        calculateItemFields(item.id, "quantity", resultValue);
+      }, 100);
+    }
+
+    toast.success(
+      `Calculated: ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
+    );
+
+    // Close modal and reset
+    setCalculationModalOpen(false);
+    setActiveCalculationItemId(null);
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
 
       // Validate common fields
       const commonValues = commonForm.getValues();
-      if (!commonValues.store || !commonValues.supplier || !commonValues.date_of_arrived) {
+      if (
+        !commonValues.store ||
+        !commonValues.supplier ||
+        !commonValues.date_of_arrived
+      ) {
         toast.error("Please fill all required common fields");
         return;
       }
@@ -1019,8 +1237,10 @@ export default function EditStockEntry() {
           quantity: formatNumberForAPI(item.form.quantity) || 0,
           purchase_unit_quantity:
             formatNumberForAPI(item.form.purchase_unit_quantity) || 0,
-          price_per_unit_uz: formatNumberForAPI(item.form.price_per_unit_uz) || 0,
-          total_price_in_uz: formatNumberForAPI(item.form.total_price_in_uz) || 0,
+          price_per_unit_uz:
+            formatNumberForAPI(item.form.price_per_unit_uz) || 0,
+          total_price_in_uz:
+            formatNumberForAPI(item.form.total_price_in_uz) || 0,
           price_per_unit_currency:
             formatNumberForAPI(item.form.price_per_unit_currency) || 0,
           total_price_in_currency:
@@ -1064,12 +1284,12 @@ export default function EditStockEntry() {
         id: Number(stockEntryId),
         data: payload,
       });
-      
+
       // Clear localStorage on successful submission
       if (stockEntryId) {
         clearLocalStorage(stockEntryId);
       }
-      
+
       toast.success("Stock entry updated successfully");
       navigate(`/suppliers/${supplierId}`);
     } catch (error) {
@@ -1084,7 +1304,7 @@ export default function EditStockEntry() {
   const isDebt = commonForm.watch("is_debt");
   useEffect(() => {
     if (!isDebt) return;
-    
+
     // Sum all calculated items' total_price_in_uz
     const totalUZS = stockItems.reduce((sum, item) => {
       if (item.isCalculated && item.form.total_price_in_uz) {
@@ -1093,25 +1313,26 @@ export default function EditStockEntry() {
       }
       return sum;
     }, 0);
-    
+
     if (totalUZS > 0) {
       const currentDebt = commonForm.getValues("amount_of_debt");
       // Only auto-set if user hasn't manually entered a value
-      if (!currentDebt || Number(currentDebt) === 0 || Number(currentDebt) < totalUZS) {
-        commonForm.setValue(
-          "amount_of_debt",
-          totalUZS.toFixed(2),
-        );
+      if (
+        !currentDebt ||
+        Number(currentDebt) === 0 ||
+        Number(currentDebt) < totalUZS
+      ) {
+        commonForm.setValue("amount_of_debt", totalUZS.toFixed(2));
       }
     }
   }, [isDebt, stockItems]);
 
   // Auto-trigger calculation when all required fields are filled
   useEffect(() => {
-    console.log('Auto-trigger effect running, stockItems:', stockItems.length);
+    console.log("Auto-trigger effect running, stockItems:", stockItems.length);
     const commonValues = commonForm.getValues();
-    console.log('Common values:', commonValues);
-    
+    console.log("Common values:", commonValues);
+
     stockItems.forEach((item) => {
       console.log(`Item ${item.id}:`, {
         hasStore: !!commonValues.store,
@@ -1121,9 +1342,9 @@ export default function EditStockEntry() {
         hasCurrency: !!item.form.currency,
         hasPurchaseUnit: !!item.form.purchase_unit,
         isCalculated: item.isCalculated,
-        stockId: item.stockId
+        stockId: item.stockId,
       });
-      
+
       if (
         commonValues.store &&
         commonValues.supplier &&
@@ -1134,7 +1355,10 @@ export default function EditStockEntry() {
         !item.isCalculated &&
         !item.isCalculating
       ) {
-        console.log(`Triggering configuration for item ${item.id}, has stockId:`, !!item.stockId);
+        console.log(
+          `Triggering configuration for item ${item.id}, has stockId:`,
+          !!item.stockId,
+        );
         // For existing stocks (with stockId), preserve values
         if (item.stockId) {
           const originalForm = { ...item.form }; // Capture current values
@@ -1145,8 +1369,13 @@ export default function EditStockEntry() {
         }
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stockItems, commonForm.watch("store"), commonForm.watch("supplier"), commonForm.watch("date_of_arrived")]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    stockItems,
+    commonForm.watch("store"),
+    commonForm.watch("supplier"),
+    commonForm.watch("date_of_arrived"),
+  ]);
 
   const handleCreateProductSubmit = async (data: CreateProductForm) => {
     try {
@@ -1225,15 +1454,19 @@ export default function EditStockEntry() {
 
         {/* Common Fields Section */}
         <div className="p-6 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold mb-4">{t("common.common_information")}</h2>
-          
+          <h2 className="text-lg font-semibold mb-4">
+            {t("common.common_information")}
+          </h2>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Store */}
             <div className="space-y-2">
               <Label htmlFor="store">{t("common.store")} *</Label>
               <Select
                 value={commonForm.watch("store")?.toString()}
-                onValueChange={(value) => commonForm.setValue("store", Number(value))}
+                onValueChange={(value) =>
+                  commonForm.setValue("store", Number(value))
+                }
                 disabled={storesLoading}
               >
                 <SelectTrigger>
@@ -1397,7 +1630,7 @@ export default function EditStockEntry() {
                       });
                     }}
                   />
-                  
+
                   <Button
                     type="button"
                     variant="ghost"
@@ -1413,16 +1646,24 @@ export default function EditStockEntry() {
                   </Button>
 
                   <div className="flex-1 flex items-center gap-4">
-                    <span className="font-medium text-gray-600">#{index + 1}</span>
+                    <span className="font-medium text-gray-600">
+                      #{index + 1}
+                    </span>
                     <span className="font-semibold text-lg">
-                      {item.selectedProduct?.product_name || "Select product..."}
+                      {item.selectedProduct?.product_name ||
+                        "Select product..."}
                     </span>
                     {item.isCalculated && (
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-green-700 font-medium">
-                          {item.form.quantity} {item.selectedProduct?.available_units?.[0]?.short_name} · 
-                          {" "}{formatNumberDisplay(item.form.total_price_in_uz)} UZS
+                          {item.form.quantity}{" "}
+                          {
+                            item.selectedProduct?.available_units?.[0]
+                              ?.short_name
+                          }{" "}
+                          · {formatNumberDisplay(item.form.total_price_in_uz)}{" "}
+                          UZS
                         </span>
                       </div>
                     )}
@@ -1432,12 +1673,14 @@ export default function EditStockEntry() {
                         <span>Calculating...</span>
                       </div>
                     )}
-                    {!item.isCalculated && !item.isCalculating && item.form.product && (
-                      <div className="flex items-center gap-2 text-sm text-amber-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Incomplete</span>
-                      </div>
-                    )}
+                    {!item.isCalculated &&
+                      !item.isCalculating &&
+                      item.form.product && (
+                        <div className="flex items-center gap-2 text-sm text-amber-600">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>Incomplete</span>
+                        </div>
+                      )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1476,7 +1719,9 @@ export default function EditStockEntry() {
                         </Label>
                         <Select
                           value={item.form.product?.toString()}
-                          onValueChange={(value) => handleProductChange(item.id, value)}
+                          onValueChange={(value) =>
+                            handleProductChange(item.id, value)
+                          }
                           onOpenChange={(open) => {
                             if (!open) setProductSearchTerm("");
                           }}
@@ -1489,7 +1734,9 @@ export default function EditStockEntry() {
                               <Input
                                 placeholder="Search product"
                                 value={productSearchTerm}
-                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                onChange={(e) =>
+                                  setProductSearchTerm(e.target.value)
+                                }
                                 onKeyDown={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
@@ -1499,11 +1746,17 @@ export default function EditStockEntry() {
                             {(() => {
                               const options = [...allProducts];
                               const sel = item.selectedProduct as any;
-                              if (sel && !options.some((p: any) => p.id === sel.id)) {
+                              if (
+                                sel &&
+                                !options.some((p: any) => p.id === sel.id)
+                              ) {
                                 options.unshift(sel);
                               }
                               return options.map((product: any) => (
-                                <SelectItem key={product.id} value={String(product.id)}>
+                                <SelectItem
+                                  key={product.id}
+                                  value={String(product.id)}
+                                >
                                   {product.product_name}
                                 </SelectItem>
                               ));
@@ -1525,11 +1778,16 @@ export default function EditStockEntry() {
                           disabled={currenciesLoading}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={t("common.select_currency")} />
+                            <SelectValue
+                              placeholder={t("common.select_currency")}
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {currencies.map((currency) => (
-                              <SelectItem key={currency.id} value={String(currency.id)}>
+                              <SelectItem
+                                key={currency.id}
+                                value={String(currency.id)}
+                              >
                                 {currency.name} ({currency.short_name})
                               </SelectItem>
                             ))}
@@ -1546,18 +1804,31 @@ export default function EditStockEntry() {
                           /* For existing stocks, show the purchase unit from stock data */
                           <div className="px-3 py-2 border rounded-md bg-gray-100">
                             {(() => {
-                              const stocks = Array.isArray(stocksData) ? stocksData : stocksData?.results || [];
-                              const stock = stocks.find((s) => s.id === item.stockId);
-                              return stock?.purchase_unit?.short_name || t("common.purchase_unit");
+                              const stocks = Array.isArray(stocksData)
+                                ? stocksData
+                                : stocksData?.results || [];
+                              const stock = stocks.find(
+                                (s) => s.id === item.stockId,
+                              );
+                              return (
+                                stock?.purchase_unit?.short_name ||
+                                t("common.purchase_unit")
+                              );
                             })()}
                           </div>
                         ) : (
                           <Select
                             value={item.form.purchase_unit?.toString()}
                             onValueChange={(value) => {
-                              updateStockItemField(item.id, "purchase_unit", value);
+                              updateStockItemField(
+                                item.id,
+                                "purchase_unit",
+                                value,
+                              );
                             }}
-                            disabled={measurementsLoading || !item.selectedProduct}
+                            disabled={
+                              measurementsLoading || !item.selectedProduct
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue
@@ -1567,7 +1838,10 @@ export default function EditStockEntry() {
                             <SelectContent>
                               {item.selectedProduct?.available_units?.map(
                                 (unit: any) => (
-                                  <SelectItem key={unit.id} value={String(unit.id)}>
+                                  <SelectItem
+                                    key={unit.id}
+                                    value={String(unit.id)}
+                                  >
                                     {unit.short_name}
                                     {unit.is_base ? " (base)" : ""}
                                   </SelectItem>
@@ -1581,19 +1855,39 @@ export default function EditStockEntry() {
 
                     {/* Stock Name Field - Show only for category Лист (id: 3) */}
                     {item.selectedProduct?.category_read?.id === 3 && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`stock_name-${item.id}`}>
-                          Stock Name
-                        </Label>
-                        <Input
-                          id={`stock_name-${item.id}`}
-                          type="text"
-                          value={item.form.stock_name || ""}
-                          onChange={(e) => {
-                            updateStockItemField(item.id, "stock_name", e.target.value);
-                          }}
-                          placeholder="Enter stock name"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`stock_name-${item.id}`}>
+                            Партия
+                          </Label>
+                          <Input
+                            id={`stock_name-${item.id}`}
+                            type="text"
+                            value={item.form.stock_name || ""}
+                            onChange={(e) => {
+                              updateStockItemField(
+                                item.id,
+                                "stock_name",
+                                e.target.value,
+                              );
+                            }}
+                            placeholder="Партия"
+                          />
+                        </div>
+
+                        {/* Calculation Button for Лист category */}
+                        <div className="space-y-2">
+                          <Label>Quantity Calculator</Label>
+                          <Button
+                            type="button"
+                            onClick={() => openCalculationModal(item.id)}
+                            disabled={!item.form.purchase_unit}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            Calculate Quantity
+                          </Button>
+                        </div>
                       </div>
                     )}
 
@@ -1617,20 +1911,34 @@ export default function EditStockEntry() {
                                   id={`${fieldName}-${item.id}`}
                                   type="number"
                                   step="0.01"
-                                  value={item.form[fieldName as keyof StockItemFormValues] || ""}
+                                  value={
+                                    item.form[
+                                      fieldName as keyof StockItemFormValues
+                                    ] || ""
+                                  }
                                   onChange={(e) => {
                                     const value = e.target.value;
-                                    console.log(`Field ${fieldName} changed to ${value}, editable: ${fieldData.editable}`);
+                                    console.log(
+                                      `Field ${fieldName} changed to ${value}, editable: ${fieldData.editable}`,
+                                    );
                                     updateStockItemField(
                                       item.id,
                                       fieldName as keyof StockItemFormValues,
                                       value,
                                     );
                                     if (fieldData.editable) {
-                                      console.log(`Calling calculateItemFields for ${fieldName}`);
-                                      calculateItemFields(item.id, fieldName, value);
+                                      console.log(
+                                        `Calling calculateItemFields for ${fieldName}`,
+                                      );
+                                      calculateItemFields(
+                                        item.id,
+                                        fieldName,
+                                        value,
+                                      );
                                     } else {
-                                      console.log(`Field ${fieldName} is not editable, skipping calculation`);
+                                      console.log(
+                                        `Field ${fieldName} is not editable, skipping calculation`,
+                                      );
                                     }
                                   }}
                                   readOnly={!fieldData.editable}
@@ -1666,7 +1974,11 @@ export default function EditStockEntry() {
             >
               {t("common.cancel")}
             </Button>
-            <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
               {isSubmitting ? t("common.submitting") : t("common.update")}
             </Button>
           </div>
@@ -1679,20 +1991,17 @@ export default function EditStockEntry() {
           <DialogTitle>Restore Draft?</DialogTitle>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              A saved draft from {draftTimestamp ? new Date(draftTimestamp).toLocaleString() : "earlier"} was found. Would you like to restore it?
+              A saved draft from{" "}
+              {draftTimestamp
+                ? new Date(draftTimestamp).toLocaleString()
+                : "earlier"}{" "}
+              was found. Would you like to restore it?
             </p>
             <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={startFresh}
-              >
+              <Button type="button" variant="outline" onClick={startFresh}>
                 Start Fresh
               </Button>
-              <Button
-                type="button"
-                onClick={restoreDraft}
-              >
+              <Button type="button" onClick={restoreDraft}>
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Restore Draft
               </Button>
@@ -1798,6 +2107,133 @@ export default function EditStockEntry() {
               {t("common.create")}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quantity Calculation Modal */}
+      <Dialog
+        open={calculationModalOpen}
+        onOpenChange={setCalculationModalOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>Calculate Quantity</DialogTitle>
+          <div className="space-y-4">
+            {activeCalculationItemId &&
+              (() => {
+                const item = stockItems.find(
+                  (i) => i.id === activeCalculationItemId,
+                );
+                if (!item) return null;
+
+                const selectedUnit =
+                  item.selectedProduct?.available_units?.find(
+                    (u: any) => u.id === Number(item.form.purchase_unit),
+                  );
+                const conversionNumber = getConversionNumber(
+                  item.selectedProduct,
+                  Number(item.form.purchase_unit),
+                );
+
+                return (
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Product:</span>
+                          <span className="font-medium">
+                            {item.selectedProduct?.product_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Purchase Unit:</span>
+                          <span className="font-medium">
+                            {selectedUnit?.short_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">
+                            Conversion Number:
+                          </span>
+                          <span className="font-bold text-blue-600">
+                            {conversionNumber
+                              ? Number(conversionNumber).toFixed(2)
+                              : "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="calculation_input">Enter Value</Label>
+                      <Input
+                        id="calculation_input"
+                        type="number"
+                        step="0.01"
+                        value={item.form.calculation_input || ""}
+                        onChange={(e) => {
+                          updateStockItemField(
+                            item.id,
+                            "calculation_input",
+                            e.target.value,
+                          );
+                        }}
+                        placeholder="Enter number"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            item.form.calculation_input
+                          ) {
+                            handleCalculateQuantity();
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                      <p className="text-sm text-amber-800">
+                        <strong>Formula:</strong>{" "}
+                        {item.form.calculation_input || "Input"} ÷{" "}
+                        {conversionNumber
+                          ? Number(conversionNumber).toFixed(2)
+                          : "N/A"}
+                        {item.form.calculation_input && conversionNumber && (
+                          <span className="block mt-1 font-bold text-amber-900">
+                            ={" "}
+                            {(
+                              Number(item.form.calculation_input) /
+                              Number(conversionNumber)
+                            ).toFixed(2)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setCalculationModalOpen(false);
+                          setActiveCalculationItemId(null);
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleCalculateQuantity}
+                        disabled={!item.form.calculation_input}
+                        className="flex-1"
+                      >
+                        Calculate
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
