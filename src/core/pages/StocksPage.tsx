@@ -15,7 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Settings } from "lucide-react";
+import {
+  MoreHorizontal,
+  Settings,
+  Landmark,
+  Wallet,
+  DollarSign,
+  Package,
+} from "lucide-react";
 import { useGetStocks, useDeleteStock } from "../api/stock";
 import { useGetStores } from "../api/store";
 import { useGetSuppliers } from "../api/supplier";
@@ -39,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type PaginatedData<T> = { results: T[]; count: number } | T[];
 
@@ -95,7 +103,8 @@ export default function StocksPage() {
   const [columnVisibilityDialogOpen, setColumnVisibilityDialogOpen] =
     useState(false);
   const [debtPaymentDialogOpen, setDebtPaymentDialogOpen] = useState(false);
-  const [selectedStockForPayment, setSelectedStockForPayment] = useState<Stock | null>(null);
+  const [selectedStockForPayment, setSelectedStockForPayment] =
+    useState<Stock | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentComment, setPaymentComment] = useState<string>("");
 
@@ -174,6 +183,10 @@ export default function StocksPage() {
     }
   };
 
+  const formatCurrency = (amount: string | number | undefined) => {
+    return new Intl.NumberFormat("ru-RU").format(Number(amount));
+  };
+
   // Columns definition
   const [selectedStocks, setSelectedStocks] = useState<number[]>([]);
 
@@ -209,9 +222,10 @@ export default function StocksPage() {
         const productName =
           row.product?.product_name || row.product_read?.product_name || "-";
 
-        const label = row.stock_name && row.stock_name.trim() !== ""
-          ? `${productName} (${row.stock_name})`
-          : productName;
+        const label =
+          row.stock_name && row.stock_name.trim() !== ""
+            ? `${productName} (${row.stock_name})`
+            : productName;
 
         return (
           <span className="inline-flex items-center gap-2">
@@ -363,9 +377,7 @@ export default function StocksPage() {
 
             {/* Show pay button if stock has debt */}
             {row.is_debt && (
-              <DropdownMenuItem
-                onClick={() => handlePayDebt(row)}
-              >
+              <DropdownMenuItem onClick={() => handlePayDebt(row)}>
                 <span className="flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -494,7 +506,7 @@ export default function StocksPage() {
         amount: amount,
         comment: paymentComment || "Таксиден жибердим",
       });
-      
+
       toast.success(t("common.payment_successful"));
       setDebtPaymentDialogOpen(false);
       setSelectedStockForPayment(null);
@@ -585,7 +597,7 @@ export default function StocksPage() {
             </DialogContent>
           </Dialog>
           <Button variant="outline" onClick={() => setWriteOffDialogOpen(true)}>
-           Списать товар
+            Списать товар
           </Button>
           <Button onClick={() => navigate("/create-stock")}>
             {t("common.create")}{" "}
@@ -675,6 +687,155 @@ export default function StocksPage() {
         onPageChange={setCurrentPage}
       />
 
+      {/* Totals Summary Section */}
+      {stocksData && (
+        <Card className="p-4 sm:p-6 mb-4 mt-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Итоги</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Count */}
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="h-5 w-5 text-purple-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Всего записей
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-purple-700">
+                  {stocksData.count || 0}
+                </p>
+              </div>
+
+              {/* Current Page */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Текущая страница
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-blue-700">
+                  {stocksData.current_page || currentPage}
+                </p>
+              </div>
+
+              {/* Page Size */}
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="h-5 w-5 text-emerald-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Размер страницы
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-700">
+                  {stocksData.page_size || pageSize}
+                </p>
+              </div>
+
+              {/* Total Pages */}
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Landmark className="h-5 w-5 text-amber-600" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Всего страниц
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-amber-700">
+                  {stocksData.total_pages ||
+                    Math.ceil((stocksData.count || 0) / pageSize)}
+                </p>
+              </div>
+            </div>
+
+            {/* Current Page Totals */}
+            <div className="mt-6">
+              <h4 className="text-md font-semibold text-gray-700 mb-3">
+                Сумма по текущей странице
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-5 w-5 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-600">
+                      Общая стоимость (валюта)
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {formatCurrency(
+                      stocksData.total_price_in_currency_page || 0,
+                    )}
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Landmark className="h-5 w-5 text-emerald-600" />
+                    <span className="text-sm font-medium text-gray-600">
+                      Общая стоимость (UZS)
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {formatCurrency(stocksData.total_price_in_uz_page || 0)} UZS
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* All Records Totals */}
+            <div className="mt-4">
+              <h4 className="text-md font-semibold text-gray-700 mb-3">
+                Общая сумма (все записи)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-5 w-5 text-indigo-600" />
+                    <span className="text-sm font-medium text-gray-600">
+                      Общая стоимость (валюта)
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-indigo-700">
+                    {formatCurrency(
+                      stocksData.total_price_in_currency_all || 0,
+                    )}
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Landmark className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium text-gray-600">
+                      Общая стоимость (UZS)
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700">
+                    {formatCurrency(stocksData.total_price_in_uz_all || 0)} UZS
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Page Range */}
+            {stocksData.page_range && stocksData.page_range.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-md font-semibold text-gray-700 mb-3">
+                  Диапазон страниц
+                </h4>
+                <div className="flex gap-2 flex-wrap">
+                  {stocksData.page_range.map((page: number) => (
+                    <span
+                      key={page}
+                      className={`px-3 py-1 rounded ${page === currentPage ? "bg-blue-500 text-white font-semibold" : "bg-gray-100 text-gray-700"}`}
+                    >
+                      {page}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Inline edit dialog removed - use dedicated edit page instead */}
 
       <DeleteConfirmationModal
@@ -701,7 +862,10 @@ export default function StocksPage() {
       />
 
       {/* Debt Payment Dialog */}
-      <Dialog open={debtPaymentDialogOpen} onOpenChange={setDebtPaymentDialogOpen}>
+      <Dialog
+        open={debtPaymentDialogOpen}
+        onOpenChange={setDebtPaymentDialogOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("common.pay_debt")}</DialogTitle>
@@ -711,24 +875,27 @@ export default function StocksPage() {
               <div className="space-y-2">
                 <Label>{t("common.product")}</Label>
                 <p className="text-sm text-gray-600">
-                  {selectedStockForPayment.product?.product_name || selectedStockForPayment.product_read?.product_name}
+                  {selectedStockForPayment.product?.product_name ||
+                    selectedStockForPayment.product_read?.product_name}
                 </p>
                 <Label>{t("common.amount_of_debt")}</Label>
                 <p className="text-sm text-gray-600">
-                  {selectedStockForPayment.amount_of_debt 
+                  {selectedStockForPayment.amount_of_debt
                     ? `${Number(selectedStockForPayment.amount_of_debt).toLocaleString()} UZS`
                     : "-"}
                 </p>
                 <Label>{t("common.advance_of_debt")}</Label>
                 <p className="text-sm text-gray-600">
-                  {selectedStockForPayment.advance_of_debt 
+                  {selectedStockForPayment.advance_of_debt
                     ? `${Number(selectedStockForPayment.advance_of_debt).toLocaleString()} UZS`
                     : "-"}
                 </p>
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="paymentAmount">{t("common.payment_amount")}</Label>
+              <Label htmlFor="paymentAmount">
+                {t("common.payment_amount")}
+              </Label>
               <Input
                 id="paymentAmount"
                 type="number"
