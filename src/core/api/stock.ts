@@ -195,6 +195,14 @@ export interface StockResponse {
   current_page: number;
   page_range: number[];
   page_size: number;
+  total_price_in_currency_page: number;
+  total_price_in_uz: number;
+
+  total_price_in_uz_page: number;
+
+  total_price_in_currency_all: number;
+
+  total_price_in_uz_all: number;
   results: Stock[];
   count: number;
 }
