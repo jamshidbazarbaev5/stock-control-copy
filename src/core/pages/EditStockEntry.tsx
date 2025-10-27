@@ -1218,6 +1218,29 @@ export default function EditStockEntry() {
         return;
       }
 
+      // Check supplier balance if using supplier balance
+      if (commonValues.use_supplier_balance) {
+        const selectedSupplier = suppliers.find(
+          (s: Supplier) => s.id === Number(commonValues.supplier),
+        );
+        if (selectedSupplier) {
+          const totalAmount = stockItems.reduce((sum, item) => {
+            if (item.isCalculated) {
+              return sum + (Number(item.form.total_price_in_uz) || 0);
+            }
+            return sum;
+          }, 0);
+          const balance = Number(selectedSupplier.balance) || 0;
+          if (balance < totalAmount) {
+            toast.error(
+              `Недостаточный баланс поставщика. Баланс: ${balance.toFixed(2)} UZS, Требуется: ${totalAmount.toFixed(2)} UZS`,
+            );
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
       // Validate all items are calculated
       const uncalculatedItems = stockItems.filter((item) => !item.isCalculated);
       if (uncalculatedItems.length > 0) {
@@ -1706,12 +1729,12 @@ export default function EditStockEntry() {
                               <span className="font-semibold">⚠️</span>
                               <div>
                                 <p className="font-semibold">
-                                  Insufficient Balance
+                                  Недостаточный баланс
                                 </p>
                                 <p className="text-xs mt-1">
-                                  Supplier balance ({balance.toFixed(2)} UZS) is
-                                  less than purchase amount (
-                                  {totalAmount.toFixed(2)} UZS). Shortage:{" "}
+                                  Баланс поставщика ({balance.toFixed(2)} UZS)
+                                  меньше суммы покупки ({totalAmount.toFixed(2)}{" "}
+                                  UZS). Нехватка:{" "}
                                   {(totalAmount - balance).toFixed(2)} UZS
                                 </p>
                               </div>
@@ -1724,11 +1747,9 @@ export default function EditStockEntry() {
                             <div className="flex items-start gap-2">
                               <span className="font-semibold">✓</span>
                               <div>
-                                <p className="font-semibold">
-                                  Payment Available
-                                </p>
+                                <p className="font-semibold">Оплата доступна</p>
                                 <p className="text-xs mt-1">
-                                  Remaining balance after purchase:{" "}
+                                  Остаток баланса после покупки:{" "}
                                   {(balance - totalAmount).toFixed(2)} UZS
                                 </p>
                               </div>
@@ -2328,7 +2349,34 @@ export default function EditStockEntry() {
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                (() => {
+                  // Disable if using supplier balance and insufficient balance
+                  if (
+                    commonForm.watch("use_supplier_balance") &&
+                    commonForm.watch("supplier")
+                  ) {
+                    const selectedSupplier = suppliers.find(
+                      (s: Supplier) =>
+                        s.id === Number(commonForm.watch("supplier")),
+                    );
+                    if (selectedSupplier) {
+                      const totalAmount = stockItems.reduce((sum, item) => {
+                        if (item.isCalculated) {
+                          return (
+                            sum + (Number(item.form.total_price_in_uz) || 0)
+                          );
+                        }
+                        return sum;
+                      }, 0);
+                      const balance = Number(selectedSupplier.balance) || 0;
+                      return balance < totalAmount;
+                    }
+                  }
+                  return false;
+                })()
+              }
             >
               {isSubmitting ? t("common.submitting") : t("common.update")}
             </Button>

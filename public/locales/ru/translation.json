@@ -163,6 +163,7 @@
     }
   },
   "common": {
+    "available_budget": "Бюджет",
     "search_product": "Поиск продукта",
     "edit_stock_entry": "Изменить приход",
     "payment_date": "Дата",

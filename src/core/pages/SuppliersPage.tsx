@@ -84,6 +84,7 @@ export default function SuppliersPage() {
     amount: "",
     payment_method: "Наличные",
   });
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
@@ -158,6 +159,7 @@ export default function SuppliersPage() {
       amount: "",
       payment_method: "Наличные",
     });
+    setSelectedStore(null);
     setIsBalanceDialogOpen(true);
   };
 
@@ -253,45 +255,6 @@ export default function SuppliersPage() {
           </DialogTitle>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="store">{t("forms.store")} *</Label>
-              <Select
-                value={balanceForm.store}
-                onValueChange={(value) =>
-                  setBalanceForm({ ...balanceForm, store: value })
-                }
-              >
-                <SelectTrigger id="store">
-                  <SelectValue
-                    placeholder={
-                      t("placeholders.select_store") || "Select store"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {stores.map((store: Store) => (
-                    <SelectItem key={store.id} value={String(store.id)}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">{t("common.amount")} *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                value={balanceForm.amount}
-                onChange={(e) =>
-                  setBalanceForm({ ...balanceForm, amount: e.target.value })
-                }
-                placeholder={t("placeholders.enter_amount") || "Enter amount"}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="payment_method">
                 {t("common.payment_method")} *
               </Label>
@@ -311,6 +274,95 @@ export default function SuppliersPage() {
                   <SelectItem value="Перечисление">Перечисление</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="store">{t("forms.store")} *</Label>
+              <Select
+                value={balanceForm.store}
+                onValueChange={(value) => {
+                  setBalanceForm({ ...balanceForm, store: value });
+                  const store = stores.find(
+                    (s: Store) => String(s.id) === value,
+                  );
+                  setSelectedStore(store || null);
+                }}
+              >
+                <SelectTrigger id="store">
+                  <SelectValue
+                    placeholder={
+                      t("placeholders.select_store") || "Select store"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {stores.map((store: Store) => (
+                    <SelectItem key={store.id} value={String(store.id)}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Display Store Budget Information based on selected payment method */}
+            {selectedStore &&
+              selectedStore.budgets &&
+              balanceForm.payment_method && (
+                <div className="space-y-2 p-4 bg-muted rounded-lg">
+                  <div className="font-medium text-sm">
+                    {t("common.available_budget") || "Available Budget"}:
+                  </div>
+                  {(() => {
+                    const selectedBudget = selectedStore.budgets.find(
+                      (budget) =>
+                        budget.budget_type === balanceForm.payment_method,
+                    );
+                    const budgetAmount = selectedBudget
+                      ? Number(selectedBudget.amount)
+                      : 0;
+                    const isInsufficient =
+                      balanceForm.amount &&
+                      budgetAmount < Number(balanceForm.amount);
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">
+                            {balanceForm.payment_method}:
+                          </span>
+                          <span
+                            className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}
+                          >
+                            {budgetAmount.toLocaleString()}{" "}
+                            {t("common.currency") || "сум"}
+                          </span>
+                        </div>
+                        {isInsufficient && (
+                          <div className="text-sm text-destructive">
+                            ⚠️{" "}
+                            {t("messages.error.insufficient_budget") ||
+                              "Insufficient budget for this payment method"}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+            <div className="space-y-2">
+              <Label htmlFor="amount">{t("common.amount")} *</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                value={balanceForm.amount}
+                onChange={(e) =>
+                  setBalanceForm({ ...balanceForm, amount: e.target.value })
+                }
+                placeholder={t("placeholders.enter_amount") || "Enter amount"}
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
