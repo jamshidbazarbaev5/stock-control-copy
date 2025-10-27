@@ -478,7 +478,13 @@ export default function StocksPage() {
 
   // Handlers
   const handleEdit = (stock: Stock) => {
-    navigate(`/edit-stock/${stock.id}`);
+    const supplierId = stock.stock_entry?.supplier?.id || stock.supplier_read?.id;
+    const stockEntryId = stock.stock_entry?.id;
+    if (supplierId && stockEntryId) {
+      navigate(`/suppliers/${supplierId}/stock-entries/${stockEntryId}/edit`);
+    } else {
+      toast.error("Cannot edit: missing supplier or stock entry information");
+    }
   };
 
   const handlePayDebt = (stock: Stock) => {

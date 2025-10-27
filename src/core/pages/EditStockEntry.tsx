@@ -313,6 +313,7 @@ export default function EditStockEntry() {
       if (entry.advance_of_debt) {
         commonForm.setValue("advance_of_debt", entry.advance_of_debt);
       }
+      commonForm.setValue("use_supplier_balance", entry.use_supplier_balance || false);
 
       // Create stock items from existing stocks
       const items: StockItem[] = stocks.map((stock, index) => {
@@ -375,7 +376,7 @@ export default function EditStockEntry() {
           calculationMetadata: null,
           selectedProduct: stock.product || null,
           isCalculated: false, // Will be recalculated to get field metadata
-          isExpanded: true, // Start with first few expanded
+          isExpanded: true, // All items expanded by default
           isCalculating: false,
         };
       });
@@ -459,8 +460,9 @@ export default function EditStockEntry() {
   // Add new stock item
   const addStockItem = () => {
     const newId = `item-${Date.now()}`;
+    // Collapse all existing items before adding new one
     setStockItems([
-      ...stockItems,
+      ...stockItems.map((item) => ({ ...item, isExpanded: false })),
       {
         id: newId,
         form: {
@@ -597,6 +599,19 @@ export default function EditStockEntry() {
         return item;
       }),
     );
+    
+    // Trigger calculation for numeric fields if item is already calculated
+    const item = stockItems.find((i) => i.id === itemId);
+    if (item?.isCalculated && [
+      "purchase_unit_quantity",
+      "quantity",
+      "price_per_unit_currency",
+      "total_price_in_currency",
+      "price_per_unit_uz",
+      "total_price_in_uz"
+    ].includes(field)) {
+      setTimeout(() => calculateItemFields(itemId, field, value), 0);
+    }
   };
 
   // Get field configuration for a stock item (for new items or recalculation)

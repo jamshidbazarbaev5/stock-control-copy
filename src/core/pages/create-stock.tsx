@@ -361,8 +361,9 @@ export default function CreateStock() {
   // Add new stock item
   const addStockItem = () => {
     const newId = `item-${Date.now()}`;
+    // Collapse all existing items before adding new one
     setStockItems([
-      ...stockItems,
+      ...stockItems.map((item) => ({ ...item, isExpanded: false })),
       {
         id: newId,
         form: {

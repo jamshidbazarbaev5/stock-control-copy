@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResourceTable } from "../helpers/ResourseTable";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet } from "lucide-react";
+import { Wallet, ArrowUp, ArrowDown } from "lucide-react";
 
 const supplierFields = (t: (key: string) => string) => [
   {
@@ -43,6 +43,15 @@ const supplierFields = (t: (key: string) => string) => [
   },
 ];
 
+const formatPrice = (value: number | string | null | undefined) => {
+  if (value === undefined || value === null || value === "") return "0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
+
 const columns = (t: (key: string) => string) => [
   {
     header: t("table.name"),
@@ -55,18 +64,22 @@ const columns = (t: (key: string) => string) => [
   {
     header: t("table.balance"),
     accessorKey: "balance",
+    cell: (row: Supplier) => formatPrice(row.balance),
   },
   {
     header: t("table.total_debt"),
     accessorKey: "total_debt",
+    cell: (row: Supplier) => formatPrice(row.total_debt),
   },
   {
     header: t("table.total_paid"),
     accessorKey: "total_paid",
+    cell: (row: Supplier) => formatPrice(row.total_paid),
   },
   {
     header: t("table.remaining_debt"),
     accessorKey: "remaining_debt",
+    cell: (row: Supplier) => formatPrice(row.remaining_debt),
   },
 ];
 
@@ -85,6 +98,7 @@ export default function SuppliersPage() {
     payment_method: "Наличные",
   });
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [showScrollButtons, setShowScrollButtons] = useState(false);
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
@@ -199,8 +213,37 @@ export default function SuppliersPage() {
     });
   };
 
+  // Scroll button handlers
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToBottom = () => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  };
+
+  // Show/hide scroll buttons based on scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.body.scrollHeight;
+
+      // Show buttons if we've scrolled more than 200px or not at bottom
+      setShowScrollButtons(
+        scrollPosition > 200 ||
+          scrollPosition + windowHeight < documentHeight - 200,
+      );
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll(); // Check initial position
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-6 relative">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{t("navigation.suppliers")}</h1>
         {/* <Button onClick={() => navigate('/create-recycling')}>
@@ -384,6 +427,30 @@ export default function SuppliersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Scroll Buttons */}
+      {showScrollButtons && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={scrollToTop}
+            title={t("common.scroll_to_top") || "Scroll to top"}
+          >
+            <ArrowUp className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={scrollToBottom}
+            title={t("common.scroll_to_bottom") || "Scroll to bottom"}
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
