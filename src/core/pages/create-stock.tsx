@@ -962,6 +962,13 @@ export default function CreateStock() {
       }),
     );
 
+    // Trigger recalculation of all dependent fields
+    if (item.isCalculated && item.calculationMetadata) {
+      setTimeout(() => {
+        calculateItemFields(item.id, "purchase_unit_quantity", resultValue);
+      }, 0);
+    }
+
     toast.success(
       `${t("common.calculated_result")} ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
     );
