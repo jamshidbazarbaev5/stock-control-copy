@@ -625,9 +625,26 @@ export default function EditStockEntry() {
       }),
     );
     
-    // Trigger calculation for numeric fields if item is already calculated
     const item = stockItems.find((i) => i.id === itemId);
-    if (item?.isCalculated && [
+    
+    // Trigger recalculation for currency and purchase_unit changes
+    if (["currency", "purchase_unit"].includes(field)) {
+      const commonValues = commonForm.getValues();
+      const updatedForm = { ...item?.form, [field]: value };
+      
+      if (
+        commonValues.store &&
+        commonValues.supplier &&
+        commonValues.date_of_arrived &&
+        updatedForm.product &&
+        updatedForm.currency &&
+        updatedForm.purchase_unit
+      ) {
+        setTimeout(() => getFieldConfiguration(itemId), 100);
+      }
+    }
+    // Trigger calculation for numeric fields if item is already calculated
+    else if (item?.isCalculated && [
       "purchase_unit_quantity",
       "quantity",
       "price_per_unit_currency",
@@ -1407,17 +1424,9 @@ export default function EditStockEntry() {
     }, 0);
 
     if (totalUZS > 0) {
-      const currentDebt = commonForm.getValues("amount_of_debt");
-      // Only auto-set if user hasn't manually entered a value
-      if (
-        !currentDebt ||
-        Number(currentDebt) === 0 ||
-        Number(currentDebt) < totalUZS
-      ) {
-        commonForm.setValue("amount_of_debt", totalUZS.toFixed(2));
-      }
+      commonForm.setValue("amount_of_debt", totalUZS.toFixed(2));
     }
-  }, [isDebt, stockItems]);
+  }, [isDebt, stockItems.map(item => item.form.total_price_in_uz).join(',')]);
 
   // Auto-trigger calculation when all required fields are filled
   useEffect(() => {

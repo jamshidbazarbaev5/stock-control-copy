@@ -487,17 +487,37 @@ export default function CreateStock() {
     setStockItems((items) =>
       items.map((item) => {
         if (item.id === itemId) {
+          const needsRecalculation = ['currency', 'purchase_unit'].includes(field);
           return {
             ...item,
             form: {
               ...item.form,
               [field]: value,
             },
+            ...(needsRecalculation && { isCalculated: false }),
           };
         }
         return item;
       }),
     );
+
+    // Trigger recalculation for currency and purchase_unit changes
+    if (['currency', 'purchase_unit'].includes(field)) {
+      const item = stockItems.find((i) => i.id === itemId);
+      const commonValues = commonForm.getValues();
+      const updatedForm = { ...item?.form, [field]: value };
+      
+      if (
+        commonValues.store &&
+        commonValues.supplier &&
+        commonValues.date_of_arrived &&
+        updatedForm.product &&
+        updatedForm.currency &&
+        updatedForm.purchase_unit
+      ) {
+        setTimeout(() => getFieldConfiguration(itemId), 100);
+      }
+    }
   };
 
   // Get field configuration for a stock item
