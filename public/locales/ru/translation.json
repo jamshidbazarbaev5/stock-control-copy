@@ -857,6 +857,7 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "discount":"Скидка",
     "balance": "Баланс",
     "total_debt": "Долг",
     "remaining_debt": "Остаток",

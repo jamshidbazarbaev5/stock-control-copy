@@ -70,6 +70,7 @@ type PaginatedData<T> = { results: T[]; count: number } | T[];
 const COLUMN_CONFIG = [
   { key: "sale_id", label: "ID продажи" },
   { key: "store_read", label: "Магазин" },
+  { key: "discount_amount", label: "Скидка" },
   { key: "sale_payments", label: "Способ оплаты" },
   { key: "worker", label: "Работник" },
   { key: "sale_items", label: "Товары" },
@@ -825,6 +826,11 @@ export default function SalesPage() {
           ))}
         </div>
       ),
+    },
+     {
+      header: t("table.discount_amount"),
+      accessorKey: "discount_amount",
+      cell: (row: any) => row?.discount_amount,
     },
     {
       header: t("table.worker"),
