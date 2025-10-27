@@ -1,6 +1,6 @@
 import { createResourceApiHooks } from "../helpers/createResourceApi";
 import api from "./api";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Types
 export interface StockMeasurement {
@@ -283,6 +283,12 @@ export interface StockItemEntry {
   total_price_in_currency: number;
   base_unit_in_uzs?: number;
   base_unit_in_currency?: number;
+  use_supplier_balance: boolean;
+  deposit_payment_method: string | null;
+  payments: Array<{
+    amount: number;
+    payment_type: string;
+  }>;
 }
 
 export interface BulkStockEntryRequest {
@@ -404,7 +410,10 @@ export const fetchStockByProduct = async (
 export const {
   useGetResources: useGetStockEntries,
   useGetResource: useGetStockEntry,
-} = createResourceApiHooks<StockEntry, StockEntryResponse>(STOCK_ENTRIES_URL, "stock-entries");
+} = createResourceApiHooks<StockEntry, StockEntryResponse>(
+  STOCK_ENTRIES_URL,
+  "stock-entries",
+);
 
 // Stock history type from the new API endpoint
 export interface StockHistoryData {
@@ -494,7 +503,9 @@ export interface StockHistoryData {
 }
 
 // Fetch stock history
-export const fetchStockHistory = async (stockId: number): Promise<StockHistoryData> => {
+export const fetchStockHistory = async (
+  stockId: number,
+): Promise<StockHistoryData> => {
   const response = await api.get(`${STOCK_URL}${stockId}/history/`);
   return response.data;
 };
@@ -502,7 +513,7 @@ export const fetchStockHistory = async (stockId: number): Promise<StockHistoryDa
 // Hook to fetch stock history
 export const useGetStockHistory = (stockId: number) => {
   return useQuery<StockHistoryData>({
-    queryKey: ['stock-history', stockId],
+    queryKey: ["stock-history", stockId],
     queryFn: () => fetchStockHistory(stockId),
     enabled: !!stockId,
   });
@@ -511,14 +522,20 @@ export const useGetStockHistory = (stockId: number) => {
 // Update stock entry mutation hook
 export const useUpdateStockEntry = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: UpdateStockEntryRequest }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: UpdateStockEntryRequest;
+    }) => {
       return updateStockEntry(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['stocks'] });
+      queryClient.invalidateQueries({ queryKey: ["stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["stocks"] });
     },
   });
 };
@@ -527,14 +544,14 @@ export const useUpdateStockEntry = () => {
 
 export const usePayStockDebt = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: StockDebtPaymentRequest) => {
       const response = await api.post(STOCK_DEBT_PAYMENT_URL, data);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
+      queryClient.invalidateQueries({ queryKey: ["stock-entries"] });
     },
   });
 };

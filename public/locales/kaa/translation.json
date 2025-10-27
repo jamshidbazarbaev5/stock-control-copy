@@ -268,9 +268,22 @@
     "search_product_placeholder": "Ónim izlew",
     "select_product_and_unit_first": "Áwwelinde ónimdi hám alıw ólshemin tańlań",
     "enter_valid_number": "Esaplaw ushın durıs sannı kiritiń",
-    "calculated_result": "Esaplanǵan:",
-    "earlier": "burun",
-    "a_previous_session": "aldınǵı sessiyadan"
+    "calculated_result": "Esaplandı:",
+    "earlier": "aldın",
+    "a_previous_session": "aldınǵı sessiya",
+    "use_supplier_balance": "Taminleyishi balansın paydalanıw",
+    "supplier_info": "Taminleyishi haqqında maǵlıwmat",
+    "supplier_balance": "Taminleyishi balansı",
+    "deposit_payment_method": "Avans tólew usılı",
+    "select_payment_method": "Tólew usılın tańlań",
+    "payments": "Tólemler",
+    "add_payment": "Tólem qosıw",
+    "paid_amount": "Tólenen summa",
+    "remaining_amount": "Tólew ushın qaldı",
+    "no_payments_added": "Tólemler qosılmaǵan. 'Tólem qosıw' túymesin basıń.",
+    "payment_type": "Tólem túri",
+    "amount": "Summa",
+    "add_balance": "Balans qosıw"
   },
   "navigation": {
     "history": "Tarix",
@@ -485,6 +498,7 @@
     "no_data_to_display": "Kórsetiw úshin maǵlıwmat joq",
     "created_successfully": "áwmetli jaratıldı",
     "success": {
+      "balance_added": "Balans áwmetli qosıldı",
       "expense_created": "Rasxod áwmetli jaratıldı",
       "created": " áwmetli jaratıldı",
       "updated": " áwmetli jańalandı",
@@ -505,7 +519,9 @@
       "invalid_stock_selection": "Невозможно создать приход на этот склад",
       "same_store_transfer": "Bir dúkandaǵı skladlar arasında transfer múmkin emes",
       "payment_create": "Tólem jaratıw ámelge aspadı",
-      "balance_increment": "Balanstı kóbeytiw ámelge aspadı"
+      "balance_increment": "Balanstı kóbeytiw ámelge aspadı",
+      "balance_add_failed": "Balans qosıw ámelge aspadı",
+      "fill_required_fields": "Kerekli maydanları toltırıń"
     },
     "confirmation": {
       "delete": "Bul zattı óshiriwge isenimlisiz be?"

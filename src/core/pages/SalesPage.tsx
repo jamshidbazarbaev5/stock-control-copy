@@ -1280,13 +1280,13 @@ export default function SalesPage() {
                       {method === "Карта" && (
                         <CreditCard className="h-5 w-5 text-blue-600" />
                       )}
-                      {method === "Click" && (
+                        {method === "Click" && (
                         <SmartphoneNfc className="h-5 w-5 text-purple-600" />
                       )}
                       {!["Наличные", "Карта", "Click"].includes(method) && (
                         <Landmark className="h-5 w-5 text-gray-600" />
                       )}
-                      <span className="font-medium text-gray-700">
+                      <span className="font- medium text-gray-700">
                         {method}
                       </span>
                     </div>

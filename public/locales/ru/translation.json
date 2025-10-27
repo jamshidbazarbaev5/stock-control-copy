@@ -173,6 +173,7 @@
     "max_amount": "Максимальная сумма",
     "saving": "Сохранение",
     "amount": "Сумма",
+    "add_balance": "Увеличит баланс",
     "total_payments": "Всего  оплаты",
     "average_payment": "Средная оплата",
     "reason": "Причина",
@@ -399,7 +400,25 @@
     "enter_valid_number": "Пожалуйста, введите корректное число для расчета",
     "calculated_result": "Рассчитано:",
     "earlier": "ранее",
-    "a_previous_session": "предыдущей сессии"
+    "a_previous_session": "предыдущей сессии",
+    "use_supplier_balance": "Использовать баланс поставщика",
+    "supplier_info": "Информация о поставщике",
+    "supplier_balance": "Баланс поставщика",
+    "deposit_payment_method": "Способ оплаты аванса",
+    "select_payment_method": "Выберите способ оплаты",
+    "payments": "Платежи",
+    "add_payment": "Добавить платеж",
+    "paid_amount": "Оплаченная сумма",
+    "remaining_amount": "Остаток к оплате",
+    "no_payments_added": "Платежи не добавлены. Нажмите 'Добавить платеж' для добавления.",
+    "payment_type": "Тип платежа",
+    "payment_options": "Способы оплаты",
+    "payment_options_description": "Выберите способ оплаты для этого прихода",
+    "debt_purchase": "Покупка в долг",
+    "debt_purchase_description": "Эта покупка будет записана как долг",
+    "use_supplier_balance_description": "Вычесть платеж из существующего баланса поставщика",
+    "deposit_payment_description": "Выберите способ оплаты для аванса",
+    "payments_description": "Разделить платеж между несколькими способами"
   },
   "navigation": {
     "shift": "Смена",
@@ -704,9 +723,10 @@
   },
   "messages": {
     "create": "Создать",
-    "no_payments_found": "Нет платежи",
-    "created_successfully": " успешно создан",
+    "no_payments_found": "Платежи не найдены",
+    "created_successfully": "Успешно создано",
     "success": {
+      "balance_added": "Баланс успешно добавлен",
       "created": " успешно создан",
       "expense_created": "Расход успешно создан",
       "money_added": "Депозит успешно добавлен",
@@ -729,7 +749,9 @@
       "invalid_stock_selection": "Невозможно создать приход на этот склад",
       "insufficient_payment": "Недостаточно средств для оплаты",
       "same_store_transfer": "Невозможно перевести между складами в одном магазине",
-      "payment_create": "Ошибка при создании платежа"
+      "payment_create": "Ошибка при создании платежа",
+      "balance_add_failed": "Не удалось добавить баланс",
+      "fill_required_fields": "Пожалуйста, заполните все обязательные поля"
     },
     "confirmation": {
       "delete": "Вы уверены, что хотите удалить это?"
@@ -834,6 +856,7 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "balance": "Баланс",
     "total_debt": "Долг",
     "remaining_debt": "Остаток",
     "total_paid": "Всего оплачено",

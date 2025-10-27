@@ -7,7 +7,11 @@ import {
   useGetProducts,
 } from "../api/product";
 import { useGetStores } from "../api/store";
-import { useGetSuppliers, useCreateSupplier } from "../api/supplier";
+import {
+  useGetSuppliers,
+  useCreateSupplier,
+  type Supplier,
+} from "../api/supplier";
 import { useGetCategories } from "../api/category";
 import { useGetCurrencies } from "../api/currency";
 import { useGetMeasurements } from "../api/measurement";
@@ -48,6 +52,12 @@ interface CommonFormValues {
   is_debt?: boolean;
   amount_of_debt?: number | string;
   advance_of_debt?: number | string;
+  use_supplier_balance?: boolean;
+  deposit_payment_method?: string;
+  payments?: Array<{
+    amount: number | string;
+    payment_type: string;
+  }>;
 }
 
 interface StockItemFormValues {
@@ -261,6 +271,9 @@ export default function CreateStock() {
       is_debt: false,
       amount_of_debt: undefined,
       advance_of_debt: undefined,
+      use_supplier_balance: false,
+      deposit_payment_method: "",
+      payments: [],
     },
   });
 
@@ -1003,10 +1016,27 @@ export default function CreateStock() {
           stockEntry.stock_name = item.form.stock_name.trim();
         }
 
+        // Add payment-related fields to each stock entry
+        if (commonValues.use_supplier_balance) {
+          stockEntry.use_supplier_balance = true;
+        }
+
+        if (commonValues.deposit_payment_method) {
+          stockEntry.deposit_payment_method =
+            commonValues.deposit_payment_method;
+        }
+
+        if (commonValues.payments && commonValues.payments.length > 0) {
+          stockEntry.payments = commonValues.payments.map((p) => ({
+            amount: formatNumberForAPI(p.amount),
+            payment_type: p.payment_type,
+          }));
+        }
+
         return stockEntry;
       });
 
-      const payload = {
+      const payload: any = {
         store: Number(commonValues.store),
         supplier: Number(commonValues.supplier),
         date_of_arrived: commonValues.date_of_arrived,
@@ -1236,28 +1266,346 @@ export default function CreateStock() {
 
           {/* Debt fields */}
           {commonForm.watch("is_debt") && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount_of_debt">
-                  {t("common.amount_of_debt")}
-                </Label>
-                <Input
-                  id="amount_of_debt"
-                  type="number"
-                  step="0.01"
-                  {...commonForm.register("amount_of_debt")}
-                />
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount_of_debt">
+                    {t("common.amount_of_debt")}
+                  </Label>
+                  <Input
+                    id="amount_of_debt"
+                    type="number"
+                    step="0.01"
+                    {...commonForm.register("amount_of_debt")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="advance_of_debt">
+                    {t("common.advance_of_debt")}
+                  </Label>
+                  <Input
+                    id="advance_of_debt"
+                    type="number"
+                    step="0.01"
+                    {...commonForm.register("advance_of_debt")}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="advance_of_debt">
-                  {t("common.advance_of_debt")}
+
+              {/* Deposit Payment Method - show when debt and NOT using supplier balance */}
+              {!commonForm.watch("use_supplier_balance") && (
+                <div className="space-y-2">
+                  <Label htmlFor="deposit_payment_method">
+                    {t("common.deposit_payment_method") ||
+                      "Deposit Payment Method"}
+                  </Label>
+                  <Select
+                    value={commonForm.watch("deposit_payment_method") || ""}
+                    onValueChange={(value) =>
+                      commonForm.setValue("deposit_payment_method", value)
+                    }
+                  >
+                    <SelectTrigger id="deposit_payment_method">
+                      <SelectValue
+                        placeholder={
+                          t("common.select_payment_method") ||
+                          "Select payment method"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Наличные">Наличные</SelectItem>
+                      <SelectItem value="Карта">Карта</SelectItem>
+                      <SelectItem value="Click">Click</SelectItem>
+                      <SelectItem value="Перечисление">Перечисление</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Use Supplier Balance Section - Separate from debt */}
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Checkbox
+              id="use_supplier_balance"
+              checked={commonForm.watch("use_supplier_balance")}
+              onCheckedChange={(checked) =>
+                commonForm.setValue("use_supplier_balance", checked as boolean)
+              }
+            />
+            <Label htmlFor="use_supplier_balance" className="cursor-pointer">
+              {t("common.use_supplier_balance") || "Use Supplier Balance"}
+            </Label>
+          </div>
+
+          {/* Show supplier balance info when use_supplier_balance is checked */}
+          {commonForm.watch("use_supplier_balance") &&
+            commonForm.watch("supplier") && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-4">
+                <h3 className="font-semibold mb-2">
+                  {t("common.supplier_info") || "Supplier Information"}
+                </h3>
+                {(() => {
+                  const selectedSupplier = suppliers.find(
+                    (s: Supplier) =>
+                      s.id === Number(commonForm.watch("supplier")),
+                  );
+                  if (selectedSupplier) {
+                    const totalAmount = stockItems.reduce((sum, item) => {
+                      if (item.isCalculated) {
+                        return sum + (Number(item.form.total_price_in_uz) || 0);
+                      }
+                      return sum;
+                    }, 0);
+                    const balance = Number(selectedSupplier.balance) || 0;
+                    const canPay = balance >= totalAmount;
+                    return (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-white border border-blue-200 rounded-lg">
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                {t("common.supplier_name") || "Supplier"}:
+                              </span>
+                              <span className="font-medium">
+                                {selectedSupplier.name}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                {t("common.supplier_balance") ||
+                                  "Available Balance"}
+                                :
+                              </span>
+                              <span
+                                className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
+                              >
+                                {balance.toFixed(2)} UZS
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-t pt-2">
+                              <span className="text-gray-600">
+                                {t("common.total_amount") || "Purchase Amount"}:
+                              </span>
+                              <span className="font-semibold">
+                                {totalAmount.toFixed(2)} UZS
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {!canPay && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold">⚠️</span>
+                              <div>
+                                <p className="font-semibold">
+                                  Insufficient Balance
+                                </p>
+                                <p className="text-xs mt-1">
+                                  Supplier balance ({balance.toFixed(2)} UZS) is
+                                  less than purchase amount (
+                                  {totalAmount.toFixed(2)} UZS). Shortage:{" "}
+                                  {(totalAmount - balance).toFixed(2)} UZS
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {canPay && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold">✓</span>
+                              <div>
+                                <p className="font-semibold">
+                                  Payment Available
+                                </p>
+                                <p className="text-xs mt-1">
+                                  Remaining balance after purchase:{" "}
+                                  {(balance - totalAmount).toFixed(2)} UZS
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+
+          {/* Payments Section - show when NOT using supplier balance */}
+          {!commonForm.watch("use_supplier_balance") && (
+            <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <Label className="text-lg font-semibold">
+                  {t("common.payments") || "Payments"}
                 </Label>
-                <Input
-                  id="advance_of_debt"
-                  type="number"
-                  step="0.01"
-                  {...commonForm.register("advance_of_debt")}
-                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentPayments = commonForm.watch("payments") || [];
+                    const totalAmount = stockItems.reduce((sum, item) => {
+                      if (item.isCalculated) {
+                        return sum + (Number(item.form.total_price_in_uz) || 0);
+                      }
+                      return sum;
+                    }, 0);
+
+                    const paidAmount = currentPayments.reduce(
+                      (sum, p) => sum + (Number(p.amount) || 0),
+                      0,
+                    );
+                    const remainingAmount = totalAmount - paidAmount;
+
+                    commonForm.setValue("payments", [
+                      ...currentPayments,
+                      {
+                        amount: remainingAmount > 0 ? remainingAmount : 0,
+                        payment_type: "Наличные",
+                      },
+                    ]);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  {t("common.add_payment") || "Add Payment"}
+                </Button>
+              </div>
+
+              {/* Total Amount Display */}
+              {(() => {
+                const totalAmount = stockItems.reduce((sum, item) => {
+                  if (item.isCalculated) {
+                    return sum + (Number(item.form.total_price_in_uz) || 0);
+                  }
+                  return sum;
+                }, 0);
+                const payments = commonForm.watch("payments") || [];
+                const paidAmount = payments.reduce(
+                  (sum, p) => sum + (Number(p.amount) || 0),
+                  0,
+                );
+                const remainingAmount = totalAmount - paidAmount;
+
+                return (
+                  <div className="space-y-2 p-3 bg-white rounded border">
+                    <div className="flex justify-between text-sm">
+                      <span>{t("common.total_amount") || "Total Amount"}:</span>
+                      <span className="font-semibold">
+                        {totalAmount.toFixed(2)} UZS
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>{t("common.paid_amount") || "Paid Amount"}:</span>
+                      <span className="font-semibold text-green-600">
+                        {paidAmount.toFixed(2)} UZS
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span>
+                        {t("common.remaining_amount") || "Remaining Amount"}:
+                      </span>
+                      <span
+                        className={`font-semibold ${remainingAmount > 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {remainingAmount.toFixed(2)} UZS
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Payments List */}
+              <div className="space-y-2">
+                {(commonForm.watch("payments") || []).map((payment, index) => (
+                  <div
+                    key={index}
+                    className="flex gap-2 items-start p-3 bg-white rounded border"
+                  >
+                    <div className="flex-1 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            {t("common.amount") || "Amount"}
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={payment.amount}
+                            onChange={(e) => {
+                              const payments =
+                                commonForm.watch("payments") || [];
+                              const newPayments = [...payments];
+                              newPayments[index] = {
+                                ...newPayments[index],
+                                amount: e.target.value,
+                              };
+                              commonForm.setValue("payments", newPayments);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            {t("common.payment_type") || "Payment Type"}
+                          </Label>
+                          <Select
+                            value={payment.payment_type}
+                            onValueChange={(value) => {
+                              const payments =
+                                commonForm.watch("payments") || [];
+                              const newPayments = [...payments];
+                              newPayments[index] = {
+                                ...newPayments[index],
+                                payment_type: value,
+                              };
+                              commonForm.setValue("payments", newPayments);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Наличные">Наличные</SelectItem>
+                              <SelectItem value="Карта">Карта</SelectItem>
+                              <SelectItem value="Click">Click</SelectItem>
+                              <SelectItem value="Перечисление">
+                                Перечисление
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const payments = commonForm.watch("payments") || [];
+                        const newPayments = payments.filter(
+                          (_, i) => i !== index,
+                        );
+                        commonForm.setValue("payments", newPayments);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                {(!commonForm.watch("payments") ||
+                  commonForm.watch("payments")?.length === 0) && (
+                  <div className="text-center text-sm text-gray-500 py-4">
+                    {t("common.no_payments_added") ||
+                      "No payments added. Click 'Add Payment' to add a payment."}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1287,7 +1635,7 @@ export default function CreateStock() {
                 size="sm"
                 onClick={() => toggleAllExpansion(false)}
               >
-
+                cвернуть
               </Button>
               <Button
                 type="button"
