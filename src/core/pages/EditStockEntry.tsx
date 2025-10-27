@@ -1426,6 +1426,48 @@ export default function EditStockEntry() {
     commonForm.watch("date_of_arrived"),
   ]);
 
+  // Auto-initialize payment when entering payment mode (both checkboxes unchecked)
+  useEffect(() => {
+    const isDebt = commonForm.watch("is_debt");
+    const useSupplierBalance = commonForm.watch("use_supplier_balance");
+    const payments = commonForm.watch("payments") || [];
+
+    // Only initialize when in payment mode (both checkboxes false)
+    if (!isDebt && !useSupplierBalance) {
+      const totalAmount = stockItems.reduce((sum, item) => {
+        if (item.isCalculated) {
+          return sum + (Number(item.form.total_price_in_uz) || 0);
+        }
+        return sum;
+      }, 0);
+
+      // Initialize with one payment if no payments exist and total > 0
+      if (payments.length === 0 && totalAmount > 0) {
+        commonForm.setValue("payments", [
+          {
+            amount: totalAmount.toFixed(2),
+            payment_type: "Наличные",
+          },
+        ]);
+      } else if (payments.length === 1 && totalAmount > 0) {
+        // Update the single payment amount if items changed
+        const currentAmount = Number(payments[0].amount) || 0;
+        if (currentAmount !== totalAmount) {
+          commonForm.setValue("payments", [
+            {
+              amount: totalAmount.toFixed(2),
+              payment_type: payments[0].payment_type,
+            },
+          ]);
+        }
+      }
+    }
+  }, [
+    commonForm.watch("is_debt"),
+    commonForm.watch("use_supplier_balance"),
+    stockItems,
+  ]);
+
   const handleCreateProductSubmit = async (data: CreateProductForm) => {
     try {
       await createProduct.mutateAsync(data);
@@ -1575,11 +1617,15 @@ export default function EditStockEntry() {
           <div className="space-y-2 flex items-center gap-2 pt-8">
             <Checkbox
               id="is_debt"
-              checked={commonForm.watch("is_debt")}
+              checked={commonForm.watch("is_debt") === true}
               onCheckedChange={(checked) => {
-                commonForm.setValue("is_debt", checked as boolean);
                 if (checked) {
+                  commonForm.setValue("is_debt", true);
                   commonForm.setValue("use_supplier_balance", false);
+                  // Clear payments when switching to debt mode
+                  commonForm.setValue("payments", []);
+                } else {
+                  commonForm.setValue("is_debt", false);
                 }
               }}
             />
@@ -1655,11 +1701,15 @@ export default function EditStockEntry() {
           <div className="space-y-2 flex items-center gap-2 pt-8">
             <Checkbox
               id="use_supplier_balance"
-              checked={commonForm.watch("use_supplier_balance")}
+              checked={commonForm.watch("use_supplier_balance") === true}
               onCheckedChange={(checked) => {
-                commonForm.setValue("use_supplier_balance", checked as boolean);
                 if (checked) {
+                  commonForm.setValue("use_supplier_balance", true);
                   commonForm.setValue("is_debt", false);
+                  // Clear payments when switching to supplier balance mode
+                  commonForm.setValue("payments", []);
+                } else {
+                  commonForm.setValue("use_supplier_balance", false);
                 }
               }}
             />
@@ -1767,8 +1817,8 @@ export default function EditStockEntry() {
             )}
 
           {/* Payments Section - show when NOT using supplier balance AND NOT debt */}
-          {!commonForm.watch("use_supplier_balance") &&
-            !commonForm.watch("is_debt") && (
+          {commonForm.watch("use_supplier_balance") !== true &&
+            commonForm.watch("is_debt") !== true && (
               <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between items-center">
                   <Label className="text-lg font-semibold">
@@ -1862,29 +1912,6 @@ export default function EditStockEntry() {
                 <div className="space-y-2">
                   {(() => {
                     const payments = commonForm.watch("payments") || [];
-
-                    // Auto-initialize with one payment if no payments exist
-                    if (payments.length === 0) {
-                      const totalAmount = stockItems.reduce((sum, item) => {
-                        if (item.isCalculated) {
-                          return (
-                            sum + (Number(item.form.total_price_in_uz) || 0)
-                          );
-                        }
-                        return sum;
-                      }, 0);
-
-                      if (totalAmount > 0) {
-                        setTimeout(() => {
-                          commonForm.setValue("payments", [
-                            {
-                              amount: totalAmount.toFixed(2),
-                              payment_type: "Наличные",
-                            },
-                          ]);
-                        }, 0);
-                      }
-                    }
 
                     return payments.map((payment, index) => (
                       <div
