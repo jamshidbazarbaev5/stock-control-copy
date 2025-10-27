@@ -124,10 +124,27 @@ const formatNumberDisplay = (value: any): string => {
   return num.toFixed(2);
 };
 
+const formatPurchaseUnitQuantity = (value: any): string => {
+  if (value === "" || value === null || value === undefined) {
+    return "";
+  }
+  const num = Number(value);
+  if (isNaN(num)) {
+    return "";
+  }
+  return num.toFixed(4);
+};
+
 const formatNumberForAPI = (value: any): number | undefined => {
   const num = parseFloat(value);
   if (isNaN(num)) return undefined;
   return parseFloat(num.toFixed(2));
+};
+
+const formatPurchaseUnitQuantityForAPI = (value: any): number | undefined => {
+  const num = parseFloat(value);
+  if (isNaN(num)) return undefined;
+  return parseFloat(num.toFixed(4));
 };
 
 // LocalStorage helper functions
@@ -687,7 +704,9 @@ export default function EditStockEntry() {
                     fieldData.value !== undefined
                   ) {
                     const rawValue = formatFieldValue(fieldData.value);
-                    const displayValue = formatNumberDisplay(rawValue);
+                    const displayValue = fieldName === 'purchase_unit_quantity' 
+                      ? formatPurchaseUnitQuantity(rawValue)
+                      : formatNumberDisplay(rawValue);
                     updatedForm[fieldName as keyof StockItemFormValues] =
                       displayValue;
                   }
@@ -918,7 +937,7 @@ export default function EditStockEntry() {
         quantity &&
         !item.dynamicFields.purchase_unit_quantity?.editable
       ) {
-        currentForm.purchase_unit_quantity = formatNumberDisplay(
+        currentForm.purchase_unit_quantity = formatPurchaseUnitQuantity(
           quantity * conversion_factor,
         );
       }
@@ -1153,7 +1172,7 @@ export default function EditStockEntry() {
 
     // Calculate: input / conversion_number
     const result = calculationInput / conversionNumber;
-    const resultValue = result.toFixed(2);
+    const resultValue = result.toFixed(4);
 
     console.log("=== Calculation Debug ===");
     console.log("Input:", calculationInput);
@@ -1170,6 +1189,7 @@ export default function EditStockEntry() {
           const updatedForm = {
             ...i.form,
             purchase_unit_quantity: resultValue,
+            quantity: calculationInput.toFixed(2), // Set input value to quantity
           };
 
           // Also update dynamicFields if purchase_unit_quantity exists there
@@ -1201,13 +1221,6 @@ export default function EditStockEntry() {
         return i;
       }),
     );
-
-    // If item is calculated, also trigger field recalculation
-    if (item.isCalculated) {
-      setTimeout(() => {
-        calculateItemFields(item.id, "purchase_unit_quantity", resultValue);
-      }, 100);
-    }
 
     toast.success(
       `${t("common.calculated_result")} ${calculationInput} ÷ ${conversionNumber} = ${resultValue}`,
@@ -1287,7 +1300,7 @@ export default function EditStockEntry() {
           exchange_rate: exchangeRateId,
           quantity: formatNumberForAPI(item.form.quantity) || 0,
           purchase_unit_quantity:
-            formatNumberForAPI(item.form.purchase_unit_quantity) || 0,
+            formatPurchaseUnitQuantityForAPI(item.form.purchase_unit_quantity) || 0,
           price_per_unit_uz:
             formatNumberForAPI(item.form.price_per_unit_uz) || 0,
           total_price_in_uz:
@@ -2690,7 +2703,7 @@ export default function EditStockEntry() {
                             {(
                               Number(item.form.calculation_input) /
                               Number(conversionNumber)
-                            ).toFixed(2)}
+                            ).toFixed(4)}
                           </span>
                         )}
                       </p>
