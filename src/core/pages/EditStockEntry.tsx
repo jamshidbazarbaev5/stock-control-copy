@@ -2384,6 +2384,11 @@ export default function EditStockEntry() {
                           )
                           .map((fieldName: string) => {
                             const fieldData = item.dynamicFields[fieldName];
+                            // For exchange_rate field, display the rate value from metadata
+                            const displayValue = fieldName === 'exchange_rate' && item.calculationMetadata
+                              ? item.calculationMetadata.exchange_rate.toString()
+                              : (item.form[fieldName as keyof StockItemFormValues] || "");
+                            
                             return (
                               <div key={fieldName} className="space-y-2">
                                 <Label htmlFor={`${fieldName}-${item.id}`}>
@@ -2393,11 +2398,7 @@ export default function EditStockEntry() {
                                   id={`${fieldName}-${item.id}`}
                                   type="number"
                                   step="0.01"
-                                  value={
-                                    item.form[
-                                      fieldName as keyof StockItemFormValues
-                                    ] || ""
-                                  }
+                                  value={displayValue}
                                   onChange={(e) => {
                                     const value = e.target.value;
                                     console.log(
