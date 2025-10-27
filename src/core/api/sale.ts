@@ -119,7 +119,7 @@ export interface SaleRefund {
 export interface Sale {
   id?: number;
   sale_id?: string;
-
+  discount_amount?: string;
   store?: number;
   store_read?: {
     id: number;

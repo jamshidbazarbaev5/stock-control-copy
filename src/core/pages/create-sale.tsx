@@ -89,6 +89,7 @@ interface SaleFormData {
   sale_items: FormSaleItem[];
   on_credit: boolean;
   total_amount: string;
+  discount_amount?: string;
   sale_payments: FormSalePayment[];
   sold_by?: number;
   sale_debt?: {
@@ -184,6 +185,7 @@ function CreateSale() {
       sale_payments: [{ payment_method: "Наличные", amount: 0 }],
       on_credit: false,
       total_amount: "0",
+      discount_amount: "0",
       store: currentUser?.store_read?.id?.toString() || "0",
       sold_by: !isSuperUser && !isAdmin ? currentUser?.id : undefined,
       sale_debt: {
@@ -627,9 +629,18 @@ function CreateSale() {
 
   const handleSubmit = async (data: SaleFormData) => {
     try {
-      data.total_amount = data.sale_payments
-        .reduce((sum, payment) => sum + (payment.amount || 0), 0)
-        .toString();
+      const discountAmount = parseFloat(data.discount_amount || "0");
+      const totalBeforeDiscount = data.sale_payments
+        .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+      
+      // Apply discount to payment amounts
+      data.sale_payments = data.sale_payments.map((payment) => ({
+        ...payment,
+        amount: payment.amount - (payment.amount / totalBeforeDiscount) * discountAmount,
+      }));
+      
+      data.total_amount = totalBeforeDiscount.toString();
+      data.discount_amount = discountAmount.toString();
 
       // Set store based on user role
       if (!isAdmin && !isSuperUser && currentUser?.store_read?.id) {
@@ -685,6 +696,7 @@ function CreateSale() {
         store: parseInt(data.store),
         payment_method: data.sale_payments[0]?.payment_method || "Наличные",
         total_amount: Number(String(data.total_amount).replace(/,/g, "")).toFixed(2),
+        discount_amount: Number(String(data.discount_amount || "0").replace(/,/g, "")).toFixed(2),
         ...(isAdmin || isSuperUser ? { sold_by: data.sold_by } : {}),
         on_credit: data.on_credit,
         sale_items: data.sale_items.map((item) => ({
@@ -1570,17 +1582,66 @@ function CreateSale() {
           )}
 
           {/* Total Amount Display */}
-          <div className="mt-6 sm:mt-8 p-4 sm:p-6 border rounded-lg bg-gray-50 dark:bg-card dark:border-border">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-700">
-                {t("table.total_amount")}
-              </h3>
-              <p className="text-xl sm:text-3xl font-bold text-green-600">
-                {form
-                  .watch("sale_payments")
-                  .reduce((sum, payment) => sum + (payment.amount || 0), 0)
-                  .toLocaleString()}
-              </p>
+          <div className="mt-6 sm:mt-8 p-4 sm:p-6 border-2 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-card dark:to-card dark:border-border shadow-sm">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  {t("table.total_amount")}
+                </h3>
+                <p className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                  {form
+                    .watch("sale_payments")
+                    .reduce((sum, payment) => sum + (payment.amount || 0), 0)
+                    .toLocaleString()}
+                </p>
+              </div>
+              
+              {/* Discount Amount */}
+              <div className="pt-3 border-t border-gray-300 dark:border-gray-600">
+                <FormField
+                  control={form.control}
+                  name="discount_amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between gap-4">
+                        <FormLabel className="text-base font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                          Скидка:
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            className="text-right text-lg font-semibold border-red-300 focus:border-red-500 focus:ring-red-500"
+                          />
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              {/* Final Amount After Discount */}
+              {parseFloat(form.watch("discount_amount") || "0") > 0 && (
+                <div className="pt-3 border-t-2 border-gray-400 dark:border-gray-500">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base sm:text-lg font-bold text-green-700 dark:text-green-400">
+                      К оплате:
+                    </h3>
+                    <p className="text-2xl sm:text-4xl font-bold text-green-600 dark:text-green-400">
+                      {(
+                        form
+                          .watch("sale_payments")
+                          .reduce((sum, payment) => sum + (payment.amount || 0), 0) -
+                        parseFloat(form.watch("discount_amount") || "0")
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

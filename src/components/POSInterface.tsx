@@ -245,6 +245,7 @@ const POSInterfaceCore = () => {
   const [paymentMethods, setPaymentMethods] = useState<SalePayment[]>([
     { amount: 0, payment_method: "Наличные" },
   ]);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   // Sale API
   const createSaleMutation = useCreateSale();
@@ -1160,7 +1161,8 @@ const POSInterfaceCore = () => {
         case "L":
           e.preventDefault();
           if (cartProducts.length > 0) {
-            setPaymentMethods([{ amount: total, payment_method: "Наличные" }]);
+            setDiscountAmount(0);
+            setPaymentMethods([{ amount: 0, payment_method: "Наличные" }]);
             setIsPaymentModalOpen(true);
           }
           return;
@@ -2152,8 +2154,9 @@ const POSInterfaceCore = () => {
           <div className="p-6 border-t border-gray-200">
             <button
               onClick={() => {
+                setDiscountAmount(0);
                 setPaymentMethods([
-                  { amount: total, payment_method: "Наличные" },
+                  { amount: 0, payment_method: "Наличные" },
                 ]);
                 setIsPaymentModalOpen(true);
               }}
@@ -3044,15 +3047,8 @@ const POSInterfaceCore = () => {
               <button
                 onClick={async () => {
                   // Validate payment total
-                  const totalPayment = paymentMethods.reduce(
-                    (sum, p) => sum + (p.amount || 0),
-                    0,
-                  );
-                  if (!onCredit && totalPayment < total) {
-                    toast.error("Сумма оплаты меньше общей суммы!");
-                    return;
-                  }
-
+                 
+                 
                   // Validate debt fields when onCredit is true
                   if (onCredit && !selectedClient) {
                     toast.error("Выберите клиента для продажи в кредит!");
@@ -3109,13 +3105,14 @@ const POSInterfaceCore = () => {
                         ...(item.stockId && { stock: item.stockId }),
                       })),
                       on_credit: onCredit,
-                      total_amount: total.toString(),
+                      total_amount: total.toFixed(2),
+                      discount_amount: discountAmount.toFixed(2),
                       sale_payments: paymentMethods
-                        .filter((p) => p.amount > 0)
                         .map((payment) => ({
                           payment_method: payment.payment_method,
-                          amount: payment.amount.toString(),
-                        })),
+                          amount: (payment.amount || (total - discountAmount)).toFixed(2),
+                        }))
+                        .filter((p) => Number(p.amount) > 0),
                       ...(onCredit &&
                         selectedClient && {
                           sale_debt: {
@@ -3199,8 +3196,8 @@ const POSInterfaceCore = () => {
                 }}
                 disabled={
                   isProcessingSale ||
-                  (paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0) <
-                    total &&
+                  (paymentMethods.reduce((sum, p) => sum + (p.amount || (total - discountAmount)), 0) <
+                      (total - discountAmount) &&
                     !onCredit)
                 }
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center gap-2 transition-colors"
@@ -3208,6 +3205,22 @@ const POSInterfaceCore = () => {
                 {isProcessingSale ? "Обработка..." : "Оплатить"}
                 <span className="text-sm bg-blue-500 px-2 py-1 rounded">L</span>
               </button>
+            </div>
+
+            {/* Discount Input */}
+            <div className="mb-8">
+              <label className="block text-gray-700 text-lg font-medium mb-2">
+                Скидка:
+              </label>
+              <input
+                type="number"
+                value={discountAmount || ""}
+                onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
+                onFocus={(e) => e.stopPropagation()}
+                onBlur={(e) => e.stopPropagation()}
+                placeholder="0"
+                className="w-full text-3xl font-bold bg-gray-50 border-2 border-gray-300 rounded-xl p-4 focus:outline-none focus:border-blue-500"
+              />
             </div>
 
             {/* Payment Summary */}
@@ -3223,7 +3236,7 @@ const POSInterfaceCore = () => {
                 <div className="text-5xl font-bold text-green-500">
                   {Math.max(
                     0,
-                    total -
+                    (total - discountAmount) -
                       paymentMethods.reduce(
                         (sum, p) => sum + (p.amount || 0),
                         0,
@@ -3235,13 +3248,11 @@ const POSInterfaceCore = () => {
               <div>
                 <div className="text-blue-500 text-lg mb-2">СДАЧА:</div>
                 <div className="text-5xl font-bold text-blue-500">
-                  {Math.max(
-                    0,
-                    paymentMethods.reduce(
-                      (sum, p) => sum + (p.amount || 0),
-                      0,
-                    ) - total,
-                  ).toLocaleString()}{" "}
+                  {(() => {
+                    const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
+                    const finalTotal = total - discountAmount;
+                    return totalPaid > finalTotal ? (totalPaid - finalTotal).toLocaleString() : "0";
+                  })()}{" "}
                   UZS
                 </div>
               </div>
@@ -3260,7 +3271,7 @@ const POSInterfaceCore = () => {
                       (sum, p) => sum + (p.amount || 0),
                       0,
                     );
-                    const remaining = total - totalPaid;
+                    const remaining = (total - discountAmount) - totalPaid;
                     setPaymentMethods((prev) => [
                       ...prev,
                       {
@@ -3307,7 +3318,7 @@ const POSInterfaceCore = () => {
                       (sum, p) => sum + (p.amount || 0),
                       0,
                     );
-                    const remaining = total - totalPaid;
+                    const remaining = (total - discountAmount) - totalPaid;
                     setPaymentMethods((prev) => [
                       ...prev,
                       {
@@ -3354,7 +3365,7 @@ const POSInterfaceCore = () => {
                       (sum, p) => sum + (p.amount || 0),
                       0,
                     );
-                    const remaining = total - totalPaid;
+                    const remaining = (total - discountAmount) - totalPaid;
                     setPaymentMethods((prev) => [
                       ...prev,
                       {
@@ -3401,7 +3412,7 @@ const POSInterfaceCore = () => {
                       (sum, p) => sum + (p.amount || 0),
                       0,
                     );
-                    const remaining = total - totalPaid;
+                    const remaining = (total - discountAmount) - totalPaid;
                     setPaymentMethods((prev) => [
                       ...prev,
                       {
@@ -3444,7 +3455,7 @@ const POSInterfaceCore = () => {
                     (sum, p) => sum + (p.amount || 0),
                     0,
                   );
-                  const remaining = total - totalPaid;
+                  const remaining = (total - discountAmount) - totalPaid;
                   if (remaining > 0) {
                     setPaymentMethods((prev) => [
                       ...prev,
@@ -3472,7 +3483,7 @@ const POSInterfaceCore = () => {
                 >
                   <button
                     onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
+                      if (onCredit) return;
                       if (paymentMethods.length > 1) {
                         setPaymentMethods((prev) =>
                           prev.filter((_, i) => i !== index),
@@ -3495,9 +3506,9 @@ const POSInterfaceCore = () => {
 
                   <input
                     type="number"
-                    value={payment.amount || ""}
+                    value={payment.amount || (total - discountAmount)}
                     onChange={(e) => {
-                      if (onCredit) return; // Disable editing when in credit mode
+                      if (onCredit) return;
                       const updated = [...paymentMethods];
                       updated[index].amount = Number(e.target.value);
                       setPaymentMethods(updated);
