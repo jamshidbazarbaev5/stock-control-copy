@@ -113,6 +113,14 @@ interface CreateSupplierForm {
 
 const LOCALSTORAGE_KEY_PREFIX = "edit-stock-entry-draft-";
 
+const formatPrice = (value: number | string | null | undefined) => {
+  if (value === undefined || value === null || value === "") return "0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
 const formatNumberDisplay = (value: any): string => {
   if (value === "" || value === null || value === undefined) {
     return "";
@@ -1261,7 +1269,7 @@ export default function EditStockEntry() {
           const balance = Number(selectedSupplier.balance) || 0;
           if (balance < totalAmount) {
             toast.error(
-              `Недостаточный баланс поставщика. Баланс: ${balance.toFixed(2)} UZS, Требуется: ${totalAmount.toFixed(2)} UZS`,
+                `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} UZS, Требуется: ${formatPrice(totalAmount)} UZS`,
             );
             setIsSubmitting(false);
             return;
@@ -1789,7 +1797,7 @@ export default function EditStockEntry() {
                               <span
                                 className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
                               >
-                                {balance.toFixed(2)} UZS
+                                {formatPrice(balance)} UZS
                               </span>
                             </div>
                             <div className="flex justify-between border-t pt-2">
@@ -1797,7 +1805,7 @@ export default function EditStockEntry() {
                                 {t("common.total_amount") || "Purchase Amount"}:
                               </span>
                               <span className="font-semibold">
-                                {totalAmount.toFixed(2)} UZS
+                                {formatPrice(totalAmount)} UZS
                               </span>
                             </div>
                           </div>
@@ -1812,10 +1820,10 @@ export default function EditStockEntry() {
                                   Недостаточный баланс
                                 </p>
                                 <p className="text-xs mt-1">
-                                  Баланс поставщика ({balance.toFixed(2)} UZS)
-                                  меньше суммы покупки ({totalAmount.toFixed(2)}{" "}
+                                  Баланс поставщика ({formatPrice(balance)} UZS)
+                                  меньше суммы покупки ({formatPrice(totalAmount)}{" "}
                                   UZS). Нехватка:{" "}
-                                  {(totalAmount - balance).toFixed(2)} UZS
+                                  {formatPrice(totalAmount - balance)} UZS
                                 </p>
                               </div>
                             </div>
@@ -2121,27 +2129,27 @@ export default function EditStockEntry() {
                         t("common.select_product_placeholder")}
                     </span>
                     {item.isCalculated && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="text-green-700 font-medium">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600"/>
+                          <span className="text-green-700 font-medium">
                           {item.form.quantity}{" "}
-                          {
-                            item.selectedProduct?.available_units?.[0]
-                              ?.short_name
-                          }{" "}
-                          · {formatNumberDisplay(item.form.total_price_in_uz)}{" "}
-                          UZS
+                            {
+                              item.selectedProduct?.available_units?.[0]
+                                  ?.short_name
+                            }{" "}
+                            · {formatPrice(item.form.total_price_in_uz)}{" "}
+                            UZS
                         </span>
-                      </div>
+                        </div>
                     )}
                     {item.isCalculating && (
-                      <div className="flex items-center gap-2 text-sm text-blue-600">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>{t("common.calculating")}</span>
-                      </div>
+                        <div className="flex items-center gap-2 text-sm text-blue-600">
+                          <Loader2 className="h-4 w-4 animate-spin"/>
+                          <span>{t("common.calculating")}</span>
+                        </div>
                     )}
                     {!item.isCalculated &&
-                      !item.isCalculating &&
+                        !item.isCalculating &&
                       item.form.product && (
                         <div className="flex items-center gap-2 text-sm text-amber-600">
                           <AlertCircle className="h-4 w-4" />

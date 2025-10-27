@@ -105,7 +105,14 @@ interface CreateSupplierForm {
 }
 
 const LOCALSTORAGE_KEY = "create-stock-draft";
-
+const formatPrice = (value: number | string | null | undefined) => {
+  if (value === undefined || value === null || value === "") return "0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
 const formatNumberDisplay = (value: any): string => {
   if (value === "" || value === null || value === undefined) {
     return "";
@@ -994,7 +1001,7 @@ export default function CreateStock() {
           const balance = Number(selectedSupplier.balance) || 0;
           if (balance < totalAmount) {
             toast.error(
-              `Недостаточный баланс поставщика. Баланс: ${balance.toFixed(2)} UZS, Требуется: ${totalAmount.toFixed(2)} UZS`,
+              `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} UZS, Требуется: ${formatPrice(totalAmount)} UZS`,
             );
             setIsSubmitting(false);
             return;
@@ -1470,7 +1477,7 @@ export default function CreateStock() {
                               <span
                                 className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
                               >
-                                {balance.toFixed(2)} UZS
+                                {formatPrice(balance)} UZS
                               </span>
                             </div>
                             <div className="flex justify-between border-t pt-2">
@@ -1478,7 +1485,7 @@ export default function CreateStock() {
                                 {t("common.total_amount") || "Purchase Amount"}:
                               </span>
                               <span className="font-semibold">
-                                {totalAmount.toFixed(2)} UZS
+                                {formatPrice(totalAmount)} UZS
                               </span>
                             </div>
                           </div>
@@ -1493,10 +1500,10 @@ export default function CreateStock() {
                                   Недостаточный баланс
                                 </p>
                                 <p className="text-xs mt-1">
-                                  Баланс поставщика ({balance.toFixed(2)} UZS)
-                                  меньше суммы покупки ({totalAmount.toFixed(2)}{" "}
+                                  Баланс поставщика ({formatPrice(balance)} UZS)
+                                  меньше суммы покупки ({formatPrice(totalAmount)}{" "}
                                   UZS). Нехватка:{" "}
-                                  {(totalAmount - balance).toFixed(2)} UZS
+                                  {formatPrice(totalAmount - balance)} UZS
                                 </p>
                               </div>
                             </div>
@@ -1810,7 +1817,7 @@ export default function CreateStock() {
                             item.selectedProduct?.available_units?.[0]
                               ?.short_name
                           }{" "}
-                          · {formatNumberDisplay(item.form.total_price_in_uz)}{" "}
+                          · {formatPrice(item.form.total_price_in_uz)}{" "}
                           UZS
                         </span>
                       </div>
