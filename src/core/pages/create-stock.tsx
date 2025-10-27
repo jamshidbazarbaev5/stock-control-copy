@@ -1273,9 +1273,12 @@ export default function CreateStock() {
               <Checkbox
                 id="is_debt"
                 checked={commonForm.watch("is_debt")}
-                onCheckedChange={(checked) =>
-                  commonForm.setValue("is_debt", checked as boolean)
-                }
+                onCheckedChange={(checked) => {
+                  commonForm.setValue("is_debt", checked as boolean);
+                  if (checked) {
+                    commonForm.setValue("use_supplier_balance", false);
+                  }
+                }}
               />
               <Label htmlFor="is_debt" className="cursor-pointer">
                 {t("common.is_debt")}
@@ -1349,9 +1352,12 @@ export default function CreateStock() {
             <Checkbox
               id="use_supplier_balance"
               checked={commonForm.watch("use_supplier_balance")}
-              onCheckedChange={(checked) =>
-                commonForm.setValue("use_supplier_balance", checked as boolean)
-              }
+              onCheckedChange={(checked) => {
+                commonForm.setValue("use_supplier_balance", checked as boolean);
+                if (checked) {
+                  commonForm.setValue("is_debt", false);
+                }
+              }}
             />
             <Label htmlFor="use_supplier_balance" className="cursor-pointer">
               {t("common.use_supplier_balance") || "Use Supplier Balance"}
@@ -1455,177 +1461,215 @@ export default function CreateStock() {
               </div>
             )}
 
-          {/* Payments Section - show when NOT using supplier balance */}
-          {!commonForm.watch("use_supplier_balance") && (
-            <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center">
-                <Label className="text-lg font-semibold">
-                  {t("common.payments") || "Payments"}
-                </Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const currentPayments = commonForm.watch("payments") || [];
-                    const totalAmount = stockItems.reduce((sum, item) => {
-                      if (item.isCalculated) {
-                        return sum + (Number(item.form.total_price_in_uz) || 0);
-                      }
-                      return sum;
-                    }, 0);
+          {/* Payments Section - show when NOT using supplier balance AND NOT debt */}
+          {!commonForm.watch("use_supplier_balance") &&
+            !commonForm.watch("is_debt") && (
+              <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <Label className="text-lg font-semibold">
+                    {t("common.payments") || "Payments"}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentPayments =
+                        commonForm.watch("payments") || [];
+                      const totalAmount = stockItems.reduce((sum, item) => {
+                        if (item.isCalculated) {
+                          return (
+                            sum + (Number(item.form.total_price_in_uz) || 0)
+                          );
+                        }
+                        return sum;
+                      }, 0);
 
-                    const paidAmount = currentPayments.reduce(
-                      (sum, p) => sum + (Number(p.amount) || 0),
-                      0,
-                    );
-                    const remainingAmount = totalAmount - paidAmount;
+                      const paidAmount = currentPayments.reduce(
+                        (sum, p) => sum + (Number(p.amount) || 0),
+                        0,
+                      );
+                      const remainingAmount = totalAmount - paidAmount;
 
-                    commonForm.setValue("payments", [
-                      ...currentPayments,
-                      {
-                        amount: remainingAmount > 0 ? remainingAmount : 0,
-                        payment_type: "Наличные",
-                      },
-                    ]);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  {t("common.add_payment") || "Add Payment"}
-                </Button>
-              </div>
-
-              {/* Total Amount Display */}
-              {(() => {
-                const totalAmount = stockItems.reduce((sum, item) => {
-                  if (item.isCalculated) {
-                    return sum + (Number(item.form.total_price_in_uz) || 0);
-                  }
-                  return sum;
-                }, 0);
-                const payments = commonForm.watch("payments") || [];
-                const paidAmount = payments.reduce(
-                  (sum, p) => sum + (Number(p.amount) || 0),
-                  0,
-                );
-                const remainingAmount = totalAmount - paidAmount;
-
-                return (
-                  <div className="space-y-2 p-3 bg-white rounded border">
-                    <div className="flex justify-between text-sm">
-                      <span>{t("common.total_amount") || "Total Amount"}:</span>
-                      <span className="font-semibold">
-                        {totalAmount.toFixed(2)} UZS
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>{t("common.paid_amount") || "Paid Amount"}:</span>
-                      <span className="font-semibold text-green-600">
-                        {paidAmount.toFixed(2)} UZS
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm border-t pt-2">
-                      <span>
-                        {t("common.remaining_amount") || "Remaining Amount"}:
-                      </span>
-                      <span
-                        className={`font-semibold ${remainingAmount > 0 ? "text-red-600" : "text-green-600"}`}
-                      >
-                        {remainingAmount.toFixed(2)} UZS
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Payments List */}
-              <div className="space-y-2">
-                {(commonForm.watch("payments") || []).map((payment, index) => (
-                  <div
-                    key={index}
-                    className="flex gap-2 items-start p-3 bg-white rounded border"
+                      commonForm.setValue("payments", [
+                        ...currentPayments,
+                        {
+                          amount:
+                            remainingAmount > 0
+                              ? remainingAmount.toFixed(2)
+                              : "0",
+                          payment_type: "Наличные",
+                        },
+                      ]);
+                    }}
                   >
-                    <div className="flex-1 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-xs">
-                            {t("common.amount") || "Amount"}
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={payment.amount}
-                            onChange={(e) => {
-                              const payments =
-                                commonForm.watch("payments") || [];
-                              const newPayments = [...payments];
-                              newPayments[index] = {
-                                ...newPayments[index],
-                                amount: e.target.value,
-                              };
-                              commonForm.setValue("payments", newPayments);
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">
-                            {t("common.payment_type") || "Payment Type"}
-                          </Label>
-                          <Select
-                            value={payment.payment_type}
-                            onValueChange={(value) => {
-                              const payments =
-                                commonForm.watch("payments") || [];
-                              const newPayments = [...payments];
-                              newPayments[index] = {
-                                ...newPayments[index],
-                                payment_type: value,
-                              };
-                              commonForm.setValue("payments", newPayments);
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Наличные">Наличные</SelectItem>
-                              <SelectItem value="Карта">Карта</SelectItem>
-                              <SelectItem value="Click">Click</SelectItem>
-                              <SelectItem value="Перечисление">
-                                Перечисление
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                    <Plus className="h-4 w-4 mr-1" />
+                    {t("common.add_payment") || "Add Payment"}
+                  </Button>
+                </div>
+
+                {/* Total Amount Display */}
+                {(() => {
+                  const totalAmount = stockItems.reduce((sum, item) => {
+                    if (item.isCalculated) {
+                      return sum + (Number(item.form.total_price_in_uz) || 0);
+                    }
+                    return sum;
+                  }, 0);
+                  const payments = commonForm.watch("payments") || [];
+                  const paidAmount = payments.reduce(
+                    (sum, p) => sum + (Number(p.amount) || 0),
+                    0,
+                  );
+                  const remainingAmount = totalAmount - paidAmount;
+
+                  return (
+                    <div className="space-y-2 p-3 bg-white rounded border">
+                      <div className="flex justify-between text-sm">
+                        <span>
+                          {t("common.total_amount") || "Total Amount"}:
+                        </span>
+                        <span className="font-semibold">
+                          {totalAmount.toFixed(2)} UZS
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>{t("common.paid_amount") || "Paid Amount"}:</span>
+                        <span className="font-semibold text-green-600">
+                          {paidAmount.toFixed(2)} UZS
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span>
+                          {t("common.remaining_amount") || "Remaining Amount"}:
+                        </span>
+                        <span
+                          className={`font-semibold ${remainingAmount > 0 ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {remainingAmount.toFixed(2)} UZS
+                        </span>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const payments = commonForm.watch("payments") || [];
-                        const newPayments = payments.filter(
-                          (_, i) => i !== index,
-                        );
-                        commonForm.setValue("payments", newPayments);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })()}
 
-                {(!commonForm.watch("payments") ||
-                  commonForm.watch("payments")?.length === 0) && (
-                  <div className="text-center text-sm text-gray-500 py-4">
-                    {t("common.no_payments_added") ||
-                      "No payments added. Click 'Add Payment' to add a payment."}
-                  </div>
-                )}
+                {/* Payments List */}
+                <div className="space-y-2">
+                  {(() => {
+                    const payments = commonForm.watch("payments") || [];
+
+                    // Auto-initialize with one payment if no payments exist
+                    if (payments.length === 0) {
+                      const totalAmount = stockItems.reduce((sum, item) => {
+                        if (item.isCalculated) {
+                          return (
+                            sum + (Number(item.form.total_price_in_uz) || 0)
+                          );
+                        }
+                        return sum;
+                      }, 0);
+
+                      if (totalAmount > 0) {
+                        setTimeout(() => {
+                          commonForm.setValue("payments", [
+                            {
+                              amount: totalAmount.toFixed(2),
+                              payment_type: "Наличные",
+                            },
+                          ]);
+                        }, 0);
+                      }
+                    }
+
+                    return payments.map((payment, index) => (
+                      <div
+                        key={index}
+                        className="flex gap-2 items-start p-3 bg-white rounded border"
+                      >
+                        <div className="flex-1 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                {t("common.amount") || "Amount"}
+                              </Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={payment.amount}
+                                onChange={(e) => {
+                                  const payments =
+                                    commonForm.watch("payments") || [];
+                                  const newPayments = [...payments];
+                                  newPayments[index] = {
+                                    ...newPayments[index],
+                                    amount: e.target.value,
+                                  };
+                                  commonForm.setValue("payments", newPayments);
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                {t("common.payment_type") || "Payment Type"}
+                              </Label>
+                              <Select
+                                value={payment.payment_type}
+                                onValueChange={(value) => {
+                                  const payments =
+                                    commonForm.watch("payments") || [];
+                                  const newPayments = [...payments];
+                                  newPayments[index] = {
+                                    ...newPayments[index],
+                                    payment_type: value,
+                                  };
+                                  commonForm.setValue("payments", newPayments);
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Наличные">
+                                    Наличные
+                                  </SelectItem>
+                                  <SelectItem value="Карта">Карта</SelectItem>
+                                  <SelectItem value="Click">Click</SelectItem>
+                                  <SelectItem value="Перечисление">
+                                    Перечисление
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const payments = commonForm.watch("payments") || [];
+                            const newPayments = payments.filter(
+                              (_, i) => i !== index,
+                            );
+                            commonForm.setValue("payments", newPayments);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ));
+                  })()}
+
+                  {(!commonForm.watch("payments") ||
+                    commonForm.watch("payments")?.length === 0) && (
+                    <div className="text-center text-sm text-gray-500 py-4">
+                      {t("common.no_payments_added") ||
+                        "No payments added. A payment will be auto-added once items are calculated."}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Stock Items List */}
