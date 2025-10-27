@@ -1292,23 +1292,6 @@ export default function EditStockEntry() {
           stockEntry.stock_name = item.form.stock_name.trim();
         }
 
-        // Add payment-related fields to each stock entry
-        if (commonValues.use_supplier_balance) {
-          stockEntry.use_supplier_balance = true;
-        }
-
-        if (commonValues.deposit_payment_method) {
-          stockEntry.deposit_payment_method =
-            commonValues.deposit_payment_method;
-        }
-
-        if (commonValues.payments && commonValues.payments.length > 0) {
-          stockEntry.payments = commonValues.payments.map((p) => ({
-            amount: formatNumberForAPI(p.amount),
-            payment_type: p.payment_type,
-          }));
-        }
-
         // Add id if this is an existing stock
         if (item.stockId) {
           stockEntry.id = item.stockId;
@@ -1328,6 +1311,19 @@ export default function EditStockEntry() {
         ...(commonValues.advance_of_debt && {
           advance_of_debt: formatNumberForAPI(commonValues.advance_of_debt),
         }),
+        ...(commonValues.use_supplier_balance && {
+          use_supplier_balance: true,
+        }),
+        ...(commonValues.deposit_payment_method && {
+          deposit_payment_method: commonValues.deposit_payment_method,
+        }),
+        ...(commonValues.payments &&
+          commonValues.payments.length > 0 && {
+            payments: commonValues.payments.map((p) => ({
+              amount: formatNumberForAPI(p.amount),
+              payment_type: p.payment_type,
+            })),
+          }),
         stocks,
         ...(deletedStockIds.length > 0 && { deleted_stocks: deletedStockIds }),
       };
