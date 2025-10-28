@@ -35,8 +35,9 @@ import {
   type SalesProfitResponse,
   getExpensesSummary,
   getNetProfit,
+  getSuppliersSummary,
 } from "../api/reports";
-import type { ExpensesSummaryResponse } from "../api/types/reports";
+import type { ExpensesSummaryResponse, SuppliersSummaryResponse } from "../api/types/reports";
 import {
   ArrowUpRight,
   DollarSign,
@@ -103,6 +104,8 @@ const DashboardPage = () => {
       useState<SalesmanDebtsResponse | null>(null);
   const [expensesSummary, setExpensesSummary] =
       useState<ExpensesSummaryResponse | null>(null);
+  const [suppliersSummary, setSuppliersSummary] =
+      useState<SuppliersSummaryResponse | null>(null);
   const [salesProfit, setSalesProfit] = useState<SalesProfitResponse | null>(
       null
   );
@@ -217,6 +220,7 @@ const DashboardPage = () => {
             topSellersData,
             expensesSummaryData,
             salesProfitData,
+            suppliersSummaryData,
           ] = await Promise.all([
             // Apply filters to all API calls consistently
             getReportsSalesSummary(apiPeriod, dateParams || undefined),
@@ -233,6 +237,7 @@ const DashboardPage = () => {
             getTopSellers(apiPeriod, dateParams || undefined),
             getExpensesSummary(apiPeriod, dateParams || undefined),
             getSalesProfitReport(apiPeriod, dateParams || undefined),
+            getSuppliersSummary(apiPeriod, dateParams || undefined),
           ]);
 
           setSalesData(salesSummary);
@@ -245,6 +250,7 @@ const DashboardPage = () => {
           setTopSellers(topSellersData);
           setExpensesSummary(expensesSummaryData);
           setSalesProfit(salesProfitData);
+          setSuppliersSummary(suppliersSummaryData);
         }
       } catch (err) {
         setError("Failed to load dashboard data");
@@ -1209,6 +1215,143 @@ const DashboardPage = () => {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Suppliers Summary */}
+        <Card className="bg-white shadow-md hover:shadow-lg transition-shadow mb-8 dark:bg-card">
+          <CardHeader>
+            <CardTitle>
+              {t("dashboard.suppliers_summary") || "Suppliers Summary"}
+            </CardTitle>
+            <CardDescription>
+              {t("dashboard.supplier_debts_overview") ||
+                  "Overview of supplier purchases and debts"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {suppliersSummary?.suppliers?.length ? (
+                <div className="space-y-6">
+                  {/* Total Left Debt Card */}
+                  <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-red-600 font-medium">
+                          {t("dashboard.total_supplier_debt") || "Total Supplier Debt"}
+                        </p>
+                        <p className="text-3xl font-bold text-red-700 mt-1">
+                          {new Intl.NumberFormat("uz-UZ", {
+                            style: "currency",
+                            currency: "UZS",
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          })
+                              .format(suppliersSummary.total_left_debt)
+                              .replace("UZS", "")
+                              .trim()}
+                        </p>
+                      </div>
+                      <Wallet className="h-12 w-12 text-red-500" />
+                    </div>
+                  </div>
+
+                  {/* Suppliers Table */}
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="w-full border-collapse bg-white text-sm dark:bg-card">
+                      <thead className="bg-gray-50">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 font-medium text-gray-900">
+                          {t("dashboard.supplier_name") || "Supplier Name"}
+                        </th>
+                        <th className="px-4 py-3 font-medium text-gray-900 text-right">
+                          {t("dashboard.total_purchases") || "Total Purchases"}
+                        </th>
+                        <th className="px-4 py-3 font-medium text-gray-900 text-right">
+                          {t("dashboard.total_debts") || "Total Debts"}
+                        </th>
+                        <th className="px-4 py-3 font-medium text-gray-900 text-right">
+                          {t("dashboard.total_paid") || "Total Paid"}
+                        </th>
+                        <th className="px-4 py-3 font-medium text-gray-900 text-right">
+                          {t("dashboard.remaining_debt") || "Remaining Debt"}
+                        </th>
+                      </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                      {suppliersSummary.suppliers.map((supplier, index) => (
+                          <tr
+                              key={index}
+                              className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                                  <Users className="h-4 w-4" />
+                                </div>
+                                <span className="font-medium">
+                                  {supplier.supplier_name}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium">
+                              {new Intl.NumberFormat("uz-UZ", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              })
+                                  .format(supplier.total_purchases)
+                                  .replace("UZS", "")
+                                  .trim()}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-orange-600">
+                              {new Intl.NumberFormat("uz-UZ", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              })
+                                  .format(supplier.total_debts)
+                                  .replace("UZS", "")
+                                  .trim()}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-green-600">
+                              {new Intl.NumberFormat("uz-UZ", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              })
+                                  .format(supplier.total_paid)
+                                  .replace("UZS", "")
+                                  .trim()}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-red-600">
+                              {new Intl.NumberFormat("uz-UZ", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              })
+                                  .format(supplier.remaining_debt)
+                                  .replace("UZS", "")
+                                  .trim()}
+                            </td>
+                          </tr>
+                      ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+            ) : (
+                <div className="text-center py-8 text-muted-foreground bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                  <p className="text-gray-500">
+                    {t("dashboard.no_supplier_data") ||
+                        "No supplier data available"}
+                  </p>
+                </div>
+            )}
           </CardContent>
         </Card>
 

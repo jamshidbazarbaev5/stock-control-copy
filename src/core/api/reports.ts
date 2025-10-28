@@ -1,5 +1,5 @@
 import api from './api';
-import type { ExpensesSummaryResponse } from './types/reports';
+import type { ExpensesSummaryResponse, SuppliersSummaryResponse } from './types/reports';
 
 export interface ProductProfitabilityResponse {
   product_name: string;
@@ -285,5 +285,18 @@ export const getNetProfit = async (period?: 'day' | 'week' | 'month', dateParams
     url += `?period=${period}`;
   }
   const response = await api.get(url);
+  return response.data;
+};
+
+export const getSuppliersSummary = async (period?: PeriodType, dateParams?: string): Promise<SuppliersSummaryResponse> => {
+  let url = 'reports/suppliers-summary';
+  if (dateParams && period) {
+    url += `?${dateParams}&period=${period}`;
+  } else if (dateParams) {
+    url += `?${dateParams}`;
+  } else if (period) {
+    url += `?period=${period}`;
+  }
+  const response = await api.get<SuppliersSummaryResponse>(url);
   return response.data;
 };
