@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+  import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
@@ -414,10 +414,11 @@ function CreateSale() {
     }, 0);
     form.setValue("total_amount", total.toString());
 
-    // Update payment amount with total
+    // Update payment amount with total minus discount
+    const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
     const payments = form.getValues("sale_payments");
     if (payments.length > 0) {
-      form.setValue("sale_payments.0.amount", total);
+      form.setValue("sale_payments.0.amount", total - discountAmount);
     }
   };
 
@@ -855,6 +856,21 @@ const handleQuantityChange = (
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [activeSearchIndex]);
+
+  // Update payment amount when discount changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "discount_amount") {
+        const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+        const discountAmount = parseFloat(value.discount_amount || "0");
+        const payments = form.getValues("sale_payments");
+        if (payments.length > 0) {
+          form.setValue("sale_payments.0.amount", totalAmount - discountAmount);
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   // Check for prices below minimum (blocking submission)
   const hasBelowMinPrices = cartProducts.some((product) => {
