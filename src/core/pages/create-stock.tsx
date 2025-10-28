@@ -730,12 +730,19 @@ export default function CreateStock() {
           currentForm.total_price_in_currency = formatNumberDisplay(
             (Number(currentForm.price_per_unit_currency) || 0) * currentQty,
           );
-        }
-        if (changedField === "total_price_in_currency") {
+        } else if (changedField === "total_price_in_currency") {
           currentForm.price_per_unit_currency = formatNumberDisplay(
             (Number(currentForm.total_price_in_currency) || 0) / currentQty,
           );
+        } else if (
+          changedField === "purchase_unit_quantity" ||
+          changedField === "quantity"
+        ) {
+          currentForm.total_price_in_currency = formatNumberDisplay(
+            (Number(currentForm.price_per_unit_currency) || 0) * currentQty,
+          );
         }
+
         currentForm.price_per_unit_uz = formatNumberDisplay(
           (Number(currentForm.price_per_unit_currency) || 0) * exchange_rate,
         );
@@ -747,10 +754,16 @@ export default function CreateStock() {
           currentForm.total_price_in_uz = formatNumberDisplay(
             (Number(currentForm.price_per_unit_uz) || 0) * currentQty,
           );
-        }
-        if (changedField === "total_price_in_uz") {
+        } else if (changedField === "total_price_in_uz") {
           currentForm.price_per_unit_uz = formatNumberDisplay(
             (Number(currentForm.total_price_in_uz) || 0) / currentQty,
+          );
+        } else if (
+          changedField === "purchase_unit_quantity" ||
+          changedField === "quantity"
+        ) {
+          currentForm.total_price_in_uz = formatNumberDisplay(
+            (Number(currentForm.price_per_unit_uz) || 0) * currentQty,
           );
         }
       }

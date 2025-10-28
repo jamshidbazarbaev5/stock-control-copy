@@ -72,7 +72,7 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
   const formatCurrency = (value?: string | number) => {
     if (!value) return "0";
     const num = typeof value === "string" ? parseFloat(value) : value;
-    return new Intl.NumberFormat("ru-RU").format(num);
+    return Number(num.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2, useGrouping: false });
   };
 
   return (
@@ -114,22 +114,19 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
                     }
                   `}
                 >
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-500">Количество</p>
                       <p className="font-medium">
-                        {formatCurrency(stock.quantity)}{" "}
-                        {stock.product?.base_unit || ""}
+                        {formatCurrency(stock.quantity)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Партия</p>
                       <p className="font-medium">
-                        {stock.stock_name}
+                        {stock.stock_name || "-"}
                       </p>
                     </div>
-
                   </div>
                 </div>
               ))}
