@@ -361,10 +361,10 @@ export default function SalesPage() {
       return;
     }
     // Don't allow deletion if on_credit is true
-    if (saleToDelete.on_credit) {
-      toast.error("Нельзя удалить продажу с долгом");
-      return;
-    }
+    // if (saleToDelete.on_credit) {
+    //   toast.error("Нельзя удалить продажу с долгом");
+    //   return;
+    // }
     // Get the store budget and sale total_amount
     // Some store_read objects may not have budget, so fallback to 0 if missing
     const storeBudget = Number(
@@ -1188,7 +1188,7 @@ export default function SalesPage() {
                   ? handleDelete
                   : undefined
               }
-              canDelete={(sale: Sale) => !sale.on_credit}
+              // canDelete={(sale: Sale) => !sale.on_credit}
               totalCount={totalCount}
               onRefund={
                 currentUser?.is_mobile_user === false &&

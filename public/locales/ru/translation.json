@@ -858,6 +858,7 @@
   },
   "table": {
     "discount":"Скидка",
+     "discount_amount":"Скидка",
     "balance": "Баланс",
     "total_debt": "Долг",
     "remaining_debt": "Остаток",
