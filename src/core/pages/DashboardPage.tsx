@@ -846,6 +846,37 @@ const DashboardPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Supplier Debts Card */}
+          <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("dashboard.supplier_debts") || "Supplier Debts"}
+              </CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(
+                      suppliersSummary?.suppliers?.reduce(
+                        (sum, supplier) => sum + supplier.total_debts,
+                        0
+                      ) || 0
+                    )
+                    .replace("UZS", "")
+                    .trim()}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("dashboard.total_supplier_debts") || "Total Supplier Debts"}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Payments by Method Pie Chart */}

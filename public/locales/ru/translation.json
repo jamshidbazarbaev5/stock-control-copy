@@ -31,6 +31,8 @@
   "dashboard": {
     "other": "Другие",
     "clients": "Клиенты",
+    "supplier_debts":"Долги поставщикам",
+    "total_supplier_debts":"Общий долг поставщикам",
     "net_profit": "Остаток на счёте",
     "payments_by_method": "Платёжные поступления",
     "payments_by_method_desc": "Описание платежей по методу",
