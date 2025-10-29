@@ -406,7 +406,6 @@ function CreateSale() {
   const updateTotalAmount = () => {
     const items = form.getValues("sale_items");
     const total = items.reduce((sum, item) => {
-      // Calculate actual total using quantity * price_per_unit
       const quantity = item.quantity || 0;
       const pricePerUnit = parseFloat(item.price_per_unit) || 0;
       const actualTotal = quantity * pricePerUnit;
@@ -414,11 +413,17 @@ function CreateSale() {
     }, 0);
     form.setValue("total_amount", total.toString());
 
-    // Update payment amount with total minus discount
     const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+    const expectedTotal = total - discountAmount;
     const payments = form.getValues("sale_payments");
-    if (payments.length > 0) {
-      form.setValue("sale_payments.0.amount", total - discountAmount);
+    
+    if (payments.length === 1) {
+      form.setValue("sale_payments.0.amount", expectedTotal);
+    } else if (payments.length > 1) {
+      // Adjust last payment to match expected total
+      const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+      const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
+      form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
     }
   };
 
@@ -672,6 +677,17 @@ const handleQuantityChange = (
       }, 0);
       
       const discountAmount = parseFloat(data.discount_amount || "0");
+      const expectedPaymentTotal = totalFromItems - discountAmount;
+      
+      // Validate payment amounts sum
+      const actualPaymentTotal = data.sale_payments.reduce((sum, payment) => {
+        return sum + (parseFloat(String(payment.amount)) || 0);
+      }, 0);
+      
+      if (Math.abs(actualPaymentTotal - expectedPaymentTotal) > 0.01) {
+        toast.error(`Payment total (${actualPaymentTotal.toFixed(2)}) must equal total amount minus discount (${expectedPaymentTotal.toFixed(2)})`);
+        return;
+      }
       
       // Set total_amount from items calculation
       data.total_amount = totalFromItems.toString();
@@ -877,9 +893,15 @@ const handleQuantityChange = (
       if (name === "discount_amount") {
         const totalAmount = parseFloat(form.getValues("total_amount") || "0");
         const discountAmount = parseFloat(value.discount_amount || "0");
+        const expectedTotal = totalAmount - discountAmount;
         const payments = form.getValues("sale_payments");
-        if (payments.length > 0) {
-          form.setValue("sale_payments.0.amount", totalAmount - discountAmount);
+        
+        if (payments.length === 1) {
+          form.setValue("sale_payments.0.amount", expectedTotal);
+        } else if (payments.length > 1) {
+          const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+          const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
+          form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
         }
       }
     });
