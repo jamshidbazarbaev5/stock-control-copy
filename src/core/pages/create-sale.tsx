@@ -1378,20 +1378,16 @@ const handleQuantityChange = (
                     onClick={() => {
                       const payments = form.getValues("sale_payments");
                       payments.splice(index, 1);
-                      const totalAmount = parseFloat(
-                        form.watch("total_amount"),
-                      );
-                      const remainingAmount = payments.reduce(
-                        (sum, p) => sum + (p.amount || 0),
-                        0,
-                      );
-                      if (remainingAmount < totalAmount) {
-                        payments[payments.length - 1].amount =
-                          totalAmount - remainingAmount;
-                        form.setValue("sale_payments", payments);
-                      } else {
-                        form.setValue("sale_payments", payments);
+                      const totalAmount = parseFloat(form.watch("total_amount"));
+                      const discountAmount = parseFloat(form.watch("discount_amount") || "0");
+                      const expectedTotal = totalAmount - discountAmount;
+                      const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                      
+                      if (payments.length > 0 && currentTotal !== expectedTotal) {
+                        const remaining = expectedTotal - payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+                        payments[payments.length - 1].amount = Math.max(0, remaining);
                       }
+                      form.setValue("sale_payments", payments);
                     }}
                     className="mt-0 sm:mt-1"
                   >
