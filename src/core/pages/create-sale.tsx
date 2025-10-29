@@ -561,9 +561,18 @@ const handleQuantityChange = (
   ) => {
     const inputValue = e.target.value;
     
-    // Allow empty input for better mobile UX
-    if (inputValue === '') {
-      form.setValue(`sale_items.${index}.quantity`, '' as any);
+    // Allow only numbers and decimal point
+    const sanitizedValue = inputValue.replace(/[^\d.]/g, '');
+    
+    // Prevent multiple decimal points
+    const decimalCount = (sanitizedValue.match(/\./g) || []).length;
+    if (decimalCount > 1) {
+      return;
+    }
+    
+    // Allow empty input or partial decimal input (like "1.")
+    if (sanitizedValue === '' || sanitizedValue === '.') {
+      form.setValue(`sale_items.${index}.quantity`, sanitizedValue as any);
       
       // Update cart product with 0 quantity for calculation
       const currentProduct = cartProducts[index];
@@ -580,10 +589,11 @@ const handleQuantityChange = (
       return;
     }
 
-    const value = parseFloat(inputValue);
+    const value = parseFloat(sanitizedValue);
     
-    // If not a valid number, don't update
+    // If not a valid number yet (like "1."), allow it but don't validate
     if (isNaN(value)) {
+      form.setValue(`sale_items.${index}.quantity`, sanitizedValue as any);
       return;
     }
 
@@ -609,9 +619,10 @@ const handleQuantityChange = (
       };
       setCartProducts(newCartProducts);
     } else {
-      form.setValue(`sale_items.${index}.quantity`, value);
+      // Allow the string value (for partial input like "1.")
+      form.setValue(`sale_items.${index}.quantity`, sanitizedValue as any);
 
-      // Update cart product
+      // Update cart product with the numeric value
       const newCartProducts = [...cartProducts];
       newCartProducts[index] = {
         ...currentProduct,
