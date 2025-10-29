@@ -561,8 +561,11 @@ const handleQuantityChange = (
   ) => {
     const inputValue = e.target.value;
     
+    // Replace comma with period for decimal separator (locale support)
+    const normalizedValue = inputValue.replace(',', '.');
+    
     // Allow only numbers and decimal point
-    const sanitizedValue = inputValue.replace(/[^\d.]/g, '');
+    const sanitizedValue = normalizedValue.replace(/[^\d.]/g, '');
     
     // Prevent multiple decimal points
     const decimalCount = (sanitizedValue.match(/\./g) || []).length;
