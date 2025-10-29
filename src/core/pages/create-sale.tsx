@@ -1418,11 +1418,13 @@ const handleQuantityChange = (
               onClick={() => {
                 const payments = form.getValues("sale_payments");
                 const totalAmount = parseFloat(form.watch("total_amount"));
+                const discountAmount = parseFloat(form.watch("discount_amount") || "0");
+                const expectedTotal = totalAmount - discountAmount;
                 const currentTotal = payments.reduce(
                   (sum, p) => sum + (p.amount || 0),
                   0,
                 );
-                const remaining = totalAmount - currentTotal;
+                const remaining = expectedTotal - currentTotal;
 
                 if (remaining > 0) {
                   payments.push({
