@@ -52,6 +52,8 @@
     "amount": "Сумма",
     "expense_details": "Расходы",
     "total_expenses": "Общие расходы",
+    "purchase_expenses": "Закупка товара",
+    "other_expenses": "Прочие расходы",
     "expense_name": "Название расхода",
     "suppliers_summary": "Сводка по поставщикам",
     "supplier_debts_overview": "Обзор закупок и долгов поставщикам",
@@ -173,6 +175,7 @@
     }
   },
   "common": {
+    "paid3":"Не в долг",
     "available_budget": "Бюджет",
     "search_product": "Поиск продукта",
     "edit_stock_entry": "Изменить приход",

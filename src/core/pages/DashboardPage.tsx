@@ -778,24 +778,68 @@ const DashboardPage = () => {
               <div className="text-2xl font-bold">
                 <div
                     className={`text-2xl font-bold ${
-                        (expensesSummary?.total_expense || 0) >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
+                        (expensesSummary?.other_expense_total || 0) >= 0
+                            ? "text-red-600"
+                            : "text-green-600"
                     }`}
                 >
-                  {new Intl.NumberFormat("uz-UZ", {
-                    style: "currency",
-                    currency: "UZS",
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })
-                      .format(expensesSummary?.total_expense || 0)
-                      .replace("UZS", "")
-                      .trim()}
+                 {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(expensesSummary?.other_expense_total || 0)
+                    .replace("UZS", "")
+                    .trim()}
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("dashboard.purchase_expenses") || "Закупка товара"}
+              </CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(expensesSummary?.purchase_expense_total || 0)
+                    .replace("UZS", "")
+                    .trim()}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("dashboard.other_expenses") || "Прочие расходы"}
+              </CardTitle>
+              <BarChart2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(expensesSummary?.other_expense_total || 0)
+                    .replace("UZS", "")
+                    .trim()}
+              </div>
+            </CardContent>
+          </Card> */}
           {/* Store Balance Card */}
           <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">

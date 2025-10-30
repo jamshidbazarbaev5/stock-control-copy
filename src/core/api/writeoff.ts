@@ -60,3 +60,17 @@ export const useCreateWriteOff = () => {
     },
   });
 };
+
+export const useUpdateWriteoff = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
+      const response = await api.put(`/writeoffs/${id}/update/`, { notes });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['writeoffs'] });
+    },
+  });
+};

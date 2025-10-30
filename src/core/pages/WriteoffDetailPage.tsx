@@ -1,8 +1,11 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useGetWriteoff } from "../api/writeoff";
+import { useGetWriteoff, useUpdateWriteoff } from "../api/writeoff";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit2, Save, X } from "lucide-react";
+import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 export default function WriteoffDetailPage() {
   const navigate = useNavigate();
@@ -10,6 +13,25 @@ export default function WriteoffDetailPage() {
   const writeoffId = parseInt(id || "0");
 
   const { data: writeoff, isLoading } = useGetWriteoff(writeoffId);
+  const updateMutation = useUpdateWriteoff();
+
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  const handleEditNotes = () => {
+    setNotes(writeoff?.notes || "");
+    setIsEditingNotes(true);
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      await updateMutation.mutateAsync({ id: writeoffId, notes });
+      toast.success("Примечания обновлены");
+      setIsEditingNotes(false);
+    } catch (error) {
+      toast.error("Ошибка при обновлении");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -76,13 +98,31 @@ export default function WriteoffDetailPage() {
               </p>
             </div>
             <div className="md:col-span-2">
-              <label className="text-sm font-medium text-gray-500">Примечания</label>
-              <p className="text-base sm:text-lg mt-1">
-                {writeoff.notes || "-"}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-500">Примечания</label>
+                {!isEditingNotes ? (
+                  <Button onClick={handleEditNotes} variant="ghost" size="sm">
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveNotes} variant="ghost" size="sm" disabled={updateMutation.isPending}>
+                      <Save className="w-4 h-4" />
+                    </Button>
+                    <Button onClick={() => setIsEditingNotes(false)} variant="ghost" size="sm">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {isEditingNotes ? (
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+              ) : (
+                <p className="text-base sm:text-lg mt-1">{writeoff.notes || "-"}</p>
+              )}
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">ID создателя</label>
+              <label className="text-sm font-medium text-gray-500">Создатель</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
                 {writeoff.created_by}
               </p>
@@ -109,9 +149,6 @@ export default function WriteoffDetailPage() {
                   <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
                     Товар
                   </th>
-                  <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Поставщик
-                  </th>
                   <th className="text-right p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
                     Количество
                   </th>
@@ -120,9 +157,6 @@ export default function WriteoffDetailPage() {
                   </th>
                   <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
                     Валюта
-                  </th>
-                  <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Дата поступления
                   </th>
                 </tr>
               </thead>
@@ -140,7 +174,6 @@ export default function WriteoffDetailPage() {
                         </div>
                       )}
                     </td>
-
                     <td className="p-2 sm:p-3 text-right font-semibold text-xs sm:text-sm">
                       {parseFloat(item.quantity).toFixed(2)}
                     </td>
@@ -150,9 +183,6 @@ export default function WriteoffDetailPage() {
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       {item.stock_read.currency.short_name}
                     </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm text-gray-600">
-                      {new Date(item.stock_read.date_of_arrived).toLocaleString("ru-RU")}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -160,94 +190,46 @@ export default function WriteoffDetailPage() {
           </div>
         </Card>
 
-        {/* Stock Details */}
+        {/* Product Attributes */}
         {writeoff.items?.map((item:any) => (
-          <Card key={item.id} className="p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold mb-4">
-              Детали склада: {item.stock_read.product.product_name}
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {/* Dynamic Fields */}
-              {Object.entries(item.stock_read.dynamic_fields).map(([key, field]: [string, any]) => {
-                if (!field.show) return null;
-                
-                return (
-                  <div key={key}>
-                    <label className="text-xs sm:text-sm font-medium text-gray-500">
-                      {field.label}
+          item.stock_read.product.attribute_values?.length > 0 && (
+            <Card key={item.id} className="p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">
+                {item.stock_read.product.product_name}
+              </h3>
+              <div className="space-y-3">
+                {item.stock_read.product.attribute_values.map((attrValue: any) => (
+                  <div key={attrValue.id} className="flex flex-col sm:flex-row sm:items-start gap-2">
+                    <label className="text-xs sm:text-sm font-medium text-gray-500 min-w-[200px]">
+                      {attrValue.attribute.translations?.ru || attrValue.attribute.name}
                     </label>
-                    <p className="text-sm sm:text-base font-semibold mt-1">
-                      {typeof field.value === 'object' && field.value !== null
-                        ? JSON.stringify(field.value)
-                        : field.value?.toString() || '-'}
-                    </p>
-                  </div>
-                );
-              })}
-
-              {/* Debt Information */}
-              {item.stock_read.is_debt && (
-                <>
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-gray-500">
-                      Сумма долга
-                    </label>
-                    <p className="text-sm sm:text-base font-semibold mt-1 text-red-600">
-                      {parseFloat(item.stock_read.amount_of_debt).toLocaleString()} {item.stock_read.currency.short_name}
-                    </p>
-                  </div>
-                  {item.stock_read.advance_of_debt && (
-                    <div>
-                      <label className="text-xs sm:text-sm font-medium text-gray-500">
-                        Аванс долга
-                      </label>
-                      <p className="text-sm sm:text-base font-semibold mt-1">
-                        {parseFloat(item.stock_read.advance_of_debt).toLocaleString()} {item.stock_read.currency.short_name}
-                      </p>
+                    <div className="text-sm sm:text-base">
+                      {attrValue.attribute.field_type === 'boolean' ? (
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          attrValue.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {attrValue.value ? 'Да' : 'Нет'}
+                        </span>
+                      ) : attrValue.attribute.field_type === 'many2many' && attrValue.attribute.related_objects ? (
+                        <div className="flex flex-wrap gap-1">
+                          {attrValue.attribute.related_objects
+                            .filter((obj: any) => attrValue.value?.includes(obj.id))
+                            .map((obj: any) => (
+                              <span key={obj.id} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                {obj.name}
+                              </span>
+                            ))
+                          }
+                        </div>
+                      ) : (
+                        <span className="text-gray-900">{attrValue.value?.toString() || '-'}</span>
+                      )}
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Product Attributes */}
-            {item.stock_read.product.attribute_values?.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="text-sm sm:text-base font-semibold mb-3">Атрибуты товара</h4>
-                <div className="space-y-3">
-                  {item.stock_read.product.attribute_values.map((attrValue: any) => (
-                    <div key={attrValue.id} className="flex flex-col sm:flex-row sm:items-start gap-2">
-                      <label className="text-xs sm:text-sm font-medium text-gray-500 min-w-[200px]">
-                        {attrValue.attribute.translations?.ru || attrValue.attribute.name}
-                      </label>
-                      <div className="text-sm sm:text-base">
-                        {attrValue.attribute.field_type === 'boolean' ? (
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            attrValue.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {attrValue.value ? 'Да' : 'Нет'}
-                          </span>
-                        ) : attrValue.attribute.field_type === 'many2many' && attrValue.attribute.related_objects ? (
-                          <div className="flex flex-wrap gap-1">
-                            {attrValue.attribute.related_objects
-                              .filter((obj: any) => attrValue.value?.includes(obj.id))
-                              .map((obj: any) => (
-                                <span key={obj.id} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                                  {obj.name}
-                                </span>
-                              ))
-                            }
-                          </div>
-                        ) : (
-                          <span className="text-gray-900">{attrValue.value?.toString() || '-'}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </Card>
+            </Card>
+          )
         ))}
       </div>
     </div>

@@ -218,21 +218,21 @@ export default function DebtDetailsPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl animate-in fade-in duration-500">
-      <div className="mb-8 animate-in slide-in-from-left duration-500">
-        <h1 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent mb-6">
-          <DollarSign className="w-10 h-10 text-emerald-500" />
-          {t("pages.debt_details")} - {debts[0]?.client_read.name}
+      <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl animate-in fade-in duration-500">
+      <div className="mb-6 sm:mb-8 animate-in slide-in-from-left duration-500">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent mb-4 sm:mb-6">
+          <DollarSign className="w-6 h-6 sm:w-10 sm:h-10 text-emerald-500" />
+          <span className="break-words">{t("pages.debt_details")} - {debts[0]?.client_read.name}</span>
         </h1>
 
         {debts[0] && (
-          <Card className="overflow-hidden mb-8">
-            <div className="bg-gray-50/50 rounded-lg p-6">
-              <h4 className="text-lg font-semibold flex items-center gap-2 mb-4 text-emerald-700">
-                <User2 className="w-5 h-5 text-emerald-500" />
+          <Card className="overflow-hidden mb-6 sm:mb-8">
+            <div className="bg-gray-50/50 rounded-lg p-4 sm:p-6">
+              <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
+                <User2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                 {t("forms.client_info")}
               </h4>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div className="flex items-start gap-3">
                   <Phone className="w-4 h-4 text-emerald-500 mt-1" />
                   <div>
@@ -270,25 +270,25 @@ export default function DebtDetailsPage() {
           >
             <Card className="overflow-hidden hover:shadow-lg transition-all duration-300">
               <div
-                className="flex items-center justify-between p-6 cursor-pointer transition-colors duration-200 hover:bg-gray-50/80"
+                className="flex items-center justify-between p-4 sm:p-6 cursor-pointer transition-colors duration-200 hover:bg-gray-50/80 min-h-[44px]"
                 onClick={() => handleDebtClick(debt.id!)}
               >
-                <div className="space-y-2">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                <div className="space-y-2 flex-1 min-w-0">
+                  <h3 className="text-base sm:text-xl font-semibold flex flex-wrap items-center gap-2">
                     <span className="text-emerald-600">
                       {formatCurrency(debt.total_amount)}
                     </span>
                     <span className="text-gray-400">•</span>
-                    <span className="text-gray-600">
+                    <span className="text-gray-600 text-sm sm:text-base">
                       {formatDate(debt.created_at)}
                     </span>
                   </h3>
-                  <p className="text-sm text-gray-500 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm text-gray-500 flex flex-wrap items-center gap-2">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                     {t("forms.due_date")}: {formatDate(debt.due_date)}
                     <span className="text-gray-400">|</span>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
                         debt.is_paid
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -299,11 +299,11 @@ export default function DebtDetailsPage() {
                   </p>
                 </div>
                 <div
-                  className={`transform transition-transform duration-200 ${
+                  className={`transform transition-transform duration-200 ml-2 flex-shrink-0 ${
                     isDebtExpanded(debt.id!) ? "rotate-180" : ""
                   }`}
                 >
-                  <ChevronDown className="w-6 h-6 text-gray-400" />
+                  <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
                 </div>
               </div>
 
@@ -315,13 +315,13 @@ export default function DebtDetailsPage() {
                 }`}
               >
                 <div className="border-t">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-                    <div className="bg-gray-50/50 rounded-lg p-6 hover:bg-gray-50 transition-colors duration-200">
-                      <h4 className="text-lg font-semibold flex items-center gap-2 mb-4 text-emerald-700">
-                        <Store className="w-5 h-5 text-emerald-500" />
+                  <div className="grid grid-cols-1 gap-4 sm:gap-6 p-4 sm:p-6">
+                    <div className="bg-gray-50/50 rounded-lg p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
+                      <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
+                        <Store className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                         {t("forms.store_info")}
                       </h4>
-                      <dl className="space-y-4">
+                      <dl className="space-y-3 sm:space-y-4">
                         <div className="flex items-start gap-3">
                           <Store className="w-4 h-4 text-emerald-500 mt-1" />
                           <div>
