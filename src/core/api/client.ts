@@ -162,3 +162,5 @@ export const useCreateClient = () => {
     },
   });
 };
+export { api };
+

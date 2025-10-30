@@ -12,6 +12,8 @@ import {
   useAddSupplierBalance,
   type AddSupplierBalanceRequest,
 } from "../api/supplier";
+import { useMutation } from "@tanstack/react-query";
+import { api } from "../api/client";
 import { useGetStores, type Store } from "../api/store";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -24,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet, ArrowUp, ArrowDown } from "lucide-react";
+import { Wallet, ArrowUp, ArrowDown, CreditCard } from "lucide-react";
 
 const supplierFields = (t: (key: string) => string) => [
   {
@@ -91,7 +93,7 @@ export default function SuppliersPage() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
   const [selectedSupplierForBalance, setSelectedSupplierForBalance] =
-    useState<Supplier | null>(null);
+      useState<Supplier | null>(null);
   const [balanceForm, setBalanceForm] = useState({
     store: "",
     amount: "",
@@ -99,6 +101,15 @@ export default function SuppliersPage() {
   });
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [showScrollButtons, setShowScrollButtons] = useState(false);
+  const [isMassPaymentDialogOpen, setIsMassPaymentDialogOpen] = useState(false);
+  const [massPaymentForm, setMassPaymentForm] = useState({
+    supplier: "",
+    store: "",
+    amount: "",
+    payment_type: "Наличные" as "Наличные" | "Карта" | "Click" | "Перечисление",
+    comment: "",
+  });
+  const [selectedMassPaymentStore, setSelectedMassPaymentStore] = useState<Store | null>(null);
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
@@ -109,18 +120,31 @@ export default function SuppliersPage() {
   const deleteSupplier = useDeleteSupplier();
   const addSupplierBalance = useAddSupplierBalance();
 
+  const massPayment = useMutation({
+    mutationFn: async (data: {
+      supplier: number;
+      store: number;
+      amount: number;
+      payment_type: "Наличные" | "Карта" | "Click" | "Перечисление";
+      comment: string;
+    }) => {
+      const response = await api.post('/stock_debt_payment/mass-pay/', data);
+      return response.data;
+    },
+  });
+
   // Get stores array
   const stores = Array.isArray(storesData)
-    ? storesData
-    : storesData?.results || [];
+      ? storesData
+      : storesData?.results || [];
 
   // Get suppliers array and total count
   const suppliers = Array.isArray(suppliersData)
-    ? suppliersData
-    : suppliersData?.results || [];
+      ? suppliersData
+      : suppliersData?.results || [];
   const totalCount = Array.isArray(suppliersData)
-    ? suppliers.length
-    : suppliersData?.count || 0;
+      ? suppliers.length
+      : suppliersData?.count || 0;
 
   // Handlers
   const handleEdit = (supplier: Supplier) => {
@@ -132,33 +156,33 @@ export default function SuppliersPage() {
     if (!editingSupplier?.id) return;
 
     updateSupplier.mutate(
-      { ...data, id: editingSupplier.id },
-      {
-        onSuccess: () => {
-          toast.success(
-            t("messages.success.updated", { item: t("navigation.suppliers") }),
-          );
-          setIsFormOpen(false);
-          setEditingSupplier(null);
+        { ...data, id: editingSupplier.id },
+        {
+          onSuccess: () => {
+            toast.success(
+                t("messages.success.updated", { item: t("navigation.suppliers") }),
+            );
+            setIsFormOpen(false);
+            setEditingSupplier(null);
+          },
+          onError: () =>
+              toast.error(
+                  t("messages.error.update", { item: t("navigation.suppliers") }),
+              ),
         },
-        onError: () =>
-          toast.error(
-            t("messages.error.update", { item: t("navigation.suppliers") }),
-          ),
-      },
     );
   };
 
   const handleDelete = (id: number) => {
     deleteSupplier.mutate(id, {
       onSuccess: () =>
-        toast.success(
-          t("messages.success.deleted", { item: t("navigation.suppliers") }),
-        ),
+          toast.success(
+              t("messages.success.deleted", { item: t("navigation.suppliers") }),
+          ),
       onError: () =>
-        toast.error(
-          t("messages.error.delete", { item: t("navigation.suppliers") }),
-        ),
+          toast.error(
+              t("messages.error.delete", { item: t("navigation.suppliers") }),
+          ),
     });
   };
 
@@ -179,12 +203,12 @@ export default function SuppliersPage() {
 
   const handleBalanceSubmit = async () => {
     if (
-      !selectedSupplierForBalance?.id ||
-      !balanceForm.store ||
-      !balanceForm.amount
+        !selectedSupplierForBalance?.id ||
+        !balanceForm.store ||
+        !balanceForm.amount
     ) {
       toast.error(
-        t("messages.error.fill_required_fields") ||
+          t("messages.error.fill_required_fields") ||
           "Please fill all required fields",
       );
       return;
@@ -200,14 +224,77 @@ export default function SuppliersPage() {
     addSupplierBalance.mutate(data, {
       onSuccess: () => {
         toast.success(
-          t("messages.success.balance_added") || "Balance added successfully",
+            t("messages.success.balance_added") || "Balance added successfully",
         );
         setIsBalanceDialogOpen(false);
         setSelectedSupplierForBalance(null);
       },
       onError: () => {
         toast.error(
-          t("messages.error.balance_add_failed") || "Failed to add balance",
+            t("messages.error.balance_add_failed") || "Failed to add balance",
+        );
+      },
+    });
+  };
+
+  const handleMassPayment = (supplier: Supplier) => {
+    setMassPaymentForm({
+      supplier: String(supplier.id),
+      store: "",
+      amount: "",
+      payment_type: "Наличные",
+      comment: "",
+    });
+    setIsMassPaymentDialogOpen(true);
+  };
+
+  const handleMassPaymentSubmit = async () => {
+    if (
+        !massPaymentForm.supplier ||
+        !massPaymentForm.store ||
+        !massPaymentForm.amount
+    ) {
+      toast.error(
+          t("messages.error.fill_required_fields") ||
+          "Please fill all required fields",
+      );
+      return;
+    }
+
+    // Check budget availability
+    if (selectedMassPaymentStore?.budgets) {
+      const selectedBudget = selectedMassPaymentStore.budgets.find(
+          (budget) => budget.budget_type === massPaymentForm.payment_type,
+      );
+      const budgetAmount = selectedBudget ? Number(selectedBudget.amount) : 0;
+      const paymentAmount = Number(massPaymentForm.amount);
+
+      if (budgetAmount < paymentAmount) {
+        toast.error(
+            t("messages.error.insufficient_budget") || "Insufficient budget for this payment method",
+        );
+        return;
+      }
+    }
+
+    const data = {
+      supplier: Number(massPaymentForm.supplier),
+      store: Number(massPaymentForm.store),
+      amount: Number(massPaymentForm.amount),
+      payment_type: massPaymentForm.payment_type,
+      comment: massPaymentForm.comment,
+    };
+
+    massPayment.mutate(data, {
+      onSuccess: () => {
+        toast.success(
+            t("messages.success.mass_payment") || "Mass payment completed successfully",
+        );
+        setIsMassPaymentDialogOpen(false);
+      },
+      onError: () => {
+        toast.error(
+            t("messages.error.mass_payment_failed") || "Failed to process mass payment",
         );
       },
     });
@@ -231,7 +318,7 @@ export default function SuppliersPage() {
 
       // Show buttons if we've scrolled more than 200px or not at bottom
       setShowScrollButtons(
-        scrollPosition > 200 ||
+          scrollPosition > 200 ||
           scrollPosition + windowHeight < documentHeight - 200,
       );
     };
@@ -243,214 +330,371 @@ export default function SuppliersPage() {
   }, []);
 
   return (
-    <div className="container mx-auto py-6 relative">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t("navigation.suppliers")}</h1>
-        {/* <Button onClick={() => navigate('/create-recycling')}>
-          {t('common.create')} {t('navigation.recyclings')}
-        </Button> */}
-      </div>
-      <ResourceTable
-        data={suppliers}
-        columns={columns(t)}
-        isLoading={isLoading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onAdd={() => navigate("/create-supplier")}
-        onRowClick={handleRowClick}
-        totalCount={totalCount}
-        pageSize={10}
-        currentPage={page}
-        onPageChange={(newPage) => setPage(newPage)}
-        actions={(supplier: Supplier) => (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddBalance(supplier);
-            }}
-          >
-            <Wallet className="h-4 w-4 mr-1" />
-            {t("common.add_balance") || "Add Balance"}
-          </Button>
-        )}
-      />
+      <div className="container mx-auto py-6 relative">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">{t("navigation.suppliers")}</h1>
+        </div>
+        <ResourceTable
+            data={suppliers}
+            columns={columns(t)}
+            isLoading={isLoading}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAdd={() => navigate("/create-supplier")}
+            onRowClick={handleRowClick}
+            totalCount={totalCount}
+            pageSize={10}
+            currentPage={page}
+            onPageChange={(newPage) => setPage(newPage)}
+            actions={(supplier: Supplier) => (
+                <div className="flex gap-2">
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddBalance(supplier);
+                      }}
+                  >
+                    <Wallet className="h-4 w-4 mr-1" />
+                    {t("common.add_balance") || "Add Balance"}
+                  </Button>
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMassPayment(supplier);
+                      }}
+                      className="bg-blue-50 hover:bg-blue-100"
+                  >
+                    <CreditCard className="h-4 w-4 mr-1" />
+                    {t("common.mass_payment") || "Mass Payment"}
+                  </Button>
+                </div>
+            )}
+        />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent>
-          <ResourceForm
-            fields={supplierFields(t)}
-            onSubmit={handleUpdateSubmit}
-            defaultValues={editingSupplier || undefined}
-            isSubmitting={updateSupplier.isPending}
-            title={t("common.edit") + " " + t("navigation.suppliers")}
-          />
-        </DialogContent>
-      </Dialog>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent>
+            <ResourceForm
+                fields={supplierFields(t)}
+                onSubmit={handleUpdateSubmit}
+                defaultValues={editingSupplier || undefined}
+                isSubmitting={updateSupplier.isPending}
+                title={t("common.edit") + " " + t("navigation.suppliers")}
+            />
+          </DialogContent>
+        </Dialog>
 
-      {/* Add Balance Dialog */}
-      <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
-        <DialogContent>
-          <DialogTitle>
-            {t("common.add_balance") || "Add Balance"} -{" "}
-            {selectedSupplierForBalance?.name}
-          </DialogTitle>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="payment_method">
-                {t("common.payment_method")} *
-              </Label>
-              <Select
-                value={balanceForm.payment_method}
-                onValueChange={(value) =>
-                  setBalanceForm({ ...balanceForm, payment_method: value })
-                }
-              >
-                <SelectTrigger id="payment_method">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Наличные">Наличные</SelectItem>
-                  <SelectItem value="Карта">Карта</SelectItem>
-                  <SelectItem value="Click">Click</SelectItem>
-                  <SelectItem value="Перечисление">Перечисление</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="store">{t("forms.store")} *</Label>
-              <Select
-                value={balanceForm.store}
-                onValueChange={(value) => {
-                  setBalanceForm({ ...balanceForm, store: value });
-                  const store = stores.find(
-                    (s: Store) => String(s.id) === value,
-                  );
-                  setSelectedStore(store || null);
-                }}
-              >
-                <SelectTrigger id="store">
-                  <SelectValue
-                    placeholder={
-                      t("placeholders.select_store") || "Select store"
+        {/* Add Balance Dialog */}
+        <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
+          <DialogContent>
+            <DialogTitle>
+              {t("common.add_balance") || "Add Balance"} -{" "}
+              {selectedSupplierForBalance?.name}
+            </DialogTitle>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="payment_method">
+                  {t("common.payment_method")} *
+                </Label>
+                <Select
+                    value={balanceForm.payment_method}
+                    onValueChange={(value) =>
+                        setBalanceForm({ ...balanceForm, payment_method: value })
                     }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {stores.map((store: Store) => (
-                    <SelectItem key={store.id} value={String(store.id)}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                >
+                  <SelectTrigger id="payment_method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Наличные">Наличные</SelectItem>
+                    <SelectItem value="Карта">Карта</SelectItem>
+                    <SelectItem value="Click">Click</SelectItem>
+                    <SelectItem value="Перечисление">Перечисление</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Display Store Budget Information based on selected payment method */}
-            {selectedStore &&
-              selectedStore.budgets &&
-              balanceForm.payment_method && (
-                <div className="space-y-2 p-4 bg-muted rounded-lg">
-                  <div className="font-medium text-sm">
-                    {t("common.available_budget") || "Available Budget"}:
-                  </div>
-                  {(() => {
-                    const selectedBudget = selectedStore.budgets.find(
-                      (budget) =>
-                        budget.budget_type === balanceForm.payment_method,
-                    );
-                    const budgetAmount = selectedBudget
-                      ? Number(selectedBudget.amount)
-                      : 0;
-                    const isInsufficient =
-                      balanceForm.amount &&
-                      budgetAmount < Number(balanceForm.amount);
+              <div className="space-y-2">
+                <Label htmlFor="store">{t("forms.store")} *</Label>
+                <Select
+                    value={balanceForm.store}
+                    onValueChange={(value) => {
+                      setBalanceForm({ ...balanceForm, store: value });
+                      const store = stores.find(
+                          (s: Store) => String(s.id) === value,
+                      );
+                      setSelectedStore(store || null);
+                    }}
+                >
+                  <SelectTrigger id="store">
+                    <SelectValue
+                        placeholder={
+                            t("placeholders.select_store") || "Select store"
+                        }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stores.map((store: Store) => (
+                        <SelectItem key={store.id} value={String(store.id)}>
+                          {store.name}
+                        </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
+              {/* Display Store Budget Information based on selected payment method */}
+              {selectedStore &&
+                  selectedStore.budgets &&
+                  balanceForm.payment_method && (
+                      <div className="space-y-2 p-4 bg-muted rounded-lg">
+                        <div className="font-medium text-sm">
+                          {t("common.available_budget") || "Available Budget"}:
+                        </div>
+                        {(() => {
+                          const selectedBudget = selectedStore.budgets.find(
+                              (budget) =>
+                                  budget.budget_type === balanceForm.payment_method,
+                          );
+                          const budgetAmount = selectedBudget
+                              ? Number(selectedBudget.amount)
+                              : 0;
+                          const isInsufficient =
+                              balanceForm.amount &&
+                              budgetAmount < Number(balanceForm.amount);
+
+                          return (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">
                             {balanceForm.payment_method}:
                           </span>
-                          <span
-                            className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}
-                          >
+                                  <span
+                                      className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}
+                                  >
                             {budgetAmount.toLocaleString()}{" "}
-                            {t("common.currency") || "сум"}
+                                    {t("common.currency") || "сум"}
                           </span>
-                        </div>
-                        {isInsufficient && (
-                          <div className="text-sm text-destructive">
-                            ⚠️{" "}
-                            {t("messages.error.insufficient_budget") ||
-                              "Insufficient budget for this payment method"}
-                          </div>
-                        )}
+                                </div>
+                                {isInsufficient && (
+                                    <div className="text-sm text-destructive">
+                                      ⚠️{" "}
+                                      {t("messages.error.insufficient_budget") ||
+                                          "Insufficient budget for this payment method"}
+                                    </div>
+                                )}
+                              </div>
+                          );
+                        })()}
                       </div>
-                    );
-                  })()}
-                </div>
+                  )}
+
+              <div className="space-y-2">
+                <Label htmlFor="amount">{t("common.amount")} *</Label>
+                <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    value={balanceForm.amount}
+                    onChange={(e) =>
+                        setBalanceForm({ ...balanceForm, amount: e.target.value })
+                    }
+                    placeholder={t("placeholders.enter_amount") || "Enter amount"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                    variant="outline"
+                    onClick={() => setIsBalanceDialogOpen(false)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                    onClick={handleBalanceSubmit}
+                    disabled={addSupplierBalance.isPending}
+                >
+                  {addSupplierBalance.isPending
+                      ? t("common.submitting")
+                      : t("common.submit")}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Mass Payment Dialog */}
+        <Dialog open={isMassPaymentDialogOpen} onOpenChange={setIsMassPaymentDialogOpen}>
+          <DialogContent>
+            <DialogTitle>
+              {t("common.mass_payment") || "Mass Payment"}
+            </DialogTitle>
+            <div className="space-y-4 pt-4">
+
+
+              <div className="space-y-2">
+                <Label htmlFor="mass_store">{t("forms.store")} *</Label>
+                <Select
+                    value={massPaymentForm.store}
+                    onValueChange={(value) => {
+                      setMassPaymentForm({ ...massPaymentForm, store: value });
+                      const store = stores.find((s: Store) => String(s.id) === value);
+                      setSelectedMassPaymentStore(store || null);
+                    }}
+                >
+                  <SelectTrigger id="mass_store">
+                    <SelectValue
+                        placeholder={
+                            t("placeholders.select_store") || "Select store"
+                        }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stores.map((store: Store) => (
+                        <SelectItem key={store.id} value={String(store.id)}>
+                          {store.name}
+                        </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Display Store Budget Information */}
+              {selectedMassPaymentStore?.budgets && massPaymentForm.payment_type && (
+                  <div className="space-y-2 p-4 bg-muted rounded-lg">
+                    <div className="font-medium text-sm">
+                      {t("common.available_budget") || "Available Budget"}:
+                    </div>
+                    {(() => {
+                      const selectedBudget = selectedMassPaymentStore.budgets.find(
+                          (budget) => budget.budget_type === massPaymentForm.payment_type,
+                      );
+                      const budgetAmount = selectedBudget ? Number(selectedBudget.amount) : 0;
+                      const isInsufficient = massPaymentForm.amount && budgetAmount < Number(massPaymentForm.amount);
+
+                      return (
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">
+                          {massPaymentForm.payment_type}:
+                        </span>
+                              <span className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}>
+                          {budgetAmount.toLocaleString()} {t("common.currency") || "сум"}
+                        </span>
+                            </div>
+                            {isInsufficient && (
+                                <div className="text-sm text-destructive">
+                                  ⚠️ {t("messages.error.insufficient_budget") || "Insufficient budget for this payment method"}
+                                </div>
+                            )}
+                          </div>
+                      );
+                    })()}
+                  </div>
               )}
 
-            <div className="space-y-2">
-              <Label htmlFor="amount">{t("common.amount")} *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                value={balanceForm.amount}
-                onChange={(e) =>
-                  setBalanceForm({ ...balanceForm, amount: e.target.value })
-                }
-                placeholder={t("placeholders.enter_amount") || "Enter amount"}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="mass_amount">{t("common.amount")} *</Label>
+                <Input
+                    id="mass_amount"
+                    type="number"
+                    step="0.01"
+                    value={massPaymentForm.amount}
+                    onChange={(e) =>
+                        setMassPaymentForm({ ...massPaymentForm, amount: e.target.value })
+                    }
+                    placeholder={t("placeholders.enter_amount") || "Enter amount"}
+                />
+              </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="mass_payment_type">
+                  {t("common.payment_type")} *
+                </Label>
+                <Select
+                    value={massPaymentForm.payment_type}
+                    onValueChange={(value: "Наличные" | "Карта" | "Click" | "Перечисление") =>
+                        setMassPaymentForm({ ...massPaymentForm, payment_type: value })
+                    }
+                >
+                  <SelectTrigger id="mass_payment_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Наличные">Наличные</SelectItem>
+                    <SelectItem value="Карта">Карта</SelectItem>
+                    <SelectItem value="Click">Click</SelectItem>
+                    <SelectItem value="Перечисление">Перечисление</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mass_comment">{t("common.comment")}</Label>
+                <Input
+                    id="mass_comment"
+                    value={massPaymentForm.comment}
+                    onChange={(e) =>
+                        setMassPaymentForm({ ...massPaymentForm, comment: e.target.value })
+                    }
+                    placeholder={t("placeholders.enter_comment") || "Enter comment"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                    variant="outline"
+                    onClick={() => setIsMassPaymentDialogOpen(false)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                    onClick={handleMassPaymentSubmit}
+                    disabled={massPayment.isPending || (() => {
+                      if (!selectedMassPaymentStore?.budgets || !massPaymentForm.payment_type || !massPaymentForm.amount) return false;
+                      const selectedBudget = selectedMassPaymentStore.budgets.find(
+                          (budget) => budget.budget_type === massPaymentForm.payment_type,
+                      );
+                      const budgetAmount = selectedBudget ? Number(selectedBudget.amount) : 0;
+                      return budgetAmount < Number(massPaymentForm.amount);
+                    })()}
+                    className="bg-blue-500 hover:bg-blue-600"
+                >
+                  {massPayment.isPending
+                      ? t("common.submitting")
+                      : t("common.submit")}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Scroll Buttons */}
+        {showScrollButtons && (
+            <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
               <Button
-                variant="outline"
-                onClick={() => setIsBalanceDialogOpen(false)}
+                  size="icon"
+                  variant="secondary"
+                  className="h-12 w-12 rounded-full shadow-lg"
+                  onClick={scrollToTop}
+                  title={t("common.scroll_to_top") || "Scroll to top"}
               >
-                {t("common.cancel")}
+                <ArrowUp className="h-5 w-5" />
               </Button>
               <Button
-                onClick={handleBalanceSubmit}
-                disabled={addSupplierBalance.isPending}
+                  size="icon"
+                  variant="secondary"
+                  className="h-12 w-12 rounded-full shadow-lg"
+                  onClick={scrollToBottom}
+                  title={t("common.scroll_to_bottom") || "Scroll to bottom"}
               >
-                {addSupplierBalance.isPending
-                  ? t("common.submitting")
-                  : t("common.submit")}
+                <ArrowDown className="h-5 w-5" />
               </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Scroll Buttons */}
-      {showScrollButtons && (
-        <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-12 w-12 rounded-full shadow-lg"
-            onClick={scrollToTop}
-            title={t("common.scroll_to_top") || "Scroll to top"}
-          >
-            <ArrowUp className="h-5 w-5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-12 w-12 rounded-full shadow-lg"
-            onClick={scrollToBottom}
-            title={t("common.scroll_to_bottom") || "Scroll to bottom"}
-          >
-            <ArrowDown className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
   );
 }

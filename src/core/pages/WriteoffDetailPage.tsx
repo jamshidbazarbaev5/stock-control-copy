@@ -124,7 +124,7 @@ export default function WriteoffDetailPage() {
             <div>
               <label className="text-sm font-medium text-gray-500">Создатель</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
-                {writeoff.created_by}
+                {writeoff.created_by.name}
               </p>
             </div>
             <div>
