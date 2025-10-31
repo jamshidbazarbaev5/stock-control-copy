@@ -1095,7 +1095,7 @@ const handleQuantityChange = (
                                   Loading...
                                 </div>
                               ) : filteredProducts.length > 0 ? (
-                                filteredProducts.map((product) => (
+                                filteredProducts.map((product:any) => (
                                     <div
                                       key={product.id}
                                       className="px-4 py-3 bg-white hover:bg-blue-50 active:bg-blue-100 dark:bg-gray-800 dark:hover:bg-gray-700 dark:active:bg-gray-600 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-all duration-150"
@@ -1116,6 +1116,13 @@ const handleQuantityChange = (
                                           {typeof product.quantity === "string"
                                             ? parseFloat(product.quantity)
                                             : product.quantity || 0}{" "}
+                                          {product.extra_quantity && Number(product.extra_quantity) > 0 && (
+                                            <span className="text-green-600">
+                                              (+{typeof product.extra_quantity === "string"
+                                                ? parseFloat(product.extra_quantity)
+                                                : product.extra_quantity})
+                                            </span>
+                                          )}{" "}
                                           {product.available_units?.[0]
                                             ?.short_name || "шт"}
                                         </span>

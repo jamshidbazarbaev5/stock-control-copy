@@ -119,6 +119,11 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
                       <p className="text-xs text-gray-500">Количество</p>
                       <p className="font-medium">
                         {formatCurrency(stock.quantity)}
+                        {stock.extra_quantity && Number(stock.extra_quantity) > 0 && (
+                          <span className="text-green-600 ml-1">
+                            (+{formatCurrency(stock.extra_quantity)})
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div>

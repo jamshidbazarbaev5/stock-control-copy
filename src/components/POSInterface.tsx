@@ -2344,7 +2344,7 @@ const POSInterfaceCore = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredProducts.map((product, index) => (
+                    filteredProducts.map((product:any, index) => (
                       <tr
                         key={product.id}
                         className={`${
@@ -2404,6 +2404,11 @@ const POSInterfaceCore = () => {
                             {parseFloat(
                               String(product.quantity || 0),
                             ).toLocaleString()}
+                            {product.extra_quantity && Number(product.extra_quantity) > 0 && (
+                              <span className="text-green-600 ml-1">
+                                (+{parseFloat(String(product.extra_quantity)).toLocaleString()})
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="p-4 text-right">

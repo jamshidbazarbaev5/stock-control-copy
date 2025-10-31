@@ -176,6 +176,7 @@
   },
   "common": {
     "paid3":"Не в долг",
+      "mass_payment":"Оплатить долг",
     "available_budget": "Бюджет",
     "search_product": "Поиск продукта",
     "edit_stock_entry": "Изменить приход",
