@@ -1043,7 +1043,10 @@ export default function StocksPage() {
             <div className="flex gap-2 pt-4">
               <Button
                 variant="outline"
-                onClick={() => setExtraQuantityDialogOpen(false)}
+                onClick={() => {
+                  setExtraQuantityDialogOpen(false);
+                  window.location.reload();
+                }}
                 className="flex-1"
               >
                 Отмена
