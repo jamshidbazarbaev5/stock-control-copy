@@ -1113,16 +1113,14 @@ const handleQuantityChange = (
                                           {product.product_name}
                                         </span>
                                         <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                          {typeof product.quantity === "string"
-                                            ? parseFloat(product.quantity)
-                                            : product.quantity || 0}{" "}
-                                          {product.extra_quantity && Number(product.extra_quantity) > 0 && (
-                                            <span className="text-green-600">
-                                              (+{typeof product.extra_quantity === "string"
-                                                ? parseFloat(product.extra_quantity)
-                                                : product.extra_quantity})
-                                            </span>
-                                          )}{" "}
+                                          {(
+                                            (typeof product.quantity === "string"
+                                              ? parseFloat(product.quantity)
+                                              : product.quantity || 0) +
+                                            (typeof product.extra_quantity === "string"
+                                              ? parseFloat(product.extra_quantity)
+                                              : product.extra_quantity || 0)
+                                          ).toFixed(2)}{" "}
                                           {product.available_units?.[0]
                                             ?.short_name || "шт"}
                                         </span>

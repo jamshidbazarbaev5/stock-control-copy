@@ -2401,14 +2401,10 @@ const POSInterfaceCore = () => {
                           <div
                             className={`font-semibold ${parseFloat(String(product.quantity || 0)) <= 0 ? "text-red-500" : "text-gray-900"}`}
                           >
-                            {parseFloat(
-                              String(product.quantity || 0),
+                            {(
+                              parseFloat(String(product.quantity || 0)) +
+                              parseFloat(String(product.extra_quantity || 0))
                             ).toLocaleString()}
-                            {product.extra_quantity && Number(product.extra_quantity) > 0 && (
-                              <span className="text-green-600 ml-1">
-                                (+{parseFloat(String(product.extra_quantity)).toLocaleString()})
-                              </span>
-                            )}
                           </div>
                         </td>
                         <td className="p-4 text-right">

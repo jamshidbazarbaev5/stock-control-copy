@@ -297,12 +297,13 @@ export default function StocksPage() {
       accessorKey: "quantity",
       cell: (row: any) => {
         const quantity = row.quantity !== undefined && row.quantity !== null
-          ? Number(row.quantity).toFixed(2)
-          : "-";
+          ? Number(row.quantity)
+          : 0;
         const extraQty = row.extra_quantity && Number(row.extra_quantity) > 0
-          ? ` (+${Number(row.extra_quantity).toFixed(2)})`
-          : "";
-        return `${quantity}${extraQty}`;
+          ? Number(row.extra_quantity)
+          : 0;
+        const total = quantity + extraQty;
+        return total.toFixed(2);
       },
     },
     {
