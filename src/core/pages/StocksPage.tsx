@@ -23,7 +23,7 @@ import {
   DollarSign,
   Package,
 } from "lucide-react";
-import { useGetStocks, useDeleteStock } from "../api/stock";
+import { useGetStocks, useDeleteStock, useUpdateExtraQuantity } from "../api/stock";
 import { useGetStores } from "../api/store";
 import { useGetSuppliers } from "../api/supplier";
 import { useCreateStockDebtPayment } from "../api/stock-debt-payment";
@@ -107,6 +107,9 @@ export default function StocksPage() {
     useState<Stock | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentComment, setPaymentComment] = useState<string>("");
+  const [extraQuantityDialogOpen, setExtraQuantityDialogOpen] = useState(false);
+  const [selectedStockForExtra, setSelectedStockForExtra] = useState<Stock | null>(null);
+  const [extraQuantityAmount, setExtraQuantityAmount] = useState<string>("");
 
   // Column visibility state - load from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
@@ -292,10 +295,15 @@ export default function StocksPage() {
     {
       header: "Количество (базовая единица)",
       accessorKey: "quantity",
-      cell: (row: any) =>
-        row.quantity !== undefined && row.quantity !== null
-          ? `${Number(row.quantity).toFixed(2)}`
-          : "-",
+      cell: (row: any) => {
+        const quantity = row.quantity !== undefined && row.quantity !== null
+          ? Number(row.quantity).toFixed(2)
+          : "-";
+        const extraQty = row.extra_quantity && Number(row.extra_quantity) > 0
+          ? ` (+${Number(row.extra_quantity).toFixed(2)})`
+          : "";
+        return `${quantity}${extraQty}`;
+      },
     },
     {
       header: "Количество (единица закупки)",
@@ -423,6 +431,12 @@ export default function StocksPage() {
                 )}
               </>
             )}
+            <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
+              <span className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Добавить количество
+              </span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -473,6 +487,7 @@ export default function StocksPage() {
   // Mutations
   const deleteStock = useDeleteStock();
   const createStockDebtPayment = useCreateStockDebtPayment();
+  const updateExtraQuantity = useUpdateExtraQuantity();
 
   // Removed fields configuration - using dedicated edit page instead
 
@@ -523,6 +538,40 @@ export default function StocksPage() {
     } catch (error) {
       console.error("Error making debt payment:", error);
       toast.error(t("common.payment_failed"));
+    }
+  };
+
+  const handleAddExtraQuantity = (stock: Stock) => {
+    setSelectedStockForExtra(stock);
+    setExtraQuantityAmount("");
+    setExtraQuantityDialogOpen(true);
+  };
+
+  const handleExtraQuantitySubmit = async () => {
+    if (!selectedStockForExtra || !extraQuantityAmount) {
+      toast.error(t("validation.fill_all_required_fields"));
+      return;
+    }
+
+    const amount = parseFloat(extraQuantityAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error(t("validation.amount_must_be_positive"));
+      return;
+    }
+
+    try {
+      await updateExtraQuantity.mutateAsync({
+        stockId: selectedStockForExtra.id!,
+        total_extra_quantity: amount,
+      });
+
+      toast.success("Количество успешно добавлено");
+      setExtraQuantityDialogOpen(false);
+      setSelectedStockForExtra(null);
+      setExtraQuantityAmount("");
+    } catch (error) {
+      console.error("Error adding extra quantity:", error);
+      toast.error("Ошибка при добавлении количества");
     }
   };
 
@@ -935,6 +984,73 @@ export default function StocksPage() {
                 disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
               >
                 {t("common.pay")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extra Quantity Dialog */}
+      <Dialog
+        open={extraQuantityDialogOpen}
+        onOpenChange={setExtraQuantityDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Добавить количество</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedStockForExtra && (
+              <div className="space-y-2">
+                <Label>Продукт</Label>
+                <p className="text-sm text-gray-600">
+                  {selectedStockForExtra.product?.product_name ||
+                    selectedStockForExtra.product_read?.product_name}
+                </p>
+                <Label>Текущее количество</Label>
+                <p className="text-sm text-gray-600">
+                  {selectedStockForExtra.quantity
+                    ? Number(selectedStockForExtra.quantity).toFixed(2)
+                    : "-"}
+                </p>
+                {selectedStockForExtra.extra_quantity && Number(selectedStockForExtra.extra_quantity) > 0 && (
+                  <>
+                    <Label>Дополнительное количество</Label>
+                    <p className="text-sm text-gray-600">
+                      +{Number(selectedStockForExtra.extra_quantity).toFixed(2)}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="extraQuantityAmount">
+                Количество для добавления
+              </Label>
+              <Input
+                id="extraQuantityAmount"
+                type="number"
+                step="0.01"
+                value={extraQuantityAmount}
+                onChange={(e) => setExtraQuantityAmount(e.target.value)}
+                placeholder="Введите количество"
+                required
+              />
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setExtraQuantityDialogOpen(false)}
+                className="flex-1"
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleExtraQuantitySubmit}
+                className="flex-1"
+                disabled={!extraQuantityAmount || parseFloat(extraQuantityAmount) <= 0}
+              >
+                Добавить
               </Button>
             </div>
           </div>

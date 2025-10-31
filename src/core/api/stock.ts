@@ -48,6 +48,7 @@ export interface Stock {
   };
   total_pure_revenue?: number;
   stock_name?: string | null;
+  extra_quantity?: string;
   // New nested object structure from API
   store?: {
     id: number;
@@ -553,6 +554,21 @@ export const usePayStockDebt = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-entries"] });
+    },
+  });
+};
+
+// Update extra quantity
+export const useUpdateExtraQuantity = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ stockId, total_extra_quantity }: { stockId: number; total_extra_quantity: number }) => {
+      const response = await api.put(`${STOCK_URL}${stockId}/extra/`, { total_extra_quantity });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stocks"] });
     },
   });
 };
