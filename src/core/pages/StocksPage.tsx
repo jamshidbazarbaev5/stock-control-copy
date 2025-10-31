@@ -546,6 +546,7 @@ export default function StocksPage() {
     setSelectedStockForExtra(stock);
     setExtraQuantityAmount("");
     setExtraQuantityDialogOpen(true);
+    window.location.reload()
   };
 
   const handleExtraQuantitySubmit = async () => {
