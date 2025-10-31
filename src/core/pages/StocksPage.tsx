@@ -546,7 +546,7 @@ export default function StocksPage() {
     setSelectedStockForExtra(stock);
     setExtraQuantityAmount("");
     setExtraQuantityDialogOpen(true);
-    window.location.reload()
+
   };
 
   const handleExtraQuantitySubmit = async () => {
@@ -571,6 +571,7 @@ export default function StocksPage() {
       setExtraQuantityDialogOpen(false);
       setSelectedStockForExtra(null);
       setExtraQuantityAmount("");
+          window.location.reload()
     } catch (error) {
       console.error("Error adding extra quantity:", error);
       toast.error("Ошибка при добавлении количества");
