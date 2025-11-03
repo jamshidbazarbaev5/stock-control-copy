@@ -53,7 +53,7 @@ export default function EditCategory() {
       const categoryData: Category = {
         id: parseInt(id!),
         category_name: categoryName,
-        attributes: selectedAttributes.length > 0 ? selectedAttributes : undefined,
+        attributes: selectedAttributes.length > 0 ? selectedAttributes : [],
       };
       
       await updateCategory.mutateAsync(categoryData);
