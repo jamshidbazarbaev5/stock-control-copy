@@ -5,6 +5,7 @@ export interface CurrentUser {
   name: string;
   phone_number: string;
   role: string;
+  can_view_quantity: boolean;
   is_superuser: boolean;
   has_active_shift: boolean;
   is_mobile_user: boolean;

@@ -30,7 +30,6 @@ export default function CreateUser() {
     return '+998' + digits;
   };
 
-  // Patch the phone_number field to use the mask
   const userFields = [
     {
       name: 'name',
@@ -102,6 +101,18 @@ export default function CreateUser() {
         { value: true, label: t('common.mobile') },
         { value: false, label: t('common.desktop') },
       ],
+    },
+    {
+      name: 'can_view_quantity',
+      label: t('forms.can_view_quantity'),
+      type: 'select',
+      placeholder: t('placeholders.select_permission'),
+      required: true,
+      defaultValue: true,
+      options: [
+        { value: true, label: t('common.yes') },
+        { value: false, label: t('common.no') },
+      ],
     }
   ];
 
@@ -109,13 +120,12 @@ export default function CreateUser() {
     try {
       // Transform the data to match the staff creation endpoint requirements
       const staffData = {
-
           name: data.name,
           phone_number: data.phone_number,
           role: data.role,
           password: data.password,
-          is_mobile_user:data.is_mobile_user,
-
+          is_mobile_user: data.is_mobile_user,
+          can_view_quantity: data.can_view_quantity !== undefined ? Boolean(data.can_view_quantity) : true,
           store_write: Number(data.store),
           is_active: Boolean(data.is_active)
       };

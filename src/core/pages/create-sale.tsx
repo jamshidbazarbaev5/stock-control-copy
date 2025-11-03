@@ -1112,18 +1112,20 @@ const handleQuantityChange = (
                                         <span className="font-medium text-sm text-gray-900 dark:text-white">
                                           {product.product_name}
                                         </span>
-                                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                          {(
-                                            (typeof product.quantity === "string"
-                                              ? parseFloat(product.quantity)
-                                              : product.quantity || 0) +
-                                            (typeof product.extra_quantity === "string"
-                                              ? parseFloat(product.extra_quantity)
-                                              : product.extra_quantity || 0)
-                                          ).toFixed(2)}{" "}
-                                          {product.available_units?.[0]
-                                            ?.short_name || "шт"}
-                                        </span>
+                                        {currentUser?.can_view_quantity !== false && (
+                                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                            {(
+                                              (typeof product.quantity === "string"
+                                                ? parseFloat(product.quantity)
+                                                : product.quantity || 0) +
+                                              (typeof product.extra_quantity === "string"
+                                                ? parseFloat(product.extra_quantity)
+                                                : product.extra_quantity || 0)
+                                            ).toFixed(2)}{" "}
+                                            {product.available_units?.[0]
+                                              ?.short_name || "шт"}
+                                          </span>
+                                        )}
                                       </div>
                                       {product.barcode && (
                                         <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">

@@ -102,6 +102,18 @@ const userFields = (t: any, stores: any[] = []) => [
     ],
   },
   {
+    name: "can_view_quantity",
+    label: t("forms.can_view_quantity"),
+    type: "select",
+    placeholder: t("placeholders.select_permission"),
+    required: true,
+    defaultValue: true,
+    options: [
+      { value: true, label: t("common.yes") },
+      { value: false, label: t("common.no") },
+    ],
+  },
+  {
     name: "password",
     label: t("forms.password"),
     type: "password",
@@ -140,7 +152,7 @@ export default function UsersPage() {
     setIsFormOpen(true);
   };
 
-  const handleUpdateSubmit = (data: Partial<ExtendedUser>) => {
+  const handleUpdateSubmit = (data: any) => {
     if (!editingUser?.id) return;
 
     // Create the update payload
@@ -149,9 +161,10 @@ export default function UsersPage() {
       name: data.name || "",
       phone_number: data.phone_number || "",
       role: data.role || "",
-      is_active: Boolean(data.is_active),
+      is_active: data.is_active === "true" || data.is_active === true,
       store_write: Number(data.store_write),
-      is_mobile_user: data.is_mobile_user,
+      is_mobile_user: data.is_mobile_user === "true" || data.is_mobile_user === true,
+      can_view_quantity: data.can_view_quantity === "true" || data.can_view_quantity === true,
     };
 
     // Only include password if it's provided
@@ -323,10 +336,13 @@ export default function UsersPage() {
             )}
             onSubmit={handleUpdateSubmit}
             defaultValues={{
-              ...editingUser,
-              store_write: editingUser?.store_read?.id,
-              is_active: editingUser?.is_active,
-              is_mobile_user: editingUser?.is_mobile_user,
+              name: editingUser?.name,
+              phone_number: editingUser?.phone_number,
+              role: editingUser?.role,
+              store_write: editingUser?.store_read?.id?.toString(),
+              is_active: editingUser?.is_active !== undefined ? editingUser.is_active.toString() : "true",
+              is_mobile_user: editingUser?.is_mobile_user !== undefined ? editingUser.is_mobile_user.toString() : "true",
+              can_view_quantity: editingUser?.can_view_quantity !== undefined ? editingUser.can_view_quantity.toString() : "true",
             }}
             isSubmitting={isUpdating}
             title={t("common.edit")}

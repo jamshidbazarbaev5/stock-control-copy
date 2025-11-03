@@ -2314,9 +2314,11 @@ const POSInterfaceCore = () => {
                     <th className="text-center p-4 font-semibold text-gray-700">
                       Штрихкод
                     </th>
-                    <th className="text-right p-4 font-semibold text-gray-700">
-                      Количество
-                    </th>
+                    {currentUser?.can_view_quantity !== false && (
+                      <th className="text-right p-4 font-semibold text-gray-700">
+                        Количество
+                      </th>
+                    )}
                     <th className="text-right p-4 font-semibold text-gray-700">
                       Цена
                     </th>
@@ -2397,16 +2399,18 @@ const POSInterfaceCore = () => {
                         <td className="p-4 text-center text-gray-600 font-mono text-sm">
                           {product.barcode || "—"}
                         </td>
-                        <td className="p-4 text-right">
-                          <div
-                            className={`font-semibold ${parseFloat(String(product.quantity || 0)) <= 0 ? "text-red-500" : "text-gray-900"}`}
-                          >
-                            {(
-                              parseFloat(String(product.quantity || 0)) +
-                              parseFloat(String(product.extra_quantity || 0))
-                            ).toLocaleString()}
-                          </div>
-                        </td>
+                        {currentUser?.can_view_quantity !== false && (
+                          <td className="p-4 text-right">
+                            <div
+                              className={`font-semibold ${parseFloat(String(product.quantity || 0)) <= 0 ? "text-red-500" : "text-gray-900"}`}
+                            >
+                              {(
+                                parseFloat(String(product.quantity || 0)) +
+                                parseFloat(String(product.extra_quantity || 0))
+                              ).toLocaleString()}
+                            </div>
+                          </td>
+                        )}
                         <td className="p-4 text-right">
                           <div className="text-gray-900 font-semibold">
                             {product.selling_price
