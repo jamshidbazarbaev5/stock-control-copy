@@ -623,7 +623,7 @@ export default function SalesPage() {
                           className="hover:underline cursor-pointer text-blue-600"
                           onClick={() => {
                             navigate(
-                              `/clients/${row.sale_debt?.client_read?.id}`,
+                              `/debts/${row.sale_debt?.client_read?.id}`,
                             );
                           }}
                         >

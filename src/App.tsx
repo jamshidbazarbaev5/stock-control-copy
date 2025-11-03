@@ -11,6 +11,7 @@ import CreateUser from "./core/pages/create-user";
 import CreateStore from "./core/pages/create-store";
 import { ProfilePage } from "./core/pages/ProfilePage";
 import CreateCategory from "./core/pages/create-category";
+import EditCategory from "./core/pages/edit-category";
 import UsersPage from "./core/pages/UsersPage";
 import StoresPage from "./core/pages/StoresPage";
 import CategoriesPage from "./core/pages/CategoriesPage";
@@ -151,6 +152,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <CreateCategory />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/edit-category/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <EditCategory />
                   </PrivateRoute>
                 }
               />

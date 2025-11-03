@@ -232,7 +232,7 @@ export default function StocksPage() {
 
         return (
             <span className="inline-flex items-center gap-2">
-            <span>{label}</span>
+              <span className="border-r border-gray-300 pr-2">{label}</span>
               {row.is_recycled ? (
                   <span className="text-[10px] leading-none px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
                 {t("stock.recycled")}
@@ -432,12 +432,15 @@ export default function StocksPage() {
                     )}
                   </>
               )}
-              <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
-              <span className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Добавить количество
-              </span>
-              </DropdownMenuItem>
+              {(row.product?.category_read?.category_name === "Лист" || 
+                row.product_read?.category_read?.category_name === "Лист") && (
+                <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
+                  <span className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Добавить количество
+                  </span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
       ),
@@ -733,9 +736,9 @@ export default function StocksPage() {
           </Select>
         </div>
 
-        <div className="overflow-x-auto border rounded-lg">
+        <div className="overflow-x-auto border-r border-gray-300 rounded-lg">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-r border-gray-300">
             <tr>
               {columns.map((column) => (
                   <th
@@ -807,7 +810,7 @@ export default function StocksPage() {
 
         {/* Pagination */}
         {stocksData && stocksData.count > pageSize && (
-            <div className="flex justify-center items-center gap-2 mt-6">
+            <div className="flex justify-center items-center gap-2 mt-6 flex-wrap">
               <Button
                   variant="outline"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -815,9 +818,16 @@ export default function StocksPage() {
               >
                 Предыдущая
               </Button>
-              <span className="text-sm text-gray-600">
-            Страница {currentPage} из {Math.ceil((stocksData.count || 0) / pageSize)}
-          </span>
+              {stocksData.page_range?.map((page: number) => (
+                <Button
+                  key={page}
+                  variant={page === currentPage ? "default" : "outline"}
+                  onClick={() => setCurrentPage(page)}
+                  size="sm"
+                >
+                  {page}
+                </Button>
+              ))}
               <Button
                   variant="outline"
                   onClick={() => setCurrentPage(currentPage + 1)}
@@ -955,7 +965,7 @@ export default function StocksPage() {
                   </div>
                 </div>
 
-                {/* Page Range */}
+                {/* Page Range
                 {stocksData.page_range && stocksData.page_range.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-md font-semibold text-gray-700 mb-3">
@@ -972,7 +982,7 @@ export default function StocksPage() {
                         ))}
                       </div>
                     </div>
-                )}
+                )} */}
               </div>
             </Card>
         )}
