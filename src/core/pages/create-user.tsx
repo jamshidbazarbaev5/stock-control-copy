@@ -11,6 +11,8 @@ interface UserFormData {
   role: string;
   password: string;
   store: number;
+  can_view_quantity:boolean;
+  
   is_active: boolean;
   is_mobile_user:boolean;
 }
