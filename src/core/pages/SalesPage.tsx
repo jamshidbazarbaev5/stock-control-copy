@@ -989,7 +989,11 @@ export default function SalesPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => handleDelete(row.id!)}
+              onClick={() => {
+                if (window.confirm("Вы уверены, что хотите удалить эту продажу?")) {
+                  handleDelete(row.id!);
+                }
+              }}
             >
               {t("common.delete")}
             </Button>
