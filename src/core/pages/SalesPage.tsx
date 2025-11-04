@@ -985,6 +985,15 @@ export default function SalesPage() {
               {t("common.print")}
             </Button>
           )}
+          {(currentUser?.role === "Продавец" || currentUser?.is_superuser) && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleDelete(row.id!)}
+            >
+              {t("common.delete")}
+            </Button>
+          )}
         </div>
       ),
     },
@@ -1100,25 +1109,29 @@ export default function SalesPage() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t("forms.start_date")}</label>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full"
-          />
-        </div>
+        {currentUser?.role !== "Продавец" && (
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("forms.start_date")}</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t("forms.end_date")}</label>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full"
-          />
-        </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("forms.end_date")}</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium">
@@ -1136,41 +1149,45 @@ export default function SalesPage() {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Смена</label>
-          <Select value={selectedShift} onValueChange={setSelectedShift}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Выберите смену" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все смены</SelectItem>
-              {shifts?.map((shift) => (
-                <SelectItem key={shift.id} value={shift.id.toString()}>
-                  Смена #{shift.id} - {shift.cashier.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {currentUser?.role !== "Продавец" && (
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Смена</label>
+              <Select value={selectedShift} onValueChange={setSelectedShift}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите смену" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все смены</SelectItem>
+                  {shifts?.map((shift) => (
+                    <SelectItem key={shift.id} value={shift.id.toString()}>
+                      Смена #{shift.id} - {shift.cashier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Продавец</label>
-          <Select value={selectedSoldBy} onValueChange={setSelectedSoldBy}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Выберите продавца" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все продавцы</SelectItem>
-              {users?.map((user) =>
-                user.id ? (
-                  <SelectItem key={user.id} value={user.id.toString()}>
-                    {user.name} ({user.role})
-                  </SelectItem>
-                ) : null,
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Продавец</label>
+              <Select value={selectedSoldBy} onValueChange={setSelectedSoldBy}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите продавца" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все продавцы</SelectItem>
+                  {users?.map((user) =>
+                    user.id ? (
+                      <SelectItem key={user.id} value={user.id.toString()}>
+                        {user.name} ({user.role})
+                      </SelectItem>
+                    ) : null,
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
       </div>
       {/* </Card> */}
 
