@@ -30,7 +30,8 @@ import {
 } from "@/core/api/fetchAllProducts";
 import type { Product } from "@/core/api/product";
 import { useCurrentUser } from "@/core/hooks/useCurrentUser";
-import { useGetUsers } from "@/core/api/user";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/core/api/api";
 import { useGetClients, useCreateClient } from "@/core/api/client";
 import type { User } from "@/core/api/user";
 import { OpenShiftForm } from "./OpenShiftForm";
@@ -97,6 +98,20 @@ interface SessionState {
 interface SalePayment {
   amount: number;
   payment_method: string;
+  exchange_rate?: number;
+  change_amount?: number;
+  usd_input?: string;
+}
+
+interface CurrencyRate {
+  created_at: string;
+  rate: string;
+  currency_detail: {
+    id: number;
+    name: string;
+    short_name: string;
+    is_base: boolean;
+  };
 }
 
 interface SalePayload {
@@ -246,6 +261,8 @@ const POSInterfaceCore = () => {
     { amount: 0, payment_method: "Наличные" },
   ]);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>([]);
+  const [_loadingRates, setLoadingRates] = useState(false);
 
   // Sale API
   const createSaleMutation = useCreateSale();
@@ -299,19 +316,32 @@ const POSInterfaceCore = () => {
 
   // User data
   const { data: currentUser } = useCurrentUser();
-  const { data: usersData } = useGetUsers({});
+  
+  // Check user roles
+  const isAdmin = currentUser?.role === "Администратор";
+  const isSuperUser = currentUser?.is_superuser === true;
+  
+  // Only fetch users if admin/superuser (sellers get 403) - use custom query to suppress errors
+  const usersQuery = useQuery({
+    queryKey: ['users', {}],
+    queryFn: async () => {
+      const response = await api.get('users/');
+      return response.data;
+    },
+    enabled: isAdmin || isSuperUser,
+    retry: false,
+  });
+  
   const { data: clientsData } = useGetClients({
     params: { name: clientSearchTerm },
   });
 
-  const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
+  const users = (isAdmin || isSuperUser) && !usersQuery.isError
+    ? (Array.isArray(usersQuery.data) ? usersQuery.data : usersQuery.data?.results || [])
+    : [];
   const clients = Array.isArray(clientsData)
     ? clientsData
     : clientsData?.results || [];
-
-  // Check user roles
-  const isAdmin = currentUser?.role === "Администратор";
-  const isSuperUser = currentUser?.is_superuser === true;
 
   // Save current session state whenever it changes
   useEffect(() => {
@@ -389,7 +419,7 @@ const POSInterfaceCore = () => {
       selectedSeller,
       currentUserRole: currentUser?.role,
       usersCount: users.length,
-      usersData: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
+      usersData: users.map((u:any) => ({ id: u.id, name: u.name, role: u.role })),
     });
 
     if (!isAdmin && !isSuperUser && currentUser?.id && !selectedSeller) {
@@ -400,6 +430,28 @@ const POSInterfaceCore = () => {
 
   // Calculate totals
   const total = cartProducts.reduce((sum, product) => sum + product.total, 0);
+
+  // Fetch currency rates
+  const fetchCurrencyRates = async () => {
+    try {
+      setLoadingRates(true);
+      const response = await fetch('https://test.bondify.uz/api/v1/currency/rates/');
+      const data = await response.json();
+      setCurrencyRates(data);
+    } catch (error) {
+      console.error('Error fetching currency rates:', error);
+      toast.error('Ошибка загрузки курсов валют');
+    } finally {
+      setLoadingRates(false);
+    }
+  };
+
+  // Fetch rates when payment modal opens
+  useEffect(() => {
+    if (isPaymentModalOpen) {
+      fetchCurrencyRates();
+    }
+  }, [isPaymentModalOpen]);
 
   // Fetch products when modal opens or search term changes
   useEffect(() => {
@@ -886,7 +938,7 @@ const POSInterfaceCore = () => {
         newName = client.name;
       }
     } else if (selectedSeller) {
-      const seller = users.find((u) => u.id === selectedSeller);
+      const seller = users.find((u:any) => u.id === selectedSeller);
       if (seller?.name) {
         newName = `${seller.name || ""}`.trim();
       }
@@ -1162,7 +1214,7 @@ const POSInterfaceCore = () => {
           e.preventDefault();
           if (cartProducts.length > 0) {
             setDiscountAmount(0);
-            setPaymentMethods([{ amount: 0, payment_method: "Наличные" }]);
+            setPaymentMethods([{ amount: total - discountAmount, payment_method: "Наличные" }]);
             setIsPaymentModalOpen(true);
           }
           return;
@@ -1249,6 +1301,32 @@ const POSInterfaceCore = () => {
                 {
                   amount: remaining > 0 ? remaining : 0,
                   payment_method: "Перечисление",
+                },
+              ]);
+            }
+          }
+          return;
+        case "F5":
+          e.preventDefault();
+          if (isPaymentModalOpen) {
+            const hasValuta = paymentMethods.some(
+              (p) => p.payment_method === "Валюта",
+            );
+            if (!hasValuta) {
+              const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
+              const totalPaid = paymentMethods.reduce(
+                (sum, p) => sum + (p.amount || 0),
+                0,
+              );
+              const remaining = total - totalPaid;
+              setPaymentMethods((prev) => [
+                ...prev,
+                {
+                  amount: remaining > 0 ? remaining : 0,
+                  payment_method: "Валюта",
+                  exchange_rate: defaultRate,
+                  change_amount: 0,
+                  usd_input: '',
                 },
               ]);
             }
@@ -1443,7 +1521,7 @@ const POSInterfaceCore = () => {
                       {selectedSeller && (
                         <span className="text-blue-700 font-medium">
                           Продавец:{" "}
-                          {users.find((u) => u.id === selectedSeller)?.name ||
+                          {users.find((u:any) => u.id === selectedSeller)?.name ||
                             (selectedSeller === currentUser?.id
                               ? currentUser?.name
                               : `ID: ${selectedSeller} (не найден)`)}
@@ -2156,7 +2234,7 @@ const POSInterfaceCore = () => {
               onClick={() => {
                 setDiscountAmount(0);
                 setPaymentMethods([
-                  { amount: 0, payment_method: "Наличные" },
+                  { amount: total - discountAmount, payment_method: "Наличные" },
                 ]);
                 setIsPaymentModalOpen(true);
               }}
@@ -2474,7 +2552,7 @@ const POSInterfaceCore = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {users
-                      .filter((user) => {
+                      .filter((user:ExtendedUser) => {
                         const extendedUser = user as ExtendedUser;
                         return (
                           (user.role === "Продавец" ||
@@ -2482,7 +2560,7 @@ const POSInterfaceCore = () => {
                           extendedUser.store_read
                         );
                       })
-                      .map((user) => (
+                      .map((user:ExtendedUser) => (
                         <SelectItem
                           key={user.id}
                           value={user.id?.toString() || ""}
@@ -2662,7 +2740,7 @@ const POSInterfaceCore = () => {
                 {selectedSeller && (
                   <p className="text-sm text-blue-700">
                     <strong>Продавец:</strong>{" "}
-                    {users.find((u) => u.id === selectedSeller)?.name ||
+                    {users.find((u:any) => u.id === selectedSeller)?.name ||
                       (selectedSeller === currentUser?.id
                         ? currentUser?.name
                         : `ID: ${selectedSeller}`)}
@@ -3116,6 +3194,12 @@ const POSInterfaceCore = () => {
                         .map((payment) => ({
                           payment_method: payment.payment_method,
                           amount: (payment.amount || (total - discountAmount)).toFixed(2),
+                          ...(payment.payment_method === "Валюта" && payment.exchange_rate && {
+                            exchange_rate: payment.exchange_rate,
+                          }),
+                          ...(payment.payment_method === "Валюта" && payment.change_amount && {
+                            change_amount: payment.change_amount.toFixed(2),
+                          }),
                         }))
                         .filter((p) => Number(p.amount) > 0),
                       ...(onCredit &&
@@ -3453,6 +3537,57 @@ const POSInterfaceCore = () => {
               <button
                 onClick={() => {
                   if (onCredit) return; // Disable when in credit mode
+                  const hasValuta = paymentMethods.some(
+                    (p) => p.payment_method === "Валюта",
+                  );
+                  if (!hasValuta) {
+                    const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
+                    const totalPaid = paymentMethods.reduce(
+                      (sum, p) => sum + (p.amount || 0),
+                      0,
+                    );
+                    const remaining = (total - discountAmount) - totalPaid;
+                    setPaymentMethods((prev) => [
+                      ...prev,
+                      {
+                        amount: remaining > 0 ? remaining : 0,
+                        payment_method: "Валюта",
+                        exchange_rate: defaultRate,
+                        change_amount: 0,
+                        usd_input: '',
+                      },
+                    ]);
+                  }
+                }}
+                disabled={onCredit}
+                className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-center gap-3 transition-colors ${
+                  onCredit 
+                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50" 
+                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                }`}
+              >
+                <svg
+                  className="w-6 h-6 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-gray-700 font-medium">Валюта</span>
+                <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                  F5
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (onCredit) return; // Disable when in credit mode
                   const totalPaid = paymentMethods.reduce(
                     (sum, p) => sum + (p.amount || 0),
                     0,
@@ -3506,27 +3641,115 @@ const POSInterfaceCore = () => {
                     {payment.payment_method}
                   </div>
 
-                  <input
-                    type="number"
-                    value={payment.amount || (total - discountAmount)}
-                    onChange={(e) => {
-                      if (onCredit) return;
-                      const updated = [...paymentMethods];
-                      updated[index].amount = Number(e.target.value);
-                      setPaymentMethods(updated);
-                    }}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                    }}
-                    onBlur={(e) => {
-                      e.stopPropagation();
-                    }}
-                    placeholder="0"
-                    disabled={onCredit}
-                    className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
-                      onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                    }`}
-                  />
+                  {payment.payment_method === "Валюта" ? (
+                    <div className="space-y-3">
+                      {/* Currency Amount in USD */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Сумма в валюте ($)</label>
+                        <input
+                          type="text"
+                          value={payment.usd_input ?? (payment.amount ? (payment.amount / (payment.exchange_rate || 1)).toFixed(2) : '')}
+                          onChange={(e) => {
+                            if (onCredit) return;
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            const usdAmount = parseFloat(value) || 0;
+                            const uzsAmount = usdAmount * (payment.exchange_rate || 1);
+                            const finalTotal = total - discountAmount;
+                            const changeAmount = Math.max(0, uzsAmount - finalTotal);
+                            const updated = [...paymentMethods];
+                            updated[index] = {
+                              ...updated[index],
+                              usd_input: value,
+                              amount: uzsAmount,
+                              change_amount: changeAmount,
+                            };
+                            setPaymentMethods(updated);
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                            e.target.select();
+                          }}
+                          onBlur={(e) => e.stopPropagation()}
+                          placeholder="0"
+                          disabled={onCredit}
+                          className={`w-full text-2xl font-bold bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                          }`}
+                        />
+                      </div>
+
+                      {/* Exchange Rate */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Курс (UZS)</label>
+                        <input
+                          type="number"
+                          value={payment.exchange_rate || ''}
+                          onChange={(e) => {
+                            if (onCredit) return;
+                            const newRate = Number(e.target.value);
+                            const usdAmount = payment.amount ? payment.amount / (payment.exchange_rate || 1) : 0;
+                            const uzsAmount = usdAmount * newRate;
+                            const finalTotal = total - discountAmount;
+                            const changeAmount = Math.max(0, uzsAmount - finalTotal);
+                            const updated = [...paymentMethods];
+                            updated[index] = {
+                              ...updated[index],
+                              exchange_rate: newRate,
+                              amount: uzsAmount,
+                              change_amount: changeAmount,
+                            };
+                            setPaymentMethods(updated);
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                            e.target.select();
+                          }}
+                          onBlur={(e) => e.stopPropagation()}
+                          placeholder="12500"
+                          disabled={onCredit}
+                          className={`w-full text-lg font-semibold bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            onCredit ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-gray-700"
+                          }`}
+                        />
+                      </div>
+
+                      {/* Total in UZS */}
+                      <div className="pt-2 border-t border-gray-300">
+                        <div className="text-xs text-gray-500">Итого (UZS)</div>
+                        <div className="text-xl font-bold text-gray-900">
+                          {(payment.amount || 0).toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Change Amount */}
+                      {payment.change_amount && payment.change_amount > 0 && (
+                        <div className="pt-2 border-t border-gray-300 bg-blue-50 -mx-6 -mb-6 px-6 py-3 rounded-b-xl">
+                          <div className="text-xs text-blue-600 font-medium">Сдача</div>
+                          <div className="text-lg font-bold text-blue-600">
+                            {payment.change_amount.toLocaleString()} UZS
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={payment.amount || (total - discountAmount)}
+                      onChange={(e) => {
+                        if (onCredit) return;
+                        const updated = [...paymentMethods];
+                        updated[index].amount = Number(e.target.value);
+                        setPaymentMethods(updated);
+                      }}
+                      onFocus={(e) => e.stopPropagation()}
+                      onBlur={(e) => e.stopPropagation()}
+                      placeholder="0"
+                      disabled={onCredit}
+                      className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                        onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                      }`}
+                    />
+                  )}
                 </div>
               ))}
             </div>
