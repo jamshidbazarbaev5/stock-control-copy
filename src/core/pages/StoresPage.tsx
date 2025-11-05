@@ -156,7 +156,6 @@ export default function StoresPage() {
           setIsFormOpen(false);
           setEditingStore(null);
         },
-        onError: () => toast.error(t('messages.error.update', { item: t('navigation.stores') })),
       }
     );
   };

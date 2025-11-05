@@ -274,8 +274,6 @@ export default function CreateProduct() {
       );
       navigate("/products");
     } catch (error) {
-      toast.error(t("messages.error.create", { item: t("table.product") }));
-      console.error("Failed to create product:", error);
     }
   };
 

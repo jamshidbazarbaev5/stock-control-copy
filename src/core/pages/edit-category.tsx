@@ -60,8 +60,6 @@ export default function EditCategory() {
       toast.success(t('messages.success.updated', { item: t('navigation.categories') }));
       navigate('/categories');
     } catch (error) {
-      toast.error(t('messages.error.update', { item: t('navigation.categories') }));
-      console.error('Failed to update category:', error);
     }
   };
 

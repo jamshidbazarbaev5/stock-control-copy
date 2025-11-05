@@ -91,27 +91,7 @@ export default function EditTransferPage() {
           toast.success(t("messages.success.updated"));
           navigate("/transfers");
         },
-        onError: (error: unknown) => {
-          if (
-            error &&
-            typeof error === "object" &&
-            "response" in error &&
-            error.response &&
-            typeof error.response === "object" &&
-            "data" in error.response &&
-            error.response.data &&
-            typeof error.response.data === "object" &&
-            "non_field_errors" in error.response.data &&
-            Array.isArray(error.response.data.non_field_errors) &&
-            error.response.data.non_field_errors.includes(
-              "Cannot transfer to the same store.",
-            )
-          ) {
-            toast.error(t("messages.error.same_store_transfer"));
-          } else {
-            toast.error(t("messages.error.update"));
-          }
-        },
+
       },
     );
   };

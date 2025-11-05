@@ -38,8 +38,6 @@ const ReceiptDesignerPage: React.FC = () => {
       // Go back to manager view after saving
       setCurrentView("manager");
     } catch (error) {
-      toast.error(t("receiptDesigner.errorSavingTemplate"));
-      console.error("Error saving template:", error);
     }
   };
 

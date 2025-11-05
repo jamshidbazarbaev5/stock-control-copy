@@ -34,8 +34,6 @@ export default function CreateLabelSize() {
             toast.success(t('messages.success.created', { item: t('navigation.labelSizes') }));
             navigate('/label-sizes');
         } catch (error) {
-            toast.error(t('messages.error.create', { item: t('navigation.labelSizes') }));
-            console.error('Failed to create label size:', error);
         }
     };
 

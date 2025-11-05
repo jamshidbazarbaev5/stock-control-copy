@@ -77,8 +77,6 @@ export default function ExchangeLoanPaymentsPage() {
       setNotes('');
       setIsCreateModalOpen(false);
     } catch (error) {
-      toast.error(t('messages.error.payment_create'));
-      console.error('Failed to create payment:', error);
     } finally {
       setIsSubmitting(false);
     }

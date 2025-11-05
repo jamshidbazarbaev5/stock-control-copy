@@ -20,7 +20,6 @@ export default function CreateSponsorPage() {
       navigate('/sponsors');
       // Optionally redirect or reset form
     } catch (e) {
-      toast.error('Failed to create sponsor');
     }
   };
 

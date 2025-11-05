@@ -1012,8 +1012,6 @@ export default function EditStock() {
       toast.success("Приход успешно обновлен");
       navigate("/stock");
     } catch (error) {
-      toast.error("Failed to update stock");
-      console.error("Failed to update stock:", error);
     }
   };
 

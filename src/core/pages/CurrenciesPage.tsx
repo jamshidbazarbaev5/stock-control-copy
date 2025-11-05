@@ -95,10 +95,7 @@ export default function CurrenciesPage() {
         setEditShortName("");
         setEditIsBase(false);
       },
-      onError: () =>
-        toast.error(
-          t("messages.error.update", { item: t("navigation.currencies") }),
-        ),
+      
     });
   };
 

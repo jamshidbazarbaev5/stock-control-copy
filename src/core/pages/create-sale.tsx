@@ -787,8 +787,6 @@ const handleQuantityChange = (
       toast.success(t("messages.created_successfully"));
       navigate("/sales");
     } catch (error) {
-      console.error("Error creating sale:", error);
-      toast.error(t("messages.error_creating"));
     }
   };
 

@@ -300,7 +300,6 @@ export default function ProductsPage() {
       setIsRevaluationDialogOpen(false);
       setSelectedProducts([]);
     } catch (error) {
-      toast.error(t("messages.error.revaluation"));
     }
   };
 
@@ -428,11 +427,6 @@ export default function ProductsPage() {
         );
         return { success: true, productId: edit.productId };
       } catch (error) {
-        console.error(`❌ Error for product ${edit.productId}:`, error);
-        toast.error(
-          t("messages.error.priceUpdate") ||
-            `Failed to update price for ${product.product_name}`,
-        );
         return { success: false, productId: edit.productId, error };
       }
     });

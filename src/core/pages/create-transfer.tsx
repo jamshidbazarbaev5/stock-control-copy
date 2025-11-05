@@ -217,10 +217,6 @@ export default function CreateTransfer() {
       );
       navigate("/transfers");
     } catch (error) {
-      toast.error(
-        t("messages.error.create", { item: t("navigation.transfers") }),
-      );
-      console.error("Failed to create transfer:", error);
     }
   };
 

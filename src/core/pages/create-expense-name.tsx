@@ -25,8 +25,6 @@ export default function CreateExpenseName() {
       toast.success(t('messages.success.expense_name_created'));
       navigate('/expense-name');
     } catch (error) {
-      toast.error(t('messages.error.expense_name_create'));
-      console.error('Failed to create expense name:', error);
     }
   };
 

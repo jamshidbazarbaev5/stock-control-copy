@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useErrorStore, parseErrorMessage } from '../store/errorStore';
 
 // Types
 interface LoginCredentials {
@@ -29,6 +30,16 @@ const authApi = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add error interceptor to authApi
+authApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const errorMessage = parseErrorMessage(error.response?.data);
+    useErrorStore.getState().setError(errorMessage);
+    return Promise.reject(error);
+  },
+);
 
 // Helper functions
 const getAccessToken = (): string | null => localStorage.getItem(ACCESS_TOKEN_KEY);

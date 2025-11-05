@@ -47,7 +47,6 @@ export default function EditExchangeLoanPage() {
         toast.success(t('messages.success.updated', { item: t('navigation.exchange_loans') }));
         queryClient.invalidateQueries({ queryKey: ['exchange-loans', Number(id)] });
       },
-      onError: () => toast.error(t('messages.error.update', { item: t('navigation.exchange_loans') })),
     });
   };
 

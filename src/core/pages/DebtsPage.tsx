@@ -76,8 +76,6 @@ export default function DebtsPage() {
       setIsPaymentModalOpen(false);
       setSelectedDebtClient(null);
     } catch (error) {
-      toast.error(t("messages.error.payment_create"));
-      console.error("Failed to create payment:", error);
     }
   };
 

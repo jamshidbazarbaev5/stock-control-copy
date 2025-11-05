@@ -68,8 +68,6 @@ export function ProfilePage() {
       toast.success(t('messages.success.password_updated'));
       setIsPasswordDialogOpen(false);
     } catch (error) {
-      toast.error(t('messages.error.password_update'));
-      console.error('Failed to update password:', error);
     }
   };
 

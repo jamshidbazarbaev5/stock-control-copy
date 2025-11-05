@@ -181,7 +181,6 @@ export default function UsersPage() {
         setIsFormOpen(false);
         setEditingUser(null);
       },
-      onError: () => toast.error(t("messages.update_failed")),
     });
   };
 

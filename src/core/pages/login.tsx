@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext';
 export function LoginPage() {
   const [phone_number, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
@@ -17,7 +16,6 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
     
     try {
@@ -33,8 +31,7 @@ export function LoginPage() {
       console.log('[LoginPage] Redirecting to:', from);
       navigate(from, { replace: true });
     } catch (err) {
-      console.error('[LoginPage] Login error:', err);
-      setError('Неверные учетные данные');
+      // Error is automatically handled by axios interceptor
     } finally {
       setIsLoading(false);
     }
@@ -57,11 +54,6 @@ export function LoginPage() {
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="text-red-500 text-sm text-center">
-              {error === 'Invalid credentials' ? 'Неверные учетные данные' : error}
-            </div>
-          )}
           <div className="rounded-md shadow-sm space-y-4">
             <div>
               <label htmlFor="username" className="sr-only">

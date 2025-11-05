@@ -69,7 +69,6 @@ export default function LabelSizesPage() {
                     setIsFormOpen(false);
                     setEditingLabelSize(null);
                 },
-                onError: () => toast.error(t('messages.error.update', { item: t('navigation.labelSizes') })),
             }
         );
     };

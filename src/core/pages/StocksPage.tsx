@@ -540,8 +540,6 @@ export default function StocksPage() {
       // Refresh the page to update the data
       window.location.reload();
     } catch (error) {
-      console.error("Error making debt payment:", error);
-      toast.error(t("common.payment_failed"));
     }
   };
 
@@ -576,8 +574,6 @@ export default function StocksPage() {
       setExtraQuantityAmount("");
       window.location.reload()
     } catch (error) {
-      console.error("Error adding extra quantity:", error);
-      toast.error("Ошибка при добавлении количества");
     }
   };
 

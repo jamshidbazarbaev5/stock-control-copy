@@ -60,8 +60,6 @@ export default function CreateMeasurement() {
       toast.success(t('messages.success.created', { item: t('navigation.measurements') }));
       navigate('/measurements');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.measurements') }));
-      console.error('Failed to create measurement:', error);
     }
   };
 

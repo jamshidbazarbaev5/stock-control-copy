@@ -28,8 +28,6 @@ export default function AttributeFormPage() {
       const data = await attributeApi.getById(attributeId);
       setAttribute(data);
     } catch (error) {
-      toast.error(t("messages.error.failed_to_load_attribute"));
-      console.error(error);
     } finally {
       setIsLoadingAttribute(false);
     }

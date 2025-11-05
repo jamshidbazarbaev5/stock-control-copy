@@ -57,8 +57,6 @@ export default function CreateStaff() {
       toast.success(t('messages.success.created', { item: t('table.staff') }));
       navigate('/staff');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('table.staff') }));
-      console.error('Failed to create staff:', error);
     }
   };
 

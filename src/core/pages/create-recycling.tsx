@@ -517,12 +517,6 @@ export default function CreateRecycling() {
       );
       navigate("/recyclings");
     } catch (error) {
-      toast.error(
-        t("messages.error.create", {
-          item: t("navigation.recyclings").toLowerCase(),
-        }),
-      );
-      console.error("Failed to create recycling:", error);
     }
   };
 

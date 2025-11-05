@@ -486,12 +486,6 @@ export default function SalesPage() {
       setRefundNotes("");
       setRefundPayments([]);
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.detail ||
-          error?.response?.data?.error ||
-          t("messages.error.refund_failed"),
-      );
-      console.error("Failed to create refund:", error);
     }
   };
 

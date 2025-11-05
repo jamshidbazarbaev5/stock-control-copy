@@ -29,7 +29,6 @@ export default function WriteoffDetailPage() {
       toast.success("Примечания обновлены");
       setIsEditingNotes(false);
     } catch (error) {
-      toast.error("Ошибка при обновлении");
     }
   };
 

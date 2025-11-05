@@ -112,8 +112,6 @@ export default function AddMoney() {
       toast.success(t("messages.success.money_added"));
       navigate("/finance"); // You'll need to create this route
     } catch (error) {
-      toast.error(t("messages.error.add_money"));
-      console.error("Failed to add money:", error);
     }
   };
 

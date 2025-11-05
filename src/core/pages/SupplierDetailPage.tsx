@@ -87,9 +87,7 @@ export default function SupplierDetailPage() {
           setPaymentAmount('');
           setPaymentComment('');
         },
-        onError: () => {
-          toast.error(t('common.payment_failed'));
-        },
+       
       }
     );
   };

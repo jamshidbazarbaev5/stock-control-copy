@@ -239,7 +239,6 @@ export default function ShiftsPage() {
       shiftClosureReceiptService.showPrintNotification(printResult);
       console.log("✅ Print completed:", printResult);
     } catch (error) {
-      console.error("❌ Print failed:", error);
       shiftClosureReceiptService.showPrintNotification({
         success: false,
         method: "failed",

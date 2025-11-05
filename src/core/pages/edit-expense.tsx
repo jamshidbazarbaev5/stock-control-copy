@@ -93,8 +93,6 @@ export default function EditExpensePage() {
       toast.success(t('messages.success.expense_updated'));
       navigate('/expense');
     } catch (error) {
-      toast.error(t('messages.error.expense_update'));
-      console.error('Failed to update expense:', error);
     }
   };
 

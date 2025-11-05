@@ -89,8 +89,6 @@ export default function EditMoney() {
       toast.success(t('messages.success.money_updated'));
       navigate('/finance');
     } catch (error) {
-      toast.error(t('messages.error.update_money'));
-      console.error('Failed to update money:', error);
     }
   };
 

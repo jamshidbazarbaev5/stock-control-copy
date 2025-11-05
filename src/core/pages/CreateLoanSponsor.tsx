@@ -59,7 +59,6 @@ export default function CreateLoanSponsor() {
         toast.success(t('messages.success.created', { item: t('navigation.loansponsors') }));
         navigate('/loans');
       },
-      onError: () => toast.error(t('messages.error.create', { item: t('navigation.loansponsors') })),
     });
   };
 

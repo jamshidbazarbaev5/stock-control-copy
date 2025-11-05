@@ -45,7 +45,6 @@ export default function EditSponsorPage() {
       toast.success(t('messages.success.updated', { item: t('navigation.sponsors') }));
       navigate('/sponsors');
     } catch (e) {
-      toast.error('Failed to update sponsor');
     }
   };
 

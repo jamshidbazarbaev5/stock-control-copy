@@ -123,7 +123,6 @@ export default function MeasurementsPage() {
           setIsFormOpen(false);
           setEditingMeasurement(null);
         },
-        onError: () => toast.error('Failed to update measurement'),
       }
     );
   };

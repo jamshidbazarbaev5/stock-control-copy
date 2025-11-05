@@ -159,8 +159,6 @@ export default function CreateExpense() {
       toast.success(t('messages.success.expense_created'));
       navigate('/expense'); // navigate to expenses list page
     } catch (error) {
-      toast.error(t('messages.error.expense_create'));
-      console.error('Failed to create expense:', error);
     }
   };
 

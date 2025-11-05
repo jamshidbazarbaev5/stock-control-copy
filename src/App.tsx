@@ -39,6 +39,7 @@ import EditClient from "./core/pages/edit-client";
 import ClientHistoryPage from "./core/pages/ClientHistoryPage";
 import SalesPage from "./core/pages/SalesPage";
 import { Toaster } from "sonner";
+import { ErrorModal } from "./core/components/ErrorModal";
 import DebtsPage from "./core/pages/DebtsPage";
 import StaffPage from "./core/pages/StaffPage";
 import CreateStaff from "./core/pages/create-staff";
@@ -791,6 +792,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
           <Toaster />
+          <ErrorModal />
         </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>

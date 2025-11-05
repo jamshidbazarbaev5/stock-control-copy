@@ -98,7 +98,6 @@ export default function CreateExchangeLoanPage() {
         toast.success(t('messages.success.created', { item: t('navigation.exchange_loans') }));
         navigate('/exchange-loans');
       },
-      onError: () => toast.error(t('messages.error.create', { item: t('navigation.exchange_loans') })),
     });
   };
 

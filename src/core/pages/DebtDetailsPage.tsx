@@ -175,8 +175,6 @@ export default function DebtDetailsPage() {
       setIsPaymentModalOpen(false);
       setSelectedDebt(null);
     } catch (error) {
-      console.error("Failed to create payment:", error);
-      toast.error(t("messages.error.payment_create"));
     }
   };
 

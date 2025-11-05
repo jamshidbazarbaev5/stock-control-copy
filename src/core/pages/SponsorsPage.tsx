@@ -59,7 +59,6 @@ export default function SponsorsPage() {
       toast.success(t('messages.success.created', { item: t('navigation.loan') }));
       fetchData();
     } catch (e) {
-      toast.error('Failed to create loan');
     }
   }, [selectedSponsorId]);
 

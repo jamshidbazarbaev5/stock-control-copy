@@ -224,8 +224,6 @@ export default function ExchangeLoansPage() {
         await deleteExchangeLoan.mutateAsync(id);
         toast.success(t('messages.success.deleted', { item: t('navigation.exchange_loans') }));
       } catch (error) {
-        toast.error(t('messages.error.delete', { item: t('navigation.exchange_loans') }));
-        console.error('Failed to delete exchange loan:', error);
       }
     }
   };
@@ -304,8 +302,6 @@ export default function ExchangeLoansPage() {
       setPaymentModalOpen(false);
       setSelectedLoan(null);
     } catch (error) {
-      toast.error(t('common.payment_failed'));
-      console.error('Failed to create payment:', error);
     } finally {
       setIsSubmittingPayment(false);
     }

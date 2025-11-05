@@ -58,8 +58,6 @@ export default function PrintBarcodePage() {
                 throw new Error('Invalid response format');
             }
         } catch (error) {
-            console.error('Print error:', error);
-            toast.error(t('messages.error.print'));
         } finally {
             setIsPrinting(false);
         }

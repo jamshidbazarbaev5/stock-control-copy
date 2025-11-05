@@ -77,8 +77,6 @@ export default function CashInflowNamesPage() {
       await deleteCashFlowName.mutateAsync(id);
       toast.success(t('messages.success.deleted', { item: t('navigation.cash_inflow_name') }));
     } catch (error) {
-      toast.error(t('messages.error.delete', { item: t('navigation.cash_inflow_name') }));
-      console.error('Failed to delete cash inflow name:', error);
     }
   };
 

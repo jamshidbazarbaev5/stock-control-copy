@@ -45,8 +45,6 @@ export default function CreateCategory() {
       toast.success(t('messages.success.created', { item: t('navigation.categories') }));
       navigate('/categories');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.categories') }));
-      console.error('Failed to create category:', error);
     }
   };
 

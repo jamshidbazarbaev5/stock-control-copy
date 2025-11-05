@@ -136,8 +136,6 @@ export default function CreateUser() {
       toast.success(t('messages.success.created', { item: t('navigation.users') }));
       navigate('/users');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.users') }));
-      console.error('Failed to create user:', error);
     }
   };
 

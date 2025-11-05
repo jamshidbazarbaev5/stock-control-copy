@@ -81,8 +81,6 @@ export default function EditClient() {
       toast.success(t('messages.success.updated', { item: t('navigation.clients') }));
       navigate('/clients');
     } catch (error) {
-      toast.error(t('messages.error.update', { item: t('navigation.clients') }));
-      console.error('Failed to update client:', error);
     }
   };
 

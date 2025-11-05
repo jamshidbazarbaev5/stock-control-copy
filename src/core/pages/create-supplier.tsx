@@ -33,8 +33,6 @@ export default function CreateSupplier() {
       toast.success(t('messages.success.created', { item: t('table.supplier') }));
       navigate('/suppliers');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('table.supplier') }));
-      console.error('Failed to create supplier:', error);
     }
   };
 

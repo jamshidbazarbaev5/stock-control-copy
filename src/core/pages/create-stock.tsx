@@ -1150,8 +1150,8 @@ export default function CreateStock() {
       toast.success("Stock entries created successfully");
       navigate("/stock");
     } catch (error) {
-      toast.error("Failed to create stock entries");
-      console.error("Failed to create stock entries:", error);
+     
+      
     } finally {
       setIsSubmitting(false);
     }

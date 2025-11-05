@@ -165,10 +165,7 @@ export default function SuppliersPage() {
             setIsFormOpen(false);
             setEditingSupplier(null);
           },
-          onError: () =>
-              toast.error(
-                  t("messages.error.update", { item: t("navigation.suppliers") }),
-              ),
+        
         },
     );
   };
@@ -229,11 +226,7 @@ export default function SuppliersPage() {
         setIsBalanceDialogOpen(false);
         setSelectedSupplierForBalance(null);
       },
-      onError: () => {
-        toast.error(
-            t("messages.error.balance_add_failed") || "Failed to add balance",
-        );
-      },
+    
     });
   };
 
@@ -292,11 +285,7 @@ export default function SuppliersPage() {
         );
         setIsMassPaymentDialogOpen(false);
       },
-      onError: () => {
-        toast.error(
-            t("messages.error.mass_payment_failed") || "Failed to process mass payment",
-        );
-      },
+    
     });
   };
 

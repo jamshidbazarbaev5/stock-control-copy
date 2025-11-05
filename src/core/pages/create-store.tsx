@@ -101,8 +101,6 @@ export default function CreateStore() {
       toast.success(t('messages.success.created', { item: t('navigation.stores') }));
       navigate('/stores');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.stores') }));
-      console.error('Failed to create store:', error);
     }
   };
 

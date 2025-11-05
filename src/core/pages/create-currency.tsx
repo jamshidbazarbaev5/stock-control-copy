@@ -37,8 +37,6 @@ export default function CreateCurrency() {
       toast.success(t('messages.success.created', { item: t('navigation.currencies') }));
       navigate('/currencies');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.currencies') }));
-      console.error('Failed to create currency:', error);
     }
   };
 

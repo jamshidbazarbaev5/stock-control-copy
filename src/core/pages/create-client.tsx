@@ -83,8 +83,6 @@ export default function CreateClient() {
       toast.success(t('messages.success.created', { item: t('navigation.clients') }));
       navigate('/clients');
     } catch (error) {
-      toast.error(t('messages.error.create', { item: t('navigation.clients') }));
-      console.error('Failed to create client:', error);
     }
   };
 

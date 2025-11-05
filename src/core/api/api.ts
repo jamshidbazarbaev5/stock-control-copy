@@ -5,13 +5,7 @@ import axios, {
   type AxiosResponse,
 } from "axios";
 import { refreshToken } from "./auth";
-import { useErrorStore } from "../store/errorStore";
-
-interface ApiErrorResponse {
-  detail?: string;
-  message?: string;
-  error?: string;
-}
+import { useErrorStore, parseErrorMessage } from "../store/errorStore";
 
 // Constants
 const BASE_URL = "https://test.bondify.uz/api/v1/";
@@ -50,7 +44,7 @@ api.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
-  async (error: AxiosError<ApiErrorResponse>) => {
+  async (error: AxiosError<any>) => {
     const originalRequest = error.config;
 
     // If error is 401 and not a retry
@@ -73,19 +67,8 @@ api.interceptors.response.use(
       }
     }
 
-    // Extract error message from response
-    let errorMessage = "Произошла ошибка";
-    if (error.response?.data) {
-      if (typeof error.response.data === "string") {
-        errorMessage = error.response.data;
-      } else {
-        errorMessage =
-          error.response.data.detail ||
-          error.response.data.message ||
-          error.response.data.error ||
-          errorMessage;
-      }
-    }
+    // Parse error message using centralized parser
+    const errorMessage = parseErrorMessage(error.response?.data);
 
     // Show error in modal
     useErrorStore.getState().setError(errorMessage);

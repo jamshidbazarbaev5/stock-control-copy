@@ -59,8 +59,6 @@ export default function ExpenseNamesPage() {
       setIsEditModalOpen(false);
       setSelectedExpenseName(null);
     } catch (error) {
-      toast.error(t('messages.error.expense_name_update'));
-      console.error('Failed to update expense name:', error);
     }
   };
 

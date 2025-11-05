@@ -203,8 +203,6 @@ export default function EditProduct() {
       );
       navigate("/products");
     } catch (error) {
-      toast.error(t("messages.error.update", { item: t("table.product") }));
-      console.error("Failed to update product:", error);
     }
   };
 

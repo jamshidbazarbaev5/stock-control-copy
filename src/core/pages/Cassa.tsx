@@ -75,7 +75,6 @@ export default function CassasPage() {
                     setIsFormOpen(false);
                     setEditingCassa(null);
                 },
-                onError: () => toast.error(t('messages.error.update', { item: t('navigation.categories') })),
             }
         );
     };

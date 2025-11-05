@@ -154,8 +154,6 @@ export default function StaffPage() {
       setIsFormOpen(false);
       setEditingStaff(null);
     } catch (error) {
-      toast.error(t('messages.error.update', { item: t('navigation.staff') }));
-      console.error('Failed to update staff:', error);
     }
   };
 

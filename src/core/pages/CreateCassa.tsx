@@ -44,7 +44,6 @@ export default function CreateCassaPage() {
                 toast.success(t('messages.success.created', { item: t('navigation.cassa') }));
                 navigate('/cassas');
             },
-            onError: () => toast.error(t('messages.error.create', { item: t('navigation.cassa') })),
         });
     };
 

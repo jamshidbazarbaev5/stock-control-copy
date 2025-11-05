@@ -1414,8 +1414,6 @@ export default function EditStockEntry() {
       toast.success("Stock entry updated successfully");
       navigate(`/suppliers/${supplierId}`);
     } catch (error) {
-      toast.error("Failed to update stock entry");
-      console.error("Failed to update stock entry:", error);
     } finally {
       setIsSubmitting(false);
     }
