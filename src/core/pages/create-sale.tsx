@@ -146,18 +146,18 @@ function CreateSale() {
   const isAdmin = currentUser?.role === "Администратор";
   const isSuperUser = currentUser?.is_superuser === true;
 
-  // Only fetch users if admin/superuser (sellers get 403)
+  // Only fetch users if admin/superuser (sellers should not fetch)
   const usersQuery = useQuery({
     queryKey: ['users', {}],
     queryFn: async () => {
       const response = await api.get('users/');
       return response.data;
     },
-    enabled: isAdmin || isSuperUser,
+    enabled: (isAdmin || isSuperUser) && currentUser?.role !== 'Продавец',
     retry: false,
   });
 
-  const users = (isAdmin || isSuperUser) && !usersQuery.isError
+  const users = (isAdmin || isSuperUser) && currentUser?.role !== 'Продавец' && !usersQuery.isError
     ? (Array.isArray(usersQuery.data) ? usersQuery.data : usersQuery.data?.results || [])
     : [];
   const [selectedStore, setSelectedStore] = useState<string | null>(
@@ -695,20 +695,7 @@ const handleQuantityChange = (
     form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
   };
 
-  useEffect(() => {
-    const payments = form.watch("sale_payments");
-    payments.forEach((payment, index) => {
-      if (payment.payment_method === "Валюта" && usdInputValues[index] === undefined) {
-        const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
-        const totalAmount = parseFloat(form.getValues("total_amount") || "0");
-        const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
-        const finalTotal = totalAmount - discountAmount;
-        const autoUsdAmount = (finalTotal / exchangeRate).toFixed(2);
-        setUsdInputValues(prev => ({ ...prev, [index]: autoUsdAmount }));
-        form.setValue(`sale_payments.${index}.amount`, finalTotal);
-      }
-    });
-  }, [form.watch("sale_payments"), form.watch("total_amount"), form.watch("discount_amount")]);
+
 
   const handlePriceChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -827,16 +814,26 @@ const handleQuantityChange = (
           price_per_unit: item.price_per_unit,
           ...(item.stock ? { stock: item.stock } : {}),
         })),
-        sale_payments: data.sale_payments.map((payment) => ({
-          payment_method: payment.payment_method,
-          amount: Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
-          ...(payment.payment_method === "Валюта" && payment.exchange_rate && {
-            exchange_rate: payment.exchange_rate,
-          }),
-          ...(payment.payment_method === "Валюта" && payment.change_amount && {
-            change_amount: Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2),
-          }),
-        })),
+        sale_payments: data.sale_payments.map((payment, index) => {
+          const usdAmount = payment.payment_method === "Валюта" && usdInputValues[index]
+            ? parseFloat(usdInputValues[index])
+            : payment.payment_method === "Валюта" && payment.exchange_rate
+            ? payment.amount / payment.exchange_rate
+            : payment.amount;
+          
+          return {
+            payment_method: payment.payment_method,
+            amount: payment.payment_method === "Валюта" 
+              ? Number(usdAmount).toFixed(2)
+              : Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
+            ...(payment.payment_method === "Валюта" && payment.exchange_rate && {
+              exchange_rate: payment.exchange_rate,
+            }),
+            ...(payment.payment_method === "Валюта" && payment.change_amount && {
+              change_amount: Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2),
+            }),
+          };
+        }),
         ...(data.sale_debt?.client && !data.on_credit
           ? { client: data.sale_debt.client }
           : {}),
@@ -1454,11 +1451,6 @@ const handleQuantityChange = (
                       control={form.control}
                       name={`sale_payments.${index}.amount`}
                       render={({ field }) => {
-                        const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
-                        const displayValue = usdInputValues[index] !== undefined 
-                          ? usdInputValues[index] 
-                          : field.value ? (field.value / exchangeRate).toFixed(2) : '';
-                        
                         return (
                           <FormItem className="flex-1">
                             <FormLabel>Сумма ($)</FormLabel>
@@ -1467,7 +1459,7 @@ const handleQuantityChange = (
                                 type="text"
                                 inputMode="decimal"
                                 className="text-right"
-                                value={displayValue}
+                                value={usdInputValues[index] || ''}
                                 onChange={(e) => handleUsdChange(e, index)}
                               />
                             </FormControl>

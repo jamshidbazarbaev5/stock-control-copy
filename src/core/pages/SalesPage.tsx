@@ -36,10 +36,11 @@ import {
   Wallet,
   SmartphoneNfc,
   Landmark,
+  DollarSign,
 } from "lucide-react";
 import { type Store, useGetStores } from "@/core/api/store.ts";
-import { useGetUsers } from "@/core/api/user";
 import { shiftsApi } from "@/core/api/shift";
+
 import { useQuery } from "@tanstack/react-query";
 import "../../expanded-row-dark.css";
 import {
@@ -63,6 +64,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Undo2 } from "lucide-react";
+import { api } from "../api/client";
 
 type PaginatedData<T> = { results: T[]; count: number } | T[];
 
@@ -190,13 +192,21 @@ export default function SalesPage() {
   ]);
 
   const { data: storesData } = useGetStores({});
-  const { data: usersData } = useGetUsers({});
+  const { data: usersData } = useQuery({
+    queryKey: ['users', {}],
+    queryFn: async () => {
+      const response = await api.get('users/');
+      return response.data;
+    },
+    enabled: currentUser?.role !== "Продавец",
+  });
   const { data: shiftsData } = useQuery({
     queryKey: ["shifts"],
     queryFn: async () => {
       const response = await shiftsApi.getAll();
       return response.data;
     },
+    enabled: currentUser?.role !== "Продавец",
   });
 
   const { data: salesData, isLoading } = useGetSales({
@@ -710,6 +720,9 @@ export default function SalesPage() {
                               {p.payment_method === "Перечисление" && (
                                 <Landmark className="h-3.5 w-3.5 text-orange-500" />
                               )}
+                              {p.payment_method === "Валюта" && (
+                                <DollarSign className="h-3.5 w-3.5 text-yellow-600" />
+                              )}
                               <span className="text-gray-700">
                                 {p.payment_method}:
                               </span>
@@ -811,11 +824,18 @@ export default function SalesPage() {
               )}
               {payment.payment_method === "Перечисление" && (
                 <Landmark className="h-4 w-4 text-orange-500" />
-              )}{" "}
-              {/* New method */}
+              )}
+              {payment.payment_method === "Валюта" && (
+                <DollarSign className="h-4 w-4 text-yellow-600" />
+              )}
               <span className="whitespace-nowrap">
                 {formatCurrency(payment.amount)}
               </span>
+              {payment.change_amount && parseFloat(payment.change_amount) > 0 && (
+                <span className="text-gray-500">
+                  (сдача: {formatCurrency(payment.change_amount)})
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -1174,7 +1194,7 @@ export default function SalesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все продавцы</SelectItem>
-                  {users?.map((user) =>
+                  {users?.map((user:any) =>
                     user.id ? (
                       <SelectItem key={user.id} value={user.id.toString()}>
                         {user.name} ({user.role})
