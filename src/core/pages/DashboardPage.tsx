@@ -7,8 +7,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+
 import { useTranslation } from "react-i18next";
 import {
   getReportsSalesSummary,
@@ -463,39 +462,29 @@ const DashboardPage = () => {
 
               {/* Date Range Selectors */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
-                <DatePicker
-                    selected={startDate}
-                    onChange={(date: Date | null) => {
+                <input
+                    type="date"
+                    value={startDate ? startDate.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
                       setStartDate(date);
-                      // If selecting a date, switch to custom period
-                      if (date) {
-                        setPeriod("custom");
-                      }
+                      if (date) setPeriod("custom");
                     }}
-                    selectsStart
-                    startDate={startDate}
-                    endDate={endDate}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText={t("forms.date_from") || "Date from"}
-                    className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
+                    placeholder={t("forms.date_from") || "Date from"}
+                    className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 />
 
-                <DatePicker
-                    selected={endDate}
-                    onChange={(date: Date | null) => {
+                <input
+                    type="date"
+                    value={endDate ? endDate.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
                       setEndDate(date);
-                      // If selecting a date, switch to custom period
-                      if (date) {
-                        setPeriod("custom");
-                      }
+                      if (date) setPeriod("custom");
                     }}
-                    selectsEnd
-                    startDate={startDate}
-                    endDate={endDate}
-                    minDate={startDate || undefined}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText={t("forms.date_to") || "Date to"}
-                    className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
+                    min={startDate ? startDate.toISOString().split('T')[0] : ''}
+                    placeholder={t("forms.date_to") || "Date to"}
+                    className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 />
               </div>
             </div>
@@ -630,39 +619,29 @@ const DashboardPage = () => {
 
             {/* Date Range Selectors */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
-              <DatePicker
-                  selected={startDate}
-                  onChange={(date: Date | null) => {
+              <input
+                  type="date"
+                  value={startDate ? startDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : null;
                     setStartDate(date);
-                    // If selecting a date, switch to custom period
-                    if (date) {
-                      setPeriod("custom");
-                    }
+                    if (date) setPeriod("custom");
                   }}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  dateFormat="dd/MM/yyyy"
-                  placeholderText={t("forms.date_from") || "Date from"}
-                  className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
+                  placeholder={t("forms.date_from") || "Date from"}
+                  className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               />
 
-              <DatePicker
-                  selected={endDate}
-                  onChange={(date: Date | null) => {
+              <input
+                  type="date"
+                  value={endDate ? endDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : null;
                     setEndDate(date);
-                    // If selecting a date, switch to custom period
-                    if (date) {
-                      setPeriod("custom");
-                    }
+                    if (date) setPeriod("custom");
                   }}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={startDate || undefined}
-                  dateFormat="dd/MM/yyyy"
-                  placeholderText={t("forms.date_to") || "Date to"}
-                  className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
+                  min={startDate ? startDate.toISOString().split('T')[0] : ''}
+                  placeholder={t("forms.date_to") || "Date to"}
+                  className="w-full sm:w-36 flex h-10 items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               />
             </div>
           </div>
