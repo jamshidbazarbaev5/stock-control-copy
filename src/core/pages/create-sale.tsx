@@ -669,6 +669,47 @@ const handleQuantityChange = (
     updateTotalAmount();
   };
 
+  const [usdInputValues, setUsdInputValues] = useState<{[key: number]: string}>({});
+
+  const handleUsdChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    index: number,
+  ) => {
+    const inputValue = e.target.value;
+    const normalizedValue = inputValue.replace(',', '.');
+    const sanitizedValue = normalizedValue.replace(/[^\d.]/g, '');
+    const decimalCount = (sanitizedValue.match(/\./g) || []).length;
+    if (decimalCount > 1) return;
+    
+    setUsdInputValues(prev => ({ ...prev, [index]: sanitizedValue }));
+    
+    const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
+    const usdAmount = parseFloat(sanitizedValue) || 0;
+    const uzsAmount = parseFloat((usdAmount * exchangeRate).toFixed(2));
+    form.setValue(`sale_payments.${index}.amount`, uzsAmount);
+    
+    const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+    const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+    const finalTotal = totalAmount - discountAmount;
+    const changeAmount = Math.max(0, uzsAmount - finalTotal);
+    form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
+  };
+
+  useEffect(() => {
+    const payments = form.watch("sale_payments");
+    payments.forEach((payment, index) => {
+      if (payment.payment_method === "Валюта" && usdInputValues[index] === undefined) {
+        const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
+        const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+        const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+        const finalTotal = totalAmount - discountAmount;
+        const autoUsdAmount = (finalTotal / exchangeRate).toFixed(2);
+        setUsdInputValues(prev => ({ ...prev, [index]: autoUsdAmount }));
+        form.setValue(`sale_payments.${index}.amount`, finalTotal);
+      }
+    });
+  }, [form.watch("sale_payments"), form.watch("total_amount"), form.watch("discount_amount")]);
+
   const handlePriceChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     index: number,
@@ -714,7 +755,7 @@ const handleQuantityChange = (
       }, 0);
       
       if (Math.abs(actualPaymentTotal - expectedPaymentTotal) > 0.01) {
-        toast.error(`Payment total (${actualPaymentTotal.toFixed(2)}) must equal total amount minus discount (${expectedPaymentTotal.toFixed(2)})`);
+        toast.error(`Сумма платежей (${actualPaymentTotal.toFixed(2)}) должна равняться общей сумме минус скидка (${expectedPaymentTotal.toFixed(2)})`);
         return;
       }
       
@@ -1412,33 +1453,11 @@ const handleQuantityChange = (
                     <FormField
                       control={form.control}
                       name={`sale_payments.${index}.amount`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Сумма (UZS)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              value={field.value?.toString() || ''}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0;
-                                field.onChange(value);
-                                const totalAmount = parseFloat(form.getValues("total_amount") || "0");
-                                const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
-                                const finalTotal = totalAmount - discountAmount;
-                                const changeAmount = Math.max(0, value - finalTotal);
-                                form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
-                              }}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`sale_payments.${index}.amount`}
                       render={({ field }) => {
                         const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
-                        const usdValue = field.value ? (field.value / exchangeRate).toFixed(2) : '0.00';
+                        const displayValue = usdInputValues[index] !== undefined 
+                          ? usdInputValues[index] 
+                          : field.value ? (field.value / exchangeRate).toFixed(2) : '';
                         
                         return (
                           <FormItem className="flex-1">
@@ -1446,10 +1465,10 @@ const handleQuantityChange = (
                             <FormControl>
                               <Input
                                 type="text"
-                                value={usdValue}
-                                readOnly
-                                disabled
-                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                                inputMode="decimal"
+                                className="text-right"
+                                value={displayValue}
+                                onChange={(e) => handleUsdChange(e, index)}
                               />
                             </FormControl>
                           </FormItem>
@@ -1485,12 +1504,6 @@ const handleQuantityChange = (
                         </FormItem>
                       )}
                     />
-                    <FormItem className="flex-1">
-                      <FormLabel>Итого (UZS)</FormLabel>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white mt-2">
-                        {(form.watch(`sale_payments.${index}.amount`) || 0).toLocaleString()}
-                      </div>
-                    </FormItem>
                     {(form.watch(`sale_payments.${index}.change_amount`) || 0) > 0 && (
                       <FormItem className="flex-1">
                         <FormLabel className="text-blue-600">Сдача</FormLabel>
