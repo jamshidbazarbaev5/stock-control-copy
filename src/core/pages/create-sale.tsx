@@ -1450,7 +1450,7 @@ const handleQuantityChange = (
                     <FormField
                       control={form.control}
                       name={`sale_payments.${index}.amount`}
-                      render={({ field }) => {
+                      render={({ }) => {
                         return (
                           <FormItem className="flex-1">
                             <FormLabel>Сумма ($)</FormLabel>
