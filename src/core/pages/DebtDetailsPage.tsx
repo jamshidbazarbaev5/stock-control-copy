@@ -99,14 +99,15 @@ export default function DebtDetailsPage() {
           message: t("validation.amount_must_be_positive"),
         },
         max: {
-          value: selectedDebt?.remainder || 0,
+          value: selectedDebt ? Number(selectedDebt.remainder) : 0,
           message: t("validation.amount_exceeds_total"),
         },
         validate: {
           notGreaterThanRemainder: (value: number) => {
             if (!selectedDebt) return true;
+            const remainder = Number(selectedDebt.remainder);
             return (
-              value <= selectedDebt.remainder ||
+              value <= remainder ||
               t("validation.amount_exceeds_remainder")
             );
           },
@@ -129,8 +130,11 @@ export default function DebtDetailsPage() {
     },
   ];
 
-  const handlePaymentClick = (debt: { id: number; remainder: number }) => {
-    setSelectedDebt(debt);
+  const handlePaymentClick = (debt: { id: number; remainder: string | number }) => {
+    setSelectedDebt({
+      id: debt.id,
+      remainder: Number(debt.remainder)
+    });
     setIsPaymentModalOpen(true);
   };
 
@@ -426,7 +430,7 @@ export default function DebtDetailsPage() {
                           onClick={() =>
                             handlePaymentClick({
                               id: debt.id!,
-                              remainder: debt.remainder,
+                              remainder: Number(debt.remainder),
                             })
                           }
                           className="bg-emerald-500 hover:bg-emerald-600"
