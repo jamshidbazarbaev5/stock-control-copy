@@ -81,7 +81,6 @@ export function OpenShiftForm() {
       }
       // No need to navigate for non-mobile users - the component will re-render and show POS interface
     } catch (error) {
-      console.error("Failed to open shift:", error);
     } finally {
       setIsLoading(false);
     }

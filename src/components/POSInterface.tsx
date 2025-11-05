@@ -3191,10 +3191,7 @@ const POSInterfaceCore = () => {
                     // Show success message
                     toast.success("Продажа успешно оформлена!");
                   } catch (error) {
-                    console.error("Error creating sale:", error);
-                    toast.error(
-                      "Ошибка при оформлении продажи. Попробуйте еще раз.",
-                    );
+                 
                   } finally {
                     setIsProcessingSale(false);
                   }
@@ -3707,8 +3704,6 @@ const POSInterfaceCore = () => {
                       balance: 0,
                     });
                   } catch (error) {
-                    toast.error('Ошибка при создании клиента');
-                    console.error('Error creating client:', error);
                   }
                 }}
                 className="flex-1"
