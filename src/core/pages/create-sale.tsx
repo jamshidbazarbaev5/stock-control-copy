@@ -706,9 +706,11 @@ const handleQuantityChange = (
       const discountAmount = parseFloat(data.discount_amount || "0");
       const expectedPaymentTotal = totalFromItems - discountAmount;
       
-      // Validate payment amounts sum
+      // Validate payment amounts sum (subtract change amount)
       const actualPaymentTotal = data.sale_payments.reduce((sum, payment) => {
-        return sum + (parseFloat(String(payment.amount)) || 0);
+        const paymentAmount = parseFloat(String(payment.amount)) || 0;
+        const changeAmount = parseFloat(String(payment.change_amount)) || 0;
+        return sum + (paymentAmount - changeAmount);
       }, 0);
       
       if (Math.abs(actualPaymentTotal - expectedPaymentTotal) > 0.01) {
@@ -1410,9 +1412,34 @@ const handleQuantityChange = (
                     <FormField
                       control={form.control}
                       name={`sale_payments.${index}.amount`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Сумма (UZS)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              value={field.value?.toString() || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0;
+                                field.onChange(value);
+                                const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                                const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                                const finalTotal = totalAmount - discountAmount;
+                                const changeAmount = Math.max(0, value - finalTotal);
+                                form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sale_payments.${index}.amount`}
                       render={({ field }) => {
                         const exchangeRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
-                        const usdValue = field.value ? (field.value / exchangeRate).toFixed(2) : '';
+                        const usdValue = field.value ? (field.value / exchangeRate).toFixed(2) : '0.00';
+                        
                         return (
                           <FormItem className="flex-1">
                             <FormLabel>Сумма ($)</FormLabel>
@@ -1420,17 +1447,9 @@ const handleQuantityChange = (
                               <Input
                                 type="text"
                                 value={usdValue}
-                                onChange={(e) => {
-                                  const value = e.target.value.replace(/[^0-9.]/g, '');
-                                  const usdAmount = parseFloat(value) || 0;
-                                  const uzsAmount = usdAmount * exchangeRate;
-                                  const totalAmount = parseFloat(form.getValues("total_amount") || "0");
-                                  const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
-                                  const finalTotal = totalAmount - discountAmount;
-                                  const changeAmount = Math.max(0, uzsAmount - finalTotal);
-                                  field.onChange(uzsAmount);
-                                  form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
-                                }}
+                                readOnly
+                                disabled
+                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
                               />
                             </FormControl>
                           </FormItem>
