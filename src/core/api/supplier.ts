@@ -9,7 +9,7 @@ export interface Supplier {
   phone_number: string;
   total_debt?: string;
   total_paid?: string;
-  balance_in_usd:string;
+  balance_in_usd?:string;
   remaining_debt?: string;
   balance?: string | null;
 }
