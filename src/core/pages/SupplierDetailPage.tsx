@@ -6,7 +6,7 @@ import { useGetStores } from '../api/store';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, DollarSign, History, Edit, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronUp, DollarSign, Edit, Wallet } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -238,17 +238,7 @@ export default function SupplierDetailPage() {
                     </Button>
                     {entry.is_debt && (
                       <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link to={`/suppliers/${id}/stock-entries/${entry.id}/payments`}>
-                            <History className="h-4 w-4 mr-2" />
-                            {t('common.payment_history')}
-                          </Link>
-                        </Button>
+                        
                         {Number(entry.remaining_debt) > 0 && (
                           <Button
                             variant="outline"

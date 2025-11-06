@@ -241,7 +241,7 @@ export default function StoresPage() {
                           {store.budgets.map((budget:any) => (
                             <div key={budget.id} className="flex justify-between items-center text-xs">
                               <span className="text-gray-600">{budget.budget_type}:</span>
-                              <span className="font-medium">{Number(budget.amount).toLocaleString()} UZS</span>
+                              <span className="font-medium">{Number(budget.amount).toLocaleString()} {budget.budget_type === 'Валюта' ? '$' : 'UZS'}</span>
                             </div>
                           ))}
                           <div className="flex justify-between items-center text-sm font-semibold border-t pt-1 mt-1">

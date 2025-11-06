@@ -98,7 +98,7 @@ export default function ExpensesPage() {
       accessorKey: "amount",
       cell: (row: Expense) => (
         <div className="text-center font-medium">
-          {Number(row.amount).toLocaleString()}
+          {Number(row.amount).toLocaleString()} {row.payment_type === 'Валюта' ? '$' : ''}
         </div>
       ),
     },

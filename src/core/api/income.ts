@@ -4,6 +4,8 @@ import { createResourceApiHooks } from '../helpers/createResourceApi';
 export interface Income {
   id?: number;
   source: string;
+ 
+
   store_read?: {
     id: number;
     name: string;

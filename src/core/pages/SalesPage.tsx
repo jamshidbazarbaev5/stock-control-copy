@@ -829,7 +829,7 @@ export default function SalesPage() {
                 <DollarSign className="h-4 w-4 text-yellow-600" />
               )}
               <span className="whitespace-nowrap">
-                {formatCurrency(payment.amount)}
+                {formatCurrency(payment.amount)}{payment.payment_method === "Валюта" ? " $" : ""}
               </span>
               {payment.change_amount && parseFloat(payment.change_amount) > 0 && (
                 <span className="text-gray-500">

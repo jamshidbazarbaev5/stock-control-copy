@@ -131,7 +131,7 @@ export default function SupplierBalanceHistoryPage() {
                           {t('common.amount')}
                         </span>
                         <p className="font-bold text-xl text-green-600">
-                          {formatNumber(item.amount)} {t('common.uzs')}
+                          {formatNumber(item.amount)} {item.payment_method === 'Валюта' ? '$' : t('common.uzs')}
                         </p>
                       </div>
                     </div>
