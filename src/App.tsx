@@ -92,6 +92,7 @@ import WriteOffsPage from "@/core/pages/WriteOffsPage.tsx";
 import WriteoffDetailPage from "@/core/pages/WriteoffDetailPage.tsx";
 import StockDebtPaymentHistoryPage from "@/core/pages/StockDebtPaymentHistoryPage.tsx";
 import EditStockEntry from "@/core/pages/EditStockEntry.tsx";
+import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
 const queryClient = new QueryClient();
@@ -305,6 +306,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <EditStockEntry />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/suppliers/:id/balance-history"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <SupplierBalanceHistoryPage />
                   </PrivateRoute>
                 }
               />

@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet, ArrowUp, ArrowDown, CreditCard } from "lucide-react";
+import { Wallet, ArrowUp, ArrowDown, CreditCard, History, MoreHorizontal } from "lucide-react";
 
 const supplierFields = (t: (key: string) => string) => [
   {
@@ -79,6 +79,11 @@ const columns = (t: (key: string) => string) => [
     accessorKey: "balance",
     cell: (row: Supplier) => formatPrice(row.balance),
   },
+    {
+    header: t("table.balance_in_usd"),
+    accessorKey: "balance_in_usd",
+    cell: (row: Supplier) => formatPrice(row.balance_in_usd),
+  },
   {
     header: t("table.total_debt"),
     accessorKey: "total_debt",
@@ -100,6 +105,7 @@ export default function SuppliersPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
@@ -379,30 +385,60 @@ export default function SuppliersPage() {
             currentPage={page}
             onPageChange={(newPage) => setPage(newPage)}
             actions={(supplier: Supplier) => (
-                <div className="flex gap-2">
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddBalance(supplier);
-                      }}
+                <div className="relative">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(openDropdown === supplier.id ? null : supplier.id!);
+                    }}
                   >
-                    <Wallet className="h-4 w-4 mr-1" />
-                    {t("common.add_balance") || "Add Balance"}
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMassPayment(supplier);
-                      }}
-                      className="bg-blue-50 hover:bg-blue-100"
-                  >
-                    <CreditCard className="h-4 w-4 mr-1" />
-                    {t("common.mass_payment") || "Mass Payment"}
-                  </Button>
+                  {openDropdown === supplier.id && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setOpenDropdown(null)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 border">
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(null);
+                            handleAddBalance(supplier);
+                          }}
+                        >
+                          <Wallet className="h-4 w-4 mr-2" />
+                          {t("common.add_balance")}
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(null);
+                            handleMassPayment(supplier);
+                          }}
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          {t("common.mass_payment")}
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(null);
+                            navigate(`/suppliers/${supplier.id}/balance-history`);
+                          }}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          {t("common.balance_history")}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
             )}
         />

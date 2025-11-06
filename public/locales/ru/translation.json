@@ -174,7 +174,15 @@
       }
     }
   },
+  "supplier": {
+    "balance_history": "История баланса поставщика",
+    "summary": "Сводка",
+    "total_transactions": "Всего транзакций",
+    "current_page": "Текущая страница",
+    "total_pages": "Всего страниц"
+  },
   "common": {
+    "balance_history": "История баланса",
     "exchange_rate":"Курс обмена",
     "paid3":"Не в долг",
       "mass_payment":"Оплатить долг",
@@ -875,6 +883,7 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "balance_in_usd": "Баланс в USD",
     "discount":"Скидка",
      "discount_amount":"Скидка",
     "balance": "Баланс",
