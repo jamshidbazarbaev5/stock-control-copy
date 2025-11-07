@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGetStockEntries, useGetStocks, usePayStockDebt } from '../api/stock';
 import { useGetStores } from '../api/store';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, DollarSign,History, Edit } from 'lucide-react';
@@ -29,6 +31,7 @@ export default function SupplierDetailPage() {
   const [paymentType, setPaymentType] = useState('Наличные');
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [paymentComment, setPaymentComment] = useState('');
+  const [exchangeRate, setExchangeRate] = useState('');
   
   // Fetch stock entries for this supplier
   const { data: stockEntriesData, isLoading: isLoadingEntries } = useGetStockEntries({
@@ -39,6 +42,21 @@ export default function SupplierDetailPage() {
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
 
   const payStockDebt = usePayStockDebt();
+
+  const { data: currencyRates } = useQuery<Array<{ rate: string }>>({
+    queryKey: ['currency-rates'],
+    queryFn: async () => {
+      const response = await api.get('/currency/rates/');
+      return response.data;
+    },
+    enabled: paymentType === "Валюта",
+  });
+
+  useEffect(() => {
+    if (currencyRates && currencyRates.length > 0 && paymentType === "Валюта" && !exchangeRate) {
+      setExchangeRate(currencyRates[0].rate);
+    }
+  }, [currencyRates, paymentType]);
   
   const currentBudget = selectedStoreId ? 
     stores.find(s => s.id === selectedStoreId)?.budgets?.find(b => b.budget_type === paymentType)?.amount || "0" 
@@ -52,6 +70,7 @@ export default function SupplierDetailPage() {
     setPaymentType('Наличные');
     setSelectedStoreId(currentUser?.is_superuser ? null : (currentUser?.store_read?.id || null));
     setPaymentComment('');
+    setExchangeRate('');
     setPaymentDialogOpen(true);
   };
 
@@ -78,6 +97,9 @@ export default function SupplierDetailPage() {
         amount,
         payment_type: paymentType,
         comment: paymentComment,
+        ...(paymentType === "Валюта" && exchangeRate && {
+          rate_at_payment: Number(exchangeRate),
+        }),
       },
       {
         onSuccess: () => {
@@ -86,6 +108,7 @@ export default function SupplierDetailPage() {
           setSelectedEntry(null);
           setPaymentAmount('');
           setPaymentComment('');
+          setExchangeRate('');
         },
        
       }
@@ -325,8 +348,23 @@ export default function SupplierDetailPage() {
                 <option value="Карта">{t('payment_types.card')}</option>
                 <option value="Click">{t('payment_types.click')}</option>
                 <option value="Перечисление">{t('payment.per')}</option>
+                <option value="Валюта">Валюта</option>
               </select>
             </div>
+
+            {paymentType === "Валюта" && (
+              <div className="space-y-2">
+                <Label htmlFor="exchange-rate">{t('common.exchange_rate') || 'Exchange Rate'} *</Label>
+                <Input
+                  id="exchange-rate"
+                  type="number"
+                  step="0.01"
+                  value={exchangeRate}
+                  onChange={(e) => setExchangeRate(e.target.value)}
+                  placeholder={t('placeholders.enter_exchange_rate') || 'Enter exchange rate'}
+                />
+              </div>
+            )}
 
             {selectedStoreId && (
               <div className="p-3 bg-muted rounded-md">
