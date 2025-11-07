@@ -829,7 +829,7 @@ export default function SalesPage() {
                 <DollarSign className="h-4 w-4 text-yellow-600" />
               )}
               <span className="whitespace-nowrap">
-                {formatCurrency(payment.amount)}{payment.payment_method === "Валюта" ? " $" : ""}
+                {formatCurrency(payment.amount)} {payment.payment_method === "Валюта" ? "$" : ""}
               </span>
               {payment.change_amount && parseFloat(payment.change_amount) > 0 && (
                 <span className="text-gray-500">
@@ -1332,7 +1332,7 @@ export default function SalesPage() {
                       </span>
                     </div>
                     <span className="font-bold text-gray-900">
-                      {formatCurrency(amount)} UZS
+                      {formatCurrency(amount)} {method === "Валюта" ? "$" : "UZS"}
                     </span>
                   </div>
                 ))}
@@ -1368,7 +1368,7 @@ export default function SalesPage() {
                       </span>
                     </div>
                     <span className="font-bold text-gray-900">
-                      {formatCurrency(amount)} UZS
+                      {formatCurrency(amount)} {method === "Валюта" ? "$" : "UZS"}
                     </span>
                   </div>
                 ))}

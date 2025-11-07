@@ -28,7 +28,7 @@ export default function CashInflowHistoryPage() {
       accessorKey: 'amount',
       cell: (row: any) => (
         <div className="text-right font-medium">
-          {Number(row.amount).toLocaleString()} UZS
+          {Number(row.amount).toLocaleString()} {row.budget_type === 'Валюта' ? '$' : 'UZS'}
         </div>
       ),
     },
