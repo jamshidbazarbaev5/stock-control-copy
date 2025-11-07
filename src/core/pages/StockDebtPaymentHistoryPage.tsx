@@ -263,7 +263,9 @@ export default function StockDebtPaymentHistoryPage() {
                         </span>
                       </div>
                       <p className="text-2xl font-bold text-primary">
-                        {formatNumber(payment.amount)} {t('common.uzs')}
+                        {payment.payment_type === 'Валюта' 
+                          ? `${formatNumber(payment.amount)} $`
+                          : `${formatNumber(payment.amount)} ${t('common.uzs')}`}
                       </p>
                     </div>
 

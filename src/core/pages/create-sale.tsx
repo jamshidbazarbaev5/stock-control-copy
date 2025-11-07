@@ -985,7 +985,7 @@ const handleQuantityChange = (
     };
   }, [activeSearchIndex]);
 
-  // Update payment amount when discount changes
+  // Update change amount when discount changes (for currency payments)
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === "discount_amount") {
@@ -994,13 +994,13 @@ const handleQuantityChange = (
         const expectedTotal = totalAmount - discountAmount;
         const payments = form.getValues("sale_payments");
         
-        if (payments.length === 1) {
-          form.setValue("sale_payments.0.amount", expectedTotal);
-        } else if (payments.length > 1) {
-          const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
-          const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
-          form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
-        }
+        payments.forEach((payment, index) => {
+          if (payment.payment_method === "Валюта" && payment.exchange_rate) {
+            const uzsAmount = payment.amount || 0;
+            const changeAmount = Math.max(0, uzsAmount - expectedTotal);
+            form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
+          }
+        });
       }
     });
     return () => subscription.unsubscribe();
