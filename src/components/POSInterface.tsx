@@ -30,8 +30,7 @@ import {
 } from "@/core/api/fetchAllProducts";
 import type { Product } from "@/core/api/product";
 import { useCurrentUser } from "@/core/hooks/useCurrentUser";
-import { useQuery } from "@tanstack/react-query";
-import api from "@/core/api/api";
+import { useGetUsers } from "@/core/api/user";
 import { useGetClients, useCreateClient } from "@/core/api/client";
 import type { User } from "@/core/api/user";
 import { OpenShiftForm } from "./OpenShiftForm";
@@ -98,20 +97,6 @@ interface SessionState {
 interface SalePayment {
   amount: number;
   payment_method: string;
-  exchange_rate?: number;
-  change_amount?: number;
-  usd_input?: string;
-}
-
-interface CurrencyRate {
-  created_at: string;
-  rate: string;
-  currency_detail: {
-    id: number;
-    name: string;
-    short_name: string;
-    is_base: boolean;
-  };
 }
 
 interface SalePayload {
@@ -261,8 +246,6 @@ const POSInterfaceCore = () => {
     { amount: 0, payment_method: "Наличные" },
   ]);
   const [discountAmount, setDiscountAmount] = useState(0);
-  const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>([]);
-  const [_loadingRates, setLoadingRates] = useState(false);
 
   // Sale API
   const createSaleMutation = useCreateSale();
@@ -321,24 +304,15 @@ const POSInterfaceCore = () => {
   const isAdmin = currentUser?.role === "Администратор";
   const isSuperUser = currentUser?.is_superuser === true;
   
-  // Only fetch users if admin/superuser (sellers get 403) - use custom query to suppress errors
-  const usersQuery = useQuery({
-    queryKey: ['users', {}],
-    queryFn: async () => {
-      const response = await api.get('users/');
-      return response.data;
-    },
+  // Only fetch users if admin or superuser - sellers don't need the full user list
+  const { data: usersData } = useGetUsers({
     enabled: isAdmin || isSuperUser,
-    retry: false,
   });
-  
   const { data: clientsData } = useGetClients({
     params: { name: clientSearchTerm },
   });
 
-  const users = (isAdmin || isSuperUser) && !usersQuery.isError
-    ? (Array.isArray(usersQuery.data) ? usersQuery.data : usersQuery.data?.results || [])
-    : [];
+  const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
   const clients = Array.isArray(clientsData)
     ? clientsData
     : clientsData?.results || [];
@@ -419,7 +393,7 @@ const POSInterfaceCore = () => {
       selectedSeller,
       currentUserRole: currentUser?.role,
       usersCount: users.length,
-      usersData: users.map((u:any) => ({ id: u.id, name: u.name, role: u.role })),
+      usersData: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     });
 
     if (!isAdmin && !isSuperUser && currentUser?.id && !selectedSeller) {
@@ -430,28 +404,6 @@ const POSInterfaceCore = () => {
 
   // Calculate totals
   const total = cartProducts.reduce((sum, product) => sum + product.total, 0);
-
-  // Fetch currency rates
-  const fetchCurrencyRates = async () => {
-    try {
-      setLoadingRates(true);
-      const response = await fetch('https://test.bondify.uz/api/v1/currency/rates/');
-      const data = await response.json();
-      setCurrencyRates(data);
-    } catch (error) {
-      console.error('Error fetching currency rates:', error);
-      toast.error('Ошибка загрузки курсов валют');
-    } finally {
-      setLoadingRates(false);
-    }
-  };
-
-  // Fetch rates when payment modal opens
-  useEffect(() => {
-    if (isPaymentModalOpen) {
-      fetchCurrencyRates();
-    }
-  }, [isPaymentModalOpen]);
 
   // Fetch products when modal opens or search term changes
   useEffect(() => {
@@ -938,7 +890,7 @@ const POSInterfaceCore = () => {
         newName = client.name;
       }
     } else if (selectedSeller) {
-      const seller = users.find((u:any) => u.id === selectedSeller);
+      const seller = users.find((u) => u.id === selectedSeller);
       if (seller?.name) {
         newName = `${seller.name || ""}`.trim();
       }
@@ -1214,7 +1166,7 @@ const POSInterfaceCore = () => {
           e.preventDefault();
           if (cartProducts.length > 0) {
             setDiscountAmount(0);
-            setPaymentMethods([{ amount: total - discountAmount, payment_method: "Наличные" }]);
+            setPaymentMethods([{ amount: 0, payment_method: "Наличные" }]);
             setIsPaymentModalOpen(true);
           }
           return;
@@ -1301,32 +1253,6 @@ const POSInterfaceCore = () => {
                 {
                   amount: remaining > 0 ? remaining : 0,
                   payment_method: "Перечисление",
-                },
-              ]);
-            }
-          }
-          return;
-        case "F5":
-          e.preventDefault();
-          if (isPaymentModalOpen) {
-            const hasValuta = paymentMethods.some(
-              (p) => p.payment_method === "Валюта",
-            );
-            if (!hasValuta) {
-              const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
-              const totalPaid = paymentMethods.reduce(
-                (sum, p) => sum + (p.amount || 0),
-                0,
-              );
-              const remaining = total - totalPaid;
-              setPaymentMethods((prev) => [
-                ...prev,
-                {
-                  amount: remaining > 0 ? remaining : 0,
-                  payment_method: "Валюта",
-                  exchange_rate: defaultRate,
-                  change_amount: 0,
-                  usd_input: '',
                 },
               ]);
             }
@@ -1521,7 +1447,7 @@ const POSInterfaceCore = () => {
                       {selectedSeller && (
                         <span className="text-blue-700 font-medium">
                           Продавец:{" "}
-                          {users.find((u:any) => u.id === selectedSeller)?.name ||
+                          {users.find((u) => u.id === selectedSeller)?.name ||
                             (selectedSeller === currentUser?.id
                               ? currentUser?.name
                               : `ID: ${selectedSeller} (не найден)`)}
@@ -1610,11 +1536,11 @@ const POSInterfaceCore = () => {
             <div className="flex-1 bg-gray-100 rounded-xl p-6">
               <div className="flex justify-between items-center">
                 <div className="text-left">
-                  <div className="text-gray-600 text-sm">Карта</div>
+                  <div className="text-gray-600 text-base font-medium">Карта</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-gray-600 text-sm mb-1">Итого</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-600 text-base mb-1 font-medium">Итого</div>
+                  <div className="text-4xl font-bold text-gray-900">
                     {total.toLocaleString()}
                   </div>
                 </div>
@@ -1623,11 +1549,11 @@ const POSInterfaceCore = () => {
             <div className="flex-1 bg-gray-100 rounded-xl p-6">
               <div className="flex justify-between items-center">
                 <div className="text-left">
-                  <div className="text-gray-600 text-sm">Скидка</div>
+                  <div className="text-gray-600 text-base font-medium">Скидка</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-gray-600 text-sm mb-1">К оплате</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-600 text-base mb-1 font-medium">К оплате</div>
+                  <div className="text-4xl font-bold text-gray-900">
                     {total.toLocaleString()}
                   </div>
                 </div>
@@ -1729,25 +1655,25 @@ const POSInterfaceCore = () => {
                   <table className="w-full">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="text-left p-4 font-semibold text-gray-700">
+                        <th className="text-left p-5 font-bold text-gray-700 text-lg">
                           №
                         </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
+                        <th className="text-left p-5 font-bold text-gray-700 text-lg">
                           Товар
                         </th>
-                        <th className="text-right p-4 font-semibold text-gray-700">
+                        <th className="text-right p-5 font-bold text-gray-700 text-lg">
                           Цена
                         </th>
-                        <th className="text-center p-4 font-semibold text-gray-700">
+                        <th className="text-center p-5 font-bold text-gray-700 text-lg">
                           Ед. изм.
                         </th>
-                        <th className="text-right p-4 font-semibold text-gray-700">
+                        <th className="text-right p-5 font-bold text-gray-700 text-lg">
                           Кол-во
                         </th>
-                        <th className="text-right p-4 font-semibold text-gray-700">
+                        <th className="text-right p-5 font-bold text-gray-700 text-lg">
                           Сумма
                         </th>
-                        <th className="text-center p-4 font-semibold text-gray-700 w-20">
+                        <th className="text-center p-5 font-bold text-gray-700 text-lg w-20">
                           Действия
                         </th>
                       </tr>
@@ -1787,21 +1713,21 @@ const POSInterfaceCore = () => {
                                   : "bg-white"
                             } transition-all duration-200 hover:bg-gray-100`}
                           >
-                            <td className="p-4 text-gray-900">{index + 1}</td>
-                            <td className="p-4 font-medium text-gray-900">
+                            <td className="p-5 text-gray-900 text-base font-medium">{index + 1}</td>
+                            <td className="p-5 font-medium text-gray-900">
                               <div>
-                                <div>{product.name}</div>
+                                <div className="text-base">{product.name}</div>
                                 {product.barcode && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-sm text-gray-500">
                                     Штрихкод: {product.barcode}
                                   </div>
                                 )}
                                 {product.product.ikpu && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-sm text-gray-500">
                                     ИКПУ: {product.product.ikpu}
                                   </div>
                                 )}
-                                <div className="text-xs text-green-600 font-medium">
+                                <div className="text-sm text-green-600 font-medium">
                                   В наличии:{" "}
                                   {parseFloat(
                                     String(product.product.quantity),
@@ -1810,7 +1736,7 @@ const POSInterfaceCore = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="p-4 text-right text-gray-900">
+                            <td className="p-5 text-right text-gray-900">
                               <button
                                 onClick={() => {
                                   setSelectedProductForPrice(product);
@@ -1818,12 +1744,12 @@ const POSInterfaceCore = () => {
                                   setPriceInput(product.price.toString());
                                   setIsPriceModalOpen(true);
                                 }}
-                                className="w-24 text-right px-3 py-2 border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                                className="w-28 text-right px-4 py-3 text-base font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
                               >
                                 {product.price.toLocaleString()}
                               </button>
                             </td>
-                            <td className="p-4 text-center text-gray-900">
+                            <td className="p-5 text-center text-gray-900">
                               {product.product.available_units &&
                               product.product.available_units.length > 0 ? (
                                 <Select
@@ -1870,8 +1796,8 @@ const POSInterfaceCore = () => {
                                 </span>
                               )}
                             </td>
-                            <td className="p-4 text-right text-gray-900">
-                              <div className="flex items-center justify-end space-x-2">
+                            <td className="p-5 text-right text-gray-900">
+                              <div className="flex items-center justify-end space-x-3">
                                 <button
                                   onClick={() => {
                                     const newQuantity = product.quantity - 1;
@@ -1884,17 +1810,17 @@ const POSInterfaceCore = () => {
                                     }
                                   }}
                                   disabled={product.quantity <= 1}
-                                  className={`w-10 h-10 rounded-full ${
+                                  className={`w-12 h-12 rounded-full ${
                                     index === focusedProductIndex
                                       ? "bg-blue-200 hover:bg-blue-300 text-blue-800"
                                       : "bg-gray-200 hover:bg-gray-300"
-                                  } ${product.quantity <= 1 ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-sm font-bold transition-colors`}
+                                  } ${product.quantity <= 1 ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-lg font-bold transition-colors`}
                                 >
                                   −
                                 </button>
                                 <button
                                   onClick={() => handleQuantityClick(product, index)}
-                                  className={`min-w-[80px] min-h-[50px] text-center border rounded-lg px-3 py-2 text-lg font-semibold transition-all ${
+                                  className={`min-w-[100px] min-h-[56px] text-center border rounded-lg px-4 py-3 text-xl font-semibold transition-all ${
                                     index === focusedProductIndex
                                       ? "border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100"
                                       : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
@@ -1914,20 +1840,20 @@ const POSInterfaceCore = () => {
                                     product.quantity >=
                                     parseFloat(String(product.product.quantity))
                                   }
-                                  className={`w-10 h-10 rounded-full ${
+                                  className={`w-12 h-12 rounded-full ${
                                     index === focusedProductIndex
                                       ? "bg-blue-200 hover:bg-blue-300 text-blue-800"
                                       : "bg-gray-200 hover:bg-gray-300"
-                                  } ${product.quantity >= parseFloat(String(product.product.quantity)) ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-sm font-bold transition-colors`}
+                                  } ${product.quantity >= parseFloat(String(product.product.quantity)) ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-lg font-bold transition-colors`}
                                 >
                                   +
                                 </button>
                               </div>
                             </td>
-                            <td className="p-4 text-right font-semibold text-gray-900">
+                            <td className="p-5 text-right font-bold text-gray-900 text-base">
                               {product.total.toLocaleString()}
                             </td>
-                            <td className="p-4 text-center">
+                            <td className="p-5 text-center">
                               <button
                                 onClick={() => {
                                   removeProduct(product.id);
@@ -1939,13 +1865,13 @@ const POSInterfaceCore = () => {
                                     );
                                   }
                                 }}
-                                className={`w-8 h-8 rounded-full ${
+                                className={`w-10 h-10 rounded-full ${
                                   index === focusedProductIndex
                                     ? "bg-red-200 hover:bg-red-300 text-red-700 ring-2 ring-red-400"
                                     : "bg-red-100 hover:bg-red-200 text-red-600"
                                 } flex items-center justify-center transition-all`}
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-5 h-5" />
                               </button>
                             </td>
                           </tr>
@@ -2017,6 +1943,30 @@ const POSInterfaceCore = () => {
                 </button>
               )}
 
+              {/* Payment Button - Show when calculator is hidden */}
+              {!isCalculatorVisible && (
+                <button
+                  onClick={() => {
+                    setDiscountAmount(0);
+                    setPaymentMethods([
+                      { amount: 0, payment_method: "Наличные" },
+                    ]);
+                    setIsPaymentModalOpen(true);
+                  }}
+                  disabled={cartProducts.length === 0}
+                  className={`py-4 px-6 rounded-xl text-lg font-bold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[60px] active:scale-95 touch-manipulation ${
+                    onCredit
+                      ? "bg-amber-600 text-white hover:bg-amber-700"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                  title={cartProducts.length === 0 ? "Добавьте товары" : onCredit ? `В долг ${total.toLocaleString()} сум` : `Оплатить ${total.toLocaleString()} сум`}
+                >
+                  {cartProducts.length === 0
+                    ? "Товары"
+                    : `${onCredit ? "Долг" : "Оплата"}: ${total.toLocaleString()}`}
+                </button>
+              )}
+
               <button
                 onClick={handleBottomDownClick}
                 disabled={cartProducts.length === 0}
@@ -2075,55 +2025,55 @@ const POSInterfaceCore = () => {
 
       {/* Right Panel - Calculator */}
       {isCalculatorVisible && (
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-screen">
           {/* Calculator Display */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6 border-b border-gray-200 flex-shrink-0">
             {/* Calculator Header with Close Button */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-2xl font-bold text-gray-900">
                 Калькулятор
               </h3>
               <button
                 onClick={() => setIsCalculatorVisible(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Закрыть калькулятор"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-6 h-6 text-gray-500" />
               </button>
             </div>
-            <div className="bg-gray-100 p-4 rounded-xl mb-4">
+            <div className="bg-gray-100 p-5 rounded-xl mb-4">
               {operation && previousInput && (
-                <div className="text-right text-lg text-gray-600 font-mono">
+                <div className="text-right text-2xl text-gray-600 font-mono">
                   {previousInput} {operation}
                 </div>
               )}
-              <div className="text-right text-3xl font-mono text-gray-900">
+              <div className="text-right text-5xl font-mono text-gray-900">
                 {currentInput || "0"}
               </div>
             </div>
           </div>
 
           {/* Calculator Keypad */}
-          <div className="flex-1 p-6">
-            <div className="grid grid-cols-4 gap-4 h-full">
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="grid grid-cols-4 gap-5">
               {/* Row 1 */}
               <button
                 onClick={handleClearInput}
-                className="bg-orange-100 hover:bg-orange-200 rounded-2xl transition-colors h-20 flex items-center justify-center col-span-2"
+                className="bg-orange-100 hover:bg-orange-200 rounded-2xl transition-colors h-24 flex items-center justify-center col-span-2 active:scale-95 touch-manipulation"
               >
-                <span className="text-xl font-bold text-orange-600">
+                <span className="text-2xl font-bold text-orange-600">
                   Очистить
                 </span>
               </button>
               <button
                 onClick={handleBackspace}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-2xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
-                <X className="w-7 h-7" />
+                <X className="w-8 h-8" />
               </button>
               <button
                 onClick={() => handleOperation("/")}
-                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-blue-600"
+                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-blue-600 active:scale-95 touch-manipulation"
               >
                 ÷
               </button>
@@ -2131,25 +2081,25 @@ const POSInterfaceCore = () => {
               {/* Row 2 */}
               <button
                 onClick={() => handleNumberClick("7")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 7
               </button>
               <button
                 onClick={() => handleNumberClick("8")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 8
               </button>
               <button
                 onClick={() => handleNumberClick("9")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 9
               </button>
               <button
                 onClick={() => handleOperation("*")}
-                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-blue-600"
+                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-blue-600 active:scale-95 touch-manipulation"
               >
                 ×
               </button>
@@ -2157,25 +2107,25 @@ const POSInterfaceCore = () => {
               {/* Row 3 */}
               <button
                 onClick={() => handleNumberClick("4")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 4
               </button>
               <button
                 onClick={() => handleNumberClick("5")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 5
               </button>
               <button
                 onClick={() => handleNumberClick("6")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 6
               </button>
               <button
                 onClick={() => handleOperation("-")}
-                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-blue-600"
+                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-blue-600 active:scale-95 touch-manipulation"
               >
                 −
               </button>
@@ -2183,25 +2133,25 @@ const POSInterfaceCore = () => {
               {/* Row 4 */}
               <button
                 onClick={() => handleNumberClick("1")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 1
               </button>
               <button
                 onClick={() => handleNumberClick("2")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 2
               </button>
               <button
                 onClick={() => handleNumberClick("3")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 3
               </button>
               <button
                 onClick={() => handleOperation("+")}
-                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-blue-600"
+                className="bg-blue-100 hover:bg-blue-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-blue-600 active:scale-95 touch-manipulation"
               >
                 +
               </button>
@@ -2209,37 +2159,37 @@ const POSInterfaceCore = () => {
               {/* Row 5 */}
               <button
                 onClick={() => handleNumberClick("0")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900 col-span-2"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 col-span-2 active:scale-95 touch-manipulation"
               >
                 0
               </button>
               <button
                 onClick={() => handleNumberClick(",")}
-                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-3xl font-semibold transition-colors h-20 flex items-center justify-center text-gray-900"
+                className="bg-gray-100 hover:bg-gray-200 rounded-2xl text-4xl font-bold transition-colors h-24 flex items-center justify-center text-gray-900 active:scale-95 touch-manipulation"
               >
                 ,
               </button>
               <button
                 onClick={handleEquals}
-                className="bg-green-100 hover:bg-green-200 rounded-2xl transition-colors h-20 flex items-center justify-center"
+                className="bg-green-100 hover:bg-green-200 rounded-2xl transition-colors h-24 flex items-center justify-center active:scale-95 touch-manipulation"
               >
-                <span className="text-xl font-bold text-green-600">=</span>
+                <span className="text-3xl font-bold text-green-600">=</span>
               </button>
             </div>
           </div>
 
           {/* Payment Button */}
-          <div className="p-6 border-t border-gray-200">
+          <div className="p-6 border-t border-gray-200 flex-shrink-0 bg-white">
             <button
               onClick={() => {
                 setDiscountAmount(0);
                 setPaymentMethods([
-                  { amount: total - discountAmount, payment_method: "Наличные" },
+                  { amount: 0, payment_method: "Наличные" },
                 ]);
                 setIsPaymentModalOpen(true);
               }}
               disabled={cartProducts.length === 0}
-              className={`w-full py-8 rounded-2xl text-xl font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[80px] ${
+              className={`w-full py-10 rounded-2xl text-2xl font-bold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[100px] active:scale-95 touch-manipulation ${
                 onCredit
                   ? "bg-amber-600 text-white hover:bg-amber-700"
                   : "bg-blue-600 text-white hover:bg-blue-700"
@@ -2552,7 +2502,7 @@ const POSInterfaceCore = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {users
-                      .filter((user:ExtendedUser) => {
+                      .filter((user) => {
                         const extendedUser = user as ExtendedUser;
                         return (
                           (user.role === "Продавец" ||
@@ -2560,7 +2510,7 @@ const POSInterfaceCore = () => {
                           extendedUser.store_read
                         );
                       })
-                      .map((user:ExtendedUser) => (
+                      .map((user) => (
                         <SelectItem
                           key={user.id}
                           value={user.id?.toString() || ""}
@@ -2740,7 +2690,7 @@ const POSInterfaceCore = () => {
                 {selectedSeller && (
                   <p className="text-sm text-blue-700">
                     <strong>Продавец:</strong>{" "}
-                    {users.find((u:any) => u.id === selectedSeller)?.name ||
+                    {users.find((u) => u.id === selectedSeller)?.name ||
                       (selectedSeller === currentUser?.id
                         ? currentUser?.name
                         : `ID: ${selectedSeller}`)}
@@ -2861,19 +2811,19 @@ const POSInterfaceCore = () => {
                         key={qty}
                         onClick={() => !isDisabled && handleQuantitySelect(qty)}
                         disabled={isDisabled}
-                        className={`border-2 rounded-2xl p-6 transition-all duration-200 min-h-[100px] touch-manipulation ${
+                        className={`border-2 rounded-2xl p-8 transition-all duration-200 min-h-[120px] touch-manipulation ${
                           isDisabled
                             ? "bg-gray-100 border-gray-300 opacity-40 cursor-not-allowed"
                             : "bg-blue-50 hover:bg-blue-100 border-blue-200 hover:border-blue-400 transform hover:scale-105 active:scale-95"
                         }`}
                       >
                         <div
-                          className={`text-3xl font-bold mb-2 ${isDisabled ? "text-gray-400" : "text-blue-700"}`}
+                          className={`text-4xl font-bold mb-2 ${isDisabled ? "text-gray-400" : "text-blue-700"}`}
                         >
                           {qty}
                         </div>
                         <div
-                          className={`text-sm ${isDisabled ? "text-gray-400" : "text-blue-600"}`}
+                          className={`text-base font-medium ${isDisabled ? "text-gray-400" : "text-blue-600"}`}
                         >
                           {selectedProductForQuantity?.selectedUnit
                             ?.short_name || "штук"}
@@ -2890,12 +2840,12 @@ const POSInterfaceCore = () => {
 
                 {/* Current Quantity Display */}
                 {selectedProductForQuantity && (
-                  <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                  <div className="bg-gray-50 rounded-xl p-5 mb-4">
                     <div className="text-center">
-                      <div className="text-sm text-gray-600 mb-1">
+                      <div className="text-base text-gray-600 mb-2 font-medium">
                         Текущее количество
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">
+                      <div className="text-3xl font-bold text-gray-900">
                         {selectedProductForQuantity.quantity.toFixed(2)}{" "}
                         {selectedProductForQuantity.selectedUnit?.short_name ||
                           "штук"}
@@ -2905,16 +2855,16 @@ const POSInterfaceCore = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={() => setIsQuantityModalOpen(false)}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
                   >
                     Отмена
                   </button>
                   <button
                     onClick={handleManualQuantityMode}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
                   >
                     Ввести вручную
                   </button>
@@ -2977,10 +2927,10 @@ const POSInterfaceCore = () => {
                 </div>
 
                 {/* Manual Input Action Buttons */}
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={() => setIsManualQuantityMode(false)}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
                   >
                     Назад
                   </button>
@@ -2996,7 +2946,7 @@ const POSInterfaceCore = () => {
                           ),
                         )
                     }
-                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
                   >
                     Применить
                   </button>
@@ -3053,7 +3003,7 @@ const POSInterfaceCore = () => {
             </div>
 
             {/* Number Pad */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map(
                 (btn) => (
                   <button
@@ -3065,7 +3015,7 @@ const POSInterfaceCore = () => {
                         handlePriceNumberClick(btn);
                       }
                     }}
-                    className={`py-6 text-2xl font-semibold rounded-xl transition-all ${
+                    className={`py-8 text-3xl font-bold rounded-xl transition-all min-h-[80px] ${
                       btn === "⌫"
                         ? "bg-red-100 hover:bg-red-200 text-red-600"
                         : "bg-blue-50 hover:bg-blue-100 text-blue-700"
@@ -3078,10 +3028,10 @@ const POSInterfaceCore = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button
                 onClick={handlePriceClear}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
               >
                 Очистить
               </button>
@@ -3091,14 +3041,14 @@ const POSInterfaceCore = () => {
                   setSelectedProductForPrice(null);
                   setPriceInput("");
                 }}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
               >
                 Отмена
               </button>
               <button
                 onClick={handlePriceSubmit}
                 disabled={!priceInput || parseFloat(priceInput) <= 0}
-                className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-semibold transition-colors min-h-[60px]"
+                className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-5 rounded-xl text-lg font-bold transition-colors min-h-[70px] active:scale-95 touch-manipulation"
               >
                 Применить
               </button>
@@ -3194,12 +3144,6 @@ const POSInterfaceCore = () => {
                         .map((payment) => ({
                           payment_method: payment.payment_method,
                           amount: (payment.amount || (total - discountAmount)).toFixed(2),
-                          ...(payment.payment_method === "Валюта" && payment.exchange_rate && {
-                            exchange_rate: payment.exchange_rate,
-                          }),
-                          ...(payment.payment_method === "Валюта" && payment.change_amount && {
-                            change_amount: payment.change_amount.toFixed(2),
-                          }),
                         }))
                         .filter((p) => Number(p.amount) > 0),
                       ...(onCredit &&
@@ -3275,7 +3219,10 @@ const POSInterfaceCore = () => {
                     // Show success message
                     toast.success("Продажа успешно оформлена!");
                   } catch (error) {
-                 
+                    console.error("Error creating sale:", error);
+                    toast.error(
+                      "Ошибка при оформлении продажи. Попробуйте еще раз.",
+                    );
                   } finally {
                     setIsProcessingSale(false);
                   }
@@ -3537,57 +3484,6 @@ const POSInterfaceCore = () => {
               <button
                 onClick={() => {
                   if (onCredit) return; // Disable when in credit mode
-                  const hasValuta = paymentMethods.some(
-                    (p) => p.payment_method === "Валюта",
-                  );
-                  if (!hasValuta) {
-                    const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
-                    const totalPaid = paymentMethods.reduce(
-                      (sum, p) => sum + (p.amount || 0),
-                      0,
-                    );
-                    const remaining = (total - discountAmount) - totalPaid;
-                    setPaymentMethods((prev) => [
-                      ...prev,
-                      {
-                        amount: remaining > 0 ? remaining : 0,
-                        payment_method: "Валюта",
-                        exchange_rate: defaultRate,
-                        change_amount: 0,
-                        usd_input: '',
-                      },
-                    ]);
-                  }
-                }}
-                disabled={onCredit}
-                className={`flex-1 border-2 rounded-xl p-4 flex items-center justify-center gap-3 transition-colors ${
-                  onCredit 
-                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50" 
-                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                }`}
-              >
-                <svg
-                  className="w-6 h-6 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-gray-700 font-medium">Валюта</span>
-                <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
-                  F5
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (onCredit) return; // Disable when in credit mode
                   const totalPaid = paymentMethods.reduce(
                     (sum, p) => sum + (p.amount || 0),
                     0,
@@ -3641,115 +3537,27 @@ const POSInterfaceCore = () => {
                     {payment.payment_method}
                   </div>
 
-                  {payment.payment_method === "Валюта" ? (
-                    <div className="space-y-3">
-                      {/* Currency Amount in USD */}
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Сумма в валюте ($)</label>
-                        <input
-                          type="text"
-                          value={payment.usd_input ?? (payment.amount ? (payment.amount / (payment.exchange_rate || 1)).toFixed(2) : '')}
-                          onChange={(e) => {
-                            if (onCredit) return;
-                            const value = e.target.value.replace(/[^0-9.]/g, '');
-                            const usdAmount = parseFloat(value) || 0;
-                            const uzsAmount = usdAmount * (payment.exchange_rate || 1);
-                            const finalTotal = total - discountAmount;
-                            const changeAmount = Math.max(0, uzsAmount - finalTotal);
-                            const updated = [...paymentMethods];
-                            updated[index] = {
-                              ...updated[index],
-                              usd_input: value,
-                              amount: uzsAmount,
-                              change_amount: changeAmount,
-                            };
-                            setPaymentMethods(updated);
-                          }}
-                          onFocus={(e) => {
-                            e.stopPropagation();
-                            e.target.select();
-                          }}
-                          onBlur={(e) => e.stopPropagation()}
-                          placeholder="0"
-                          disabled={onCredit}
-                          className={`w-full text-2xl font-bold bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                          }`}
-                        />
-                      </div>
-
-                      {/* Exchange Rate */}
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Курс (UZS)</label>
-                        <input
-                          type="number"
-                          value={payment.exchange_rate || ''}
-                          onChange={(e) => {
-                            if (onCredit) return;
-                            const newRate = Number(e.target.value);
-                            const usdAmount = payment.amount ? payment.amount / (payment.exchange_rate || 1) : 0;
-                            const uzsAmount = usdAmount * newRate;
-                            const finalTotal = total - discountAmount;
-                            const changeAmount = Math.max(0, uzsAmount - finalTotal);
-                            const updated = [...paymentMethods];
-                            updated[index] = {
-                              ...updated[index],
-                              exchange_rate: newRate,
-                              amount: uzsAmount,
-                              change_amount: changeAmount,
-                            };
-                            setPaymentMethods(updated);
-                          }}
-                          onFocus={(e) => {
-                            e.stopPropagation();
-                            e.target.select();
-                          }}
-                          onBlur={(e) => e.stopPropagation()}
-                          placeholder="12500"
-                          disabled={onCredit}
-                          className={`w-full text-lg font-semibold bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            onCredit ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-gray-700"
-                          }`}
-                        />
-                      </div>
-
-                      {/* Total in UZS */}
-                      <div className="pt-2 border-t border-gray-300">
-                        <div className="text-xs text-gray-500">Итого (UZS)</div>
-                        <div className="text-xl font-bold text-gray-900">
-                          {(payment.amount || 0).toLocaleString()}
-                        </div>
-                      </div>
-
-                      {/* Change Amount */}
-                      {payment.change_amount && payment.change_amount > 0 && (
-                        <div className="pt-2 border-t border-gray-300 bg-blue-50 -mx-6 -mb-6 px-6 py-3 rounded-b-xl">
-                          <div className="text-xs text-blue-600 font-medium">Сдача</div>
-                          <div className="text-lg font-bold text-blue-600">
-                            {payment.change_amount.toLocaleString()} UZS
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      value={payment.amount || (total - discountAmount)}
-                      onChange={(e) => {
-                        if (onCredit) return;
-                        const updated = [...paymentMethods];
-                        updated[index].amount = Number(e.target.value);
-                        setPaymentMethods(updated);
-                      }}
-                      onFocus={(e) => e.stopPropagation()}
-                      onBlur={(e) => e.stopPropagation()}
-                      placeholder="0"
-                      disabled={onCredit}
-                      className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
-                        onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                      }`}
-                    />
-                  )}
+                  <input
+                    type="number"
+                    value={payment.amount || (total - discountAmount)}
+                    onChange={(e) => {
+                      if (onCredit) return;
+                      const updated = [...paymentMethods];
+                      updated[index].amount = Number(e.target.value);
+                      setPaymentMethods(updated);
+                    }}
+                    onFocus={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onBlur={(e) => {
+                      e.stopPropagation();
+                    }}
+                    placeholder="0"
+                    disabled={onCredit}
+                    className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                      onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                    }`}
+                  />
                 </div>
               ))}
             </div>
@@ -3927,6 +3735,8 @@ const POSInterfaceCore = () => {
                       balance: 0,
                     });
                   } catch (error) {
+                    toast.error('Ошибка при создании клиента');
+                    console.error('Error creating client:', error);
                   }
                 }}
                 className="flex-1"
