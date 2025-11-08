@@ -2961,20 +2961,8 @@ const POSInterfaceCore = () => {
       <WideDialog open={isPriceModalOpen} onOpenChange={setIsPriceModalOpen}>
         <WideDialogContent className="max-w-md p-0">
           <WideDialogHeader className="p-4 pb-3">
-            <WideDialogTitle className="text-lg font-bold text-center">
-              Введите цену
-            </WideDialogTitle>
-            {selectedProductForPrice && (
-              <div className="text-center mt-2">
-                <p className="text-sm text-gray-600">
-                  {selectedProductForPrice.name}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Количество: {selectedProductForPrice.quantity.toFixed(2)}{" "}
-                  {selectedProductForPrice.selectedUnit?.short_name || "шт"}
-                </p>
-              </div>
-            )}
+           
+            
           </WideDialogHeader>
 
           <div className="p-4 pt-2">
