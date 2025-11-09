@@ -86,6 +86,7 @@ interface FormSalePayment {
   amount: number;
   exchange_rate?: number;
   change_amount?: number;
+  comment?: string;
 }
 
 interface CurrencyRate {
@@ -107,6 +108,7 @@ interface SaleFormData {
   discount_amount?: string;
   sale_payments: FormSalePayment[];
   sold_by?: number;
+  comment?: string;
   sale_debt?: {
     client: number;
     due_date: string;
@@ -800,6 +802,10 @@ const handleQuantityChange = (
         return;
       }
 
+      // Extract comment from Click payment if exists
+      const clickPayment = data.sale_payments.find(p => p.payment_method === "Click");
+      const clickComment = clickPayment?.comment || "";
+
       const formattedData = {
         store: parseInt(data.store),
         payment_method: data.sale_payments[0]?.payment_method || "Наличные",
@@ -807,6 +813,7 @@ const handleQuantityChange = (
         discount_amount: Number(String(data.discount_amount || "0").replace(/,/g, "")).toFixed(2),
         ...(isAdmin || isSuperUser ? { sold_by: data.sold_by } : {}),
         on_credit: data.on_credit,
+        ...(clickPayment ? { comment: clickComment } : {}),
         sale_items: data.sale_items.map((item) => ({
           product_write: item.product_write,
           quantity: item.quantity.toString(),
@@ -821,18 +828,22 @@ const handleQuantityChange = (
             ? payment.amount / payment.exchange_rate
             : payment.amount;
           
-          return {
+          const paymentData: any = {
             payment_method: payment.payment_method,
             amount: payment.payment_method === "Валюта" 
               ? Number(usdAmount).toFixed(2)
               : Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
-            ...(payment.payment_method === "Валюта" && payment.exchange_rate && {
-              exchange_rate: payment.exchange_rate,
-            }),
-            ...(payment.payment_method === "Валюта" && payment.change_amount && {
-              change_amount: Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2),
-            }),
           };
+          
+          if (payment.payment_method === "Валюта" && payment.exchange_rate) {
+            paymentData.exchange_rate = payment.exchange_rate;
+          }
+          
+          if (payment.payment_method === "Валюта" && payment.change_amount) {
+            paymentData.change_amount = Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2);
+          }
+          
+          return paymentData;
         }),
         ...(data.sale_debt?.client && !data.on_credit
           ? { client: data.sale_debt.client }
@@ -1421,6 +1432,9 @@ const handleQuantityChange = (
                             form.setValue(`sale_payments.${index}.exchange_rate`, defaultRate);
                             form.setValue(`sale_payments.${index}.change_amount`, 0);
                           }
+                          if (value !== "Click") {
+                            form.setValue(`sale_payments.${index}.comment`, undefined);
+                          }
                         }}
                       >
                         <SelectTrigger>
@@ -1508,46 +1522,66 @@ const handleQuantityChange = (
                     )}
                   </>
                 ) : (
-                  <FormField
-                    control={form.control}
-                    name={`sale_payments.${index}.amount`}
-                    render={({ field: { onChange, value } }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>{t("table.amount")}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            value={
-                              value !== undefined && value !== null
-                                ? Number(value).toLocaleString()
-                                : ""
-                            }
-                            onChange={(e) => {
-                              // Remove all non-digit and non-decimal characters for parsing
-                              const rawValue = e.target.value
-                                .replace(/[^\d.,]/g, "")
-                                .replace(/,/g, "");
-                              const newAmount = parseFloat(rawValue) || 0;
-                              const totalAmount = parseFloat(
-                                form.watch("total_amount"),
-                              );
-                              const otherPaymentsTotal = form
-                                .watch("sale_payments")
-                                .filter((_, i) => i !== index)
-                                .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-                              // Update payment amount
-                              if (newAmount + otherPaymentsTotal > totalAmount) {
-                                onChange(totalAmount - otherPaymentsTotal);
-                              } else {
-                                onChange(newAmount);
+                  <>
+                    <FormField
+                      control={form.control}
+                      name={`sale_payments.${index}.amount`}
+                      render={({ field: { onChange, value } }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>{t("table.amount")}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              value={
+                                value !== undefined && value !== null
+                                  ? Number(value).toLocaleString()
+                                  : ""
                               }
-                            }}
-                          />
-                        </FormControl>
-                      </FormItem>
+                              onChange={(e) => {
+                                // Remove all non-digit and non-decimal characters for parsing
+                                const rawValue = e.target.value
+                                  .replace(/[^\d.,]/g, "")
+                                  .replace(/,/g, "");
+                                const newAmount = parseFloat(rawValue) || 0;
+                                const totalAmount = parseFloat(
+                                  form.watch("total_amount"),
+                                );
+                                const otherPaymentsTotal = form
+                                  .watch("sale_payments")
+                                  .filter((_, i) => i !== index)
+                                  .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                                // Update payment amount
+                                if (newAmount + otherPaymentsTotal > totalAmount) {
+                                  onChange(totalAmount - otherPaymentsTotal);
+                                } else {
+                                  onChange(newAmount);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    {payment.payment_method === "Click" && (
+                      <FormField
+                        control={form.control}
+                        name={`sale_payments.${index}.comment`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Комментарий</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="Введите комментарий"
+                                {...field}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  </>
                 )}
                 {index > 0 && (
                   <Button

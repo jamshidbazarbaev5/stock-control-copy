@@ -521,6 +521,21 @@ export default function SalesPage() {
 
     return (
       <div className="p-2 space-y-3">
+        {/* Comment Section */}
+        {row.comment && (
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2 text-sm">
+              💬 Комментарий
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                Click
+              </span>
+            </h3>
+            <div className="dark:bg-expanded-row-dark bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+              <p className="text-sm text-gray-700">{row.comment}</p>
+            </div>
+          </div>
+        )}
+
         {/* Worker Information Section */}
         {row.worker_read && (
           <div>

@@ -117,6 +117,7 @@ export interface SaleRefund {
 }
 
 export interface Sale {
+  comment?:string
   id?: number;
   sale_id?: string;
   discount_amount?: string;
