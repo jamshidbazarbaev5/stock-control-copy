@@ -369,7 +369,10 @@ export default function StocksPage() {
                 {t("navigation.history")}
               </span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEdit(row)}>
+              <DropdownMenuItem 
+                onClick={() => handleEdit(row)}
+                disabled={Number(row.quantity) !== Number(row.quantity_for_history)}
+              >
                 {t("common.edit")}
               </DropdownMenuItem>
               {/* Only show remove if superuser and stock is not recycled */}

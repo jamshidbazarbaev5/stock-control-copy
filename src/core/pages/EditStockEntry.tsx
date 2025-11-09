@@ -98,6 +98,8 @@ interface StockItem {
   isCalculated: boolean;
   isExpanded: boolean;
   isCalculating: boolean;
+  isEditable: boolean; // Whether this stock can be edited
+  quantityMismatch?: boolean; // Whether quantity != quantity_for_history
 }
 
 interface CreateProductForm {
@@ -342,6 +344,12 @@ export default function EditStockEntry() {
 
       // Create stock items from existing stocks
       const items: StockItem[] = stocks.map((stock, index) => {
+        // Check if stock can be edited (quantity == quantity_for_history)
+        const quantity = Number(stock.quantity) || 0;
+        const quantityForHistory = Number(stock.quantity_for_history) || 0;
+        const isEditable = quantity === quantityForHistory;
+        const quantityMismatch = !isEditable;
+
         // Extract exchange_rate ID properly
         let exchangeRateValue: any = "";
         if (stock.exchange_rate) {
@@ -403,6 +411,8 @@ export default function EditStockEntry() {
           isCalculated: false, // Will be recalculated to get field metadata
           isExpanded: true, // All items expanded by default
           isCalculating: false,
+          isEditable,
+          quantityMismatch,
         };
       });
 
@@ -513,6 +523,8 @@ export default function EditStockEntry() {
         isCalculated: false,
         isExpanded: true,
         isCalculating: false,
+        isEditable: true,
+        quantityMismatch: false,
       },
     ]);
   };
@@ -530,6 +542,8 @@ export default function EditStockEntry() {
       isExpanded: true,
       isCalculated: false,
       isCalculating: false,
+      isEditable: true,
+      quantityMismatch: false,
     };
 
     setStockItems([...stockItems, duplicated]);
@@ -2116,7 +2130,9 @@ export default function EditStockEntry() {
                       } ${item.isCalculated ? "border-green-300 bg-green-50/30" : "border-gray-200"}`}
                   >
                     {/* Item Header */}
-                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-t-lg">
+                    <div className={`flex items-center gap-3 p-4 rounded-t-lg ${
+                      item.quantityMismatch ? "bg-red-50 border-red-300" : "bg-gray-50"
+                    }`}>
                       <Checkbox
                           checked={selectedItems.has(item.id)}
                           onCheckedChange={(checked) => {
@@ -2154,6 +2170,14 @@ export default function EditStockEntry() {
                       {item.selectedProduct?.product_name ||
                           t("common.select_product_placeholder")}
                     </span>
+                        {item.quantityMismatch && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-red-100 border border-red-300 rounded-md">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                            <span className="text-sm font-medium text-red-700">
+                              Редактирование запрещено (товар продан)
+                            </span>
+                          </div>
+                        )}
                         {item.isCalculated && (
                             <div className="flex items-center gap-2 text-sm">
                               <CheckCircle2 className="h-4 w-4 text-green-600"/>
@@ -2226,6 +2250,7 @@ export default function EditStockEntry() {
                                   onOpenChange={(open) => {
                                     if (!open) setProductSearchTerm("");
                                   }}
+                                  disabled={!item.isEditable}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder={t("common.product")} />
@@ -2276,7 +2301,7 @@ export default function EditStockEntry() {
                                   onValueChange={(value) =>
                                       updateStockItemField(item.id, "currency", value)
                                   }
-                                  disabled={currenciesLoading}
+                                  disabled={currenciesLoading || !item.isEditable}
                               >
                                 <SelectTrigger>
                                   <SelectValue
@@ -2328,7 +2353,7 @@ export default function EditStockEntry() {
                                         );
                                       }}
                                       disabled={
-                                          measurementsLoading || !item.selectedProduct
+                                          measurementsLoading || !item.selectedProduct || !item.isEditable
                                       }
                                   >
                                     <SelectTrigger>
@@ -2373,6 +2398,7 @@ export default function EditStockEntry() {
                                         );
                                       }}
                                       placeholder="Партия"
+                                      disabled={!item.isEditable}
                                   />
                                 </div>
 
@@ -2382,7 +2408,7 @@ export default function EditStockEntry() {
                                   <Button
                                       type="button"
                                       onClick={() => openCalculationModal(item.id)}
-                                      disabled={!item.form.purchase_unit}
+                                      disabled={!item.form.purchase_unit || !item.isEditable}
                                       variant="outline"
                                       className="w-full"
                                   >
@@ -2443,9 +2469,10 @@ export default function EditStockEntry() {
                                                     );
                                                   }
                                                 }}
-                                                readOnly={!fieldData.editable}
+                                                readOnly={!fieldData.editable || !item.isEditable}
+                                                disabled={!item.isEditable}
                                                 className={
-                                                  !fieldData.editable
+                                                  !fieldData.editable || !item.isEditable
                                                       ? "bg-gray-100 cursor-not-allowed"
                                                       : ""
                                                 }
