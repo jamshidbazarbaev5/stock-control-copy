@@ -999,7 +999,7 @@ export default function SalesPage() {
               {t("common.print")}
             </Button>
           )}
-          {(currentUser?.role === "Продавец" || currentUser?.is_superuser) && (
+          {currentUser?.is_superuser && (
             <Button
               variant="destructive"
               size="sm"

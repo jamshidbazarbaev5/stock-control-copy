@@ -6,6 +6,7 @@ export interface ExpensesSummaryResponse {
     expense_name__name: string;
     total_amount: number;
   }>;
+  other_expense_total_usd:number;
 }
 
 export interface SuppliersSummaryResponse {

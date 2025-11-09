@@ -38,7 +38,7 @@ import {
 } from "../api/reports";
 import type { ExpensesSummaryResponse, SuppliersSummaryResponse } from "../api/types/reports";
 import {
-  ArrowUpRight,
+  
   DollarSign,
   ShoppingCart,
   TrendingUp,
@@ -683,8 +683,8 @@ const DashboardPage = () => {
                     .replace("UZS", "")
                     .trim()}
               </div>
-              <div className="text-xs text-green-500 flex items-center mt-1">
-                <ArrowUpRight className="h-4 w-4 mr-1" />
+              <div className="text-xs text-muted-foreground mt-1">
+                ${(salesProfit?.total_revenue_in_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </div>
             </CardContent>
           </Card>
@@ -773,6 +773,9 @@ const DashboardPage = () => {
                     .trim()}
                 </div>
               </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                ${(expensesSummary?.other_expense_total_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              </div>
             </CardContent>
           </Card>
 
@@ -794,6 +797,9 @@ const DashboardPage = () => {
                     .format(expensesSummary?.purchase_expense_total || 0)
                     .replace("UZS", "")
                     .trim()}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                ${(salesProfit?.total_expense_usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </div>
             </CardContent>
           </Card>
@@ -862,10 +868,20 @@ const DashboardPage = () => {
                 })()}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {selectedStore === "all"
-                    ? t("dashboard.all_stores_balance") || "All Stores Balance"
-                    : t("dashboard.selected_store_balance") ||
-                    "Selected Store Balance"}
+                {(() => {
+                  if (selectedStore === "all") {
+                    const totalUSD = stores.reduce((sum, store) => {
+                      const usdBudget = store.budgets?.find(b => b.budget_type === "Валюта");
+                      return sum + (usdBudget ? Number(usdBudget.amount) : 0);
+                    }, 0);
+                    return `$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+                  } else {
+                    const store = stores.find((s) => s.id?.toString() === selectedStore);
+                    const usdBudget = store?.budgets?.find(b => b.budget_type === "Валюта");
+                    const usdAmount = usdBudget ? Number(usdBudget.amount) : 0;
+                    return `$${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+                  }
+                })()}
               </div>
             </CardContent>
           </Card>

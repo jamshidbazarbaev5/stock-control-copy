@@ -76,7 +76,9 @@ export interface TopSellersResponse {
 
 export interface SalesProfitResponse {
   total_sales: number;
+  total_expense_usd:number;
   total_revenue: number;
+  total_revenue_in_usd: number;
   total_pure_revenue: number;
   sale_items: Array<{
     id: number;

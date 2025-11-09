@@ -388,8 +388,7 @@ export default function DebtDetailsPage() {
                                     </div>
                                     <div className="text-sm text-gray-500">
                                       {
-                                        item.product_read.category_read
-                                          .category_name
+                                        item.product_read?.category_read?.category_name
                                       }
                                     </div>
                                   </div>

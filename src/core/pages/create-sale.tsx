@@ -860,6 +860,8 @@ const handleQuantityChange = (
       toast.success(t("messages.created_successfully"));
       navigate("/sales");
     } catch (error) {
+      console.error("Error creating sale:", error);
+      toast.error(t("messages.error_creating"));
     }
   };
 
@@ -985,7 +987,7 @@ const handleQuantityChange = (
     };
   }, [activeSearchIndex]);
 
-  // Update change amount when discount changes (for currency payments)
+  // Update payment amount when discount changes
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === "discount_amount") {
@@ -994,13 +996,13 @@ const handleQuantityChange = (
         const expectedTotal = totalAmount - discountAmount;
         const payments = form.getValues("sale_payments");
         
-        payments.forEach((payment, index) => {
-          if (payment.payment_method === "Валюта" && payment.exchange_rate) {
-            const uzsAmount = payment.amount || 0;
-            const changeAmount = Math.max(0, uzsAmount - expectedTotal);
-            form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
-          }
-        });
+        if (payments.length === 1) {
+          form.setValue("sale_payments.0.amount", expectedTotal);
+        } else if (payments.length > 1) {
+          const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+          const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
+          form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -1394,252 +1396,223 @@ const handleQuantityChange = (
 
           {/* Payment Methods */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-semibold">
-                {t("table.payment_methods")}
-              </h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const payments = form.getValues("sale_payments");
-                  const totalAmount = parseFloat(form.watch("total_amount"));
-                  const discountAmount = parseFloat(form.watch("discount_amount") || "0");
-                  const expectedTotal = totalAmount - discountAmount;
-                  const currentTotal = payments.reduce(
-                    (sum, p) => sum + (p.amount || 0),
-                    0,
-                  );
-                  const remaining = expectedTotal - currentTotal;
-
-                  if (remaining > 0) {
-                    payments.push({
-                      payment_method: "Наличные",
-                      amount: remaining,
-                    });
-                    form.setValue("sale_payments", payments);
-                  }
-                }}
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {t("common.add_payment_method")}
-              </Button>
-            </div>
-            
+            <h3 className="text-base sm:text-lg font-semibold">
+              {t("table.payment_methods")}
+            </h3>
             {form.watch("sale_payments").map((payment, index) => (
               <div
                 key={index}
-                className="p-4 border-2 rounded-lg bg-white "
+                className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-end"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-600 ">
-                    Платеж {index + 1}
-                  </span>
-                  {index > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const payments = form.getValues("sale_payments");
-                        payments.splice(index, 1);
-                        const totalAmount = parseFloat(form.watch("total_amount"));
-                        const discountAmount = parseFloat(form.watch("discount_amount") || "0");
-                        const expectedTotal = totalAmount - discountAmount;
-                        const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-                        
-                        if (payments.length > 0 && currentTotal !== expectedTotal) {
-                          const remaining = expectedTotal - payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
-                          payments[payments.length - 1].amount = Math.max(0, remaining);
+                <FormField
+                  control={form.control}
+                  name={`sale_payments.${index}.payment_method`}
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>{t("table.payment_method")}</FormLabel>
+                      <Select
+                        value={
+                          typeof field.value === "string" ? field.value : ""
                         }
-                        form.setValue("sale_payments", payments);
-                      }}
-                      className="text-red-600 "
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </Button>
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          if (value === "Валюта") {
+                            const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
+                            form.setValue(`sale_payments.${index}.exchange_rate`, defaultRate);
+                            form.setValue(`sale_payments.${index}.change_amount`, 0);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Наличные">
+                            {t("payment.cash")}
+                          </SelectItem>
+                          <SelectItem value="Click">
+                            {t("payment.click")}
+                          </SelectItem>
+                          <SelectItem value="Карта">
+                            {t("payment.card")}
+                          </SelectItem>
+                          <SelectItem value="Перечисление">
+                            {t("payment.per")}
+                          </SelectItem>
+                          <SelectItem value="Валюта">
+                            Валюта (USD)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
                   )}
-                </div>
-
-                <div className="space-y-3">
-                  <FormField
-                    control={form.control}
-                    name={`sale_payments.${index}.payment_method`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">{t("table.payment_method")}</FormLabel>
-                        <Select
-                          value={typeof field.value === "string" ? field.value : ""}
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            if (value === "Валюта") {
-                              const defaultRate = currencyRates[0] ? parseFloat(currencyRates[0].rate) : 12500;
-                              form.setValue(`sale_payments.${index}.exchange_rate`, defaultRate);
-                              form.setValue(`sale_payments.${index}.change_amount`, 0);
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-11">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Наличные">
-                              <div className="flex items-center gap-2">
-                                <span>💵</span>
-                                <span>{t("payment.cash")}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="Click">
-                              <div className="flex items-center gap-2">
-                                <span>📱</span>
-                                <span>{t("payment.click")}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="Карта">
-                              <div className="flex items-center gap-2">
-                                <span>💳</span>
-                                <span>{t("payment.card")}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="Перечисление">
-                              <div className="flex items-center gap-2">
-                                <span>🏦</span>
-                                <span>{t("payment.per")}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="Валюта">
-                              <div className="flex items-center gap-2">
-                                <span>💱</span>
-                                <span>Валюта (USD)</span>
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-
-                  {payment.payment_method === "Валюта" ? (
-                    <div className="space-y-3 p-3 bg-blue-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name={`sale_payments.${index}.amount`}
-                          render={() => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-medium flex items-center gap-1">
-                                <span>💵</span>
-                                <span>Сумма ($)</span>
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  className="text-right h-11 text-lg font-semibold"
-                                  placeholder="0.00"
-                                  value={usdInputValues[index] || ''}
-                                  onChange={(e) => handleUsdChange(e, index)}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`sale_payments.${index}.exchange_rate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-medium">Курс (UZS)</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  className="h-11"
-                                  {...field}
-                                  onChange={(e) => {
-                                    const newRate = Number(e.target.value);
-                                    field.onChange(newRate);
-                                    const usdAmount = parseFloat(usdInputValues[index] || '0');
-                                    const uzsAmount = parseFloat((usdAmount * newRate).toFixed(2));
-                                    form.setValue(`sale_payments.${index}.amount`, uzsAmount);
-                                    const totalAmount = parseFloat(form.getValues("total_amount") || "0");
-                                    const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
-                                    const finalTotal = totalAmount - discountAmount;
-                                    const changeAmount = Math.max(0, uzsAmount - finalTotal);
-                                    form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-2 bg-white ">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Эквивалент в UZS:</span>
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                          {(form.watch(`sale_payments.${index}.amount`) || 0).toLocaleString()} сум
-                        </span>
-                      </div>
-
-                      {(form.watch(`sale_payments.${index}.change_amount`) || 0) > 0 && (
-                        <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-300 ">
-                          <span className="text-sm font-medium text-green-700 dark:text-green-400">Сдача:</span>
-                          <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                            {(form.watch(`sale_payments.${index}.change_amount`) || 0).toLocaleString()} сум
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
+                />
+                {payment.payment_method === "Валюта" ? (
+                  <>
                     <FormField
                       control={form.control}
                       name={`sale_payments.${index}.amount`}
-                      render={({ field: { onChange, value } }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">{t("table.amount")}</FormLabel>
+                      render={({ }) => {
+                        return (
+                          <FormItem className="flex-1">
+                            <FormLabel>Сумма ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                className="text-right"
+                                value={usdInputValues[index] || ''}
+                                onChange={(e) => handleUsdChange(e, index)}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sale_payments.${index}.exchange_rate`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Курс (UZS)</FormLabel>
                           <FormControl>
                             <Input
-                              type="text"
-                              className="text-right h-11 text-lg font-semibold"
-                              placeholder="0"
-                              value={
-                                value !== undefined && value !== null
-                                  ? Number(value).toLocaleString()
-                                  : ""
-                              }
+                              type="number"
+                              {...field}
                               onChange={(e) => {
-                                const rawValue = e.target.value
-                                  .replace(/[^\d.,]/g, "")
-                                  .replace(/,/g, "");
-                                const newAmount = parseFloat(rawValue) || 0;
-                                const totalAmount = parseFloat(
-                                  form.watch("total_amount"),
-                                );
-                                const otherPaymentsTotal = form
-                                  .watch("sale_payments")
-                                  .filter((_, i) => i !== index)
-                                  .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-                                if (newAmount + otherPaymentsTotal > totalAmount) {
-                                  onChange(totalAmount - otherPaymentsTotal);
-                                } else {
-                                  onChange(newAmount);
-                                }
+                                const newRate = Number(e.target.value);
+                                field.onChange(newRate);
+                                const currentAmount = form.watch(`sale_payments.${index}.amount`) || 0;
+                                const oldRate = form.watch(`sale_payments.${index}.exchange_rate`) || 1;
+                                const usdAmount = currentAmount / oldRate;
+                                const uzsAmount = usdAmount * newRate;
+                                const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                                const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                                const finalTotal = totalAmount - discountAmount;
+                                const changeAmount = Math.max(0, uzsAmount - finalTotal);
+                                form.setValue(`sale_payments.${index}.amount`, uzsAmount);
+                                form.setValue(`sale_payments.${index}.change_amount`, changeAmount);
                               }}
                             />
                           </FormControl>
                         </FormItem>
                       )}
                     />
-                  )}
-                </div>
+                    {(form.watch(`sale_payments.${index}.change_amount`) || 0) > 0 && (
+                      <FormItem className="flex-1">
+                        <FormLabel className="text-blue-600">Сдача</FormLabel>
+                        <div className="text-lg font-bold text-blue-600 mt-2">
+                          {(form.watch(`sale_payments.${index}.change_amount`) || 0).toLocaleString()} UZS
+                        </div>
+                      </FormItem>
+                    )}
+                  </>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name={`sale_payments.${index}.amount`}
+                    render={({ field: { onChange, value } }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>{t("table.amount")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            value={
+                              value !== undefined && value !== null
+                                ? Number(value).toLocaleString()
+                                : ""
+                            }
+                            onChange={(e) => {
+                              // Remove all non-digit and non-decimal characters for parsing
+                              const rawValue = e.target.value
+                                .replace(/[^\d.,]/g, "")
+                                .replace(/,/g, "");
+                              const newAmount = parseFloat(rawValue) || 0;
+                              const totalAmount = parseFloat(
+                                form.watch("total_amount"),
+                              );
+                              const otherPaymentsTotal = form
+                                .watch("sale_payments")
+                                .filter((_, i) => i !== index)
+                                .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                              // Update payment amount
+                              if (newAmount + otherPaymentsTotal > totalAmount) {
+                                onChange(totalAmount - otherPaymentsTotal);
+                              } else {
+                                onChange(newAmount);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {index > 0 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => {
+                      const payments = form.getValues("sale_payments");
+                      payments.splice(index, 1);
+                      const totalAmount = parseFloat(form.watch("total_amount"));
+                      const discountAmount = parseFloat(form.watch("discount_amount") || "0");
+                      const expectedTotal = totalAmount - discountAmount;
+                      const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                      
+                      if (payments.length > 0 && currentTotal !== expectedTotal) {
+                        const remaining = expectedTotal - payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+                        payments[payments.length - 1].amount = Math.max(0, remaining);
+                      }
+                      form.setValue("sale_payments", payments);
+                    }}
+                    className="mt-0 sm:mt-1"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </Button>
+                )}
               </div>
             ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const payments = form.getValues("sale_payments");
+                const totalAmount = parseFloat(form.watch("total_amount"));
+                const discountAmount = parseFloat(form.watch("discount_amount") || "0");
+                const expectedTotal = totalAmount - discountAmount;
+                const currentTotal = payments.reduce(
+                  (sum, p) => sum + (p.amount || 0),
+                  0,
+                );
+                const remaining = expectedTotal - currentTotal;
+
+                if (remaining > 0) {
+                  payments.push({
+                    payment_method: "Наличные",
+                    amount: remaining,
+                  });
+                  form.setValue("sale_payments", payments);
+                }
+              }}
+              className="w-full sm:w-auto"
+            >
+              {t("common.add_payment_method")}
+            </Button>
           </div>
 
           {/* On Credit */}
