@@ -2067,7 +2067,7 @@ export default function CreateStock() {
                     </div>
 
                     {/* Stock Name Field - Show only for category Лист (id: 3) */}
-                    {item.selectedProduct?.category_read?.id === 3 && (
+                    {item.selectedProduct?.category_read?.name === 'Лист' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor={`stock_name-${item.id}`}>
