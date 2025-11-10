@@ -824,36 +824,59 @@ export default function SalesPage() {
       accessorKey: "sale_payments",
       cell: (row: any) => (
         <div className="flex flex-col items-center gap-1">
-          {row.sale_payments.map((payment: any, index: number) => (
-            <div
-              key={index}
-              className="flex items-center gap-1 text-xs justify-center"
-            >
-              {payment.payment_method === "Наличные" && (
+          {row.sale_debt ? (
+            <div className="flex items-center gap-1 text-xs justify-center">
+              {row.sale_debt.deposit_payment_method === "Наличные" && (
                 <Wallet className="h-4 w-4 text-green-600" />
               )}
-              {payment.payment_method === "Карта" && (
+              {row.sale_debt.deposit_payment_method === "Карта" && (
                 <CreditCard className="h-4 w-4 text-blue-600" />
               )}
-              {payment.payment_method === "Click" && (
+              {row.sale_debt.deposit_payment_method === "Click" && (
                 <SmartphoneNfc className="h-4 w-4 text-purple-600" />
               )}
-              {payment.payment_method === "Перечисление" && (
+              {row.sale_debt.deposit_payment_method === "Перечисление" && (
                 <Landmark className="h-4 w-4 text-orange-500" />
               )}
-              {payment.payment_method === "Валюта" && (
+              {row.sale_debt.deposit_payment_method === "Валюта" && (
                 <DollarSign className="h-4 w-4 text-yellow-600" />
               )}
               <span className="whitespace-nowrap">
-                {formatCurrency(payment.amount)} {payment.payment_method === "Валюта" ? "$" : ""}
+                Аванс: {formatCurrency(row.sale_debt.deposit || "0")}
               </span>
-              {payment.change_amount && parseFloat(payment.change_amount) > 0 && (
-                <span className="text-gray-500">
-                  (сдача: {formatCurrency(payment.change_amount)})
-                </span>
-              )}
             </div>
-          ))}
+          ) : (
+            row.sale_payments.map((payment: any, index: number) => (
+              <div
+                key={index}
+                className="flex items-center gap-1 text-xs justify-center"
+              >
+                {payment.payment_method === "Наличные" && (
+                  <Wallet className="h-4 w-4 text-green-600" />
+                )}
+                {payment.payment_method === "Карта" && (
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                )}
+                {payment.payment_method === "Click" && (
+                  <SmartphoneNfc className="h-4 w-4 text-purple-600" />
+                )}
+                {payment.payment_method === "Перечисление" && (
+                  <Landmark className="h-4 w-4 text-orange-500" />
+                )}
+                {payment.payment_method === "Валюта" && (
+                  <DollarSign className="h-4 w-4 text-yellow-600" />
+                )}
+                <span className="whitespace-nowrap">
+                  {formatCurrency(payment.amount)} {payment.payment_method === "Валюта" ? "$" : ""}
+                </span>
+                {payment.change_amount && parseFloat(payment.change_amount) > 0 && (
+                  <span className="text-gray-500">
+                    (сдача: {formatCurrency(payment.change_amount)})
+                  </span>
+                )}
+              </div>
+            ))
+          )}
         </div>
       ),
     },

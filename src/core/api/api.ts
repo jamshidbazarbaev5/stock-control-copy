@@ -9,7 +9,7 @@ import { useErrorStore, parseErrorMessage } from "../store/errorStore";
 
 // Constants
 
-// const BASE/_URL = 'https://test.bondify.uz/api/v1/'
+// const BASE_URL = 'https://test.bondify.uz/api/v1/'
 
 const getBaseURL = (): string => {
   const hostname = window.location.hostname;
