@@ -378,11 +378,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             label: t("navigation.sponsors"),
             href: "/sponsors",
           },
-          {
-            icon: ListView,
-            label: t("navigation.attributes"),
-            href: "/attributes",
-          },
+         
           {
             icon: Ruler,
             label: t("navigation.labelSizes"),

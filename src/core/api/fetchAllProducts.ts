@@ -103,3 +103,17 @@ export async function fetchProductByBarcode(
     return null;
   }
 }
+
+export async function fetchFirstPageProducts(
+  params: FetchProductsParams = {},
+): Promise<Product[]> {
+  try {
+    const response = await api.get<ProductsResponse>("/items/product/", {
+      params: { ...params, non_zero: 1 },
+    });
+    return response.data.results || [];
+  } catch (error) {
+    console.error("Error fetching first page products:", error);
+    return [];
+  }
+}

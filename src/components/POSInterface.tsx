@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  fetchAllProducts,
+  fetchFirstPageProducts,
   fetchProductByBarcode,
 } from "@/core/api/fetchAllProducts";
 import type { Product } from "@/core/api/product";
@@ -97,6 +97,8 @@ interface SessionState {
 interface SalePayment {
   amount: number;
   payment_method: string;
+  exchange_rate?: number;
+  usd_amount?: number;
 }
 
 interface SalePayload {
@@ -246,6 +248,8 @@ const POSInterfaceCore = () => {
     { amount: 0, payment_method: "Наличные" },
   ]);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [exchangeRate, setExchangeRate] = useState<number>(12200);
+  const [_loadingExchangeRate, setLoadingExchangeRate] = useState(false);
 
   // Sale API
   const createSaleMutation = useCreateSale();
@@ -410,7 +414,7 @@ const POSInterfaceCore = () => {
     if (isSearchModalOpen) {
       const timeoutId = setTimeout(() => {
         setLoadingProducts(true);
-        fetchAllProducts({
+        fetchFirstPageProducts({
           product_name: searchTerm.length > 0 ? searchTerm : undefined,
           barcode: barcodeSearchTerm.length > 0 ? barcodeSearchTerm : undefined,
         })
@@ -425,6 +429,27 @@ const POSInterfaceCore = () => {
       return () => clearTimeout(timeoutId);
     }
   }, [isSearchModalOpen, searchTerm, barcodeSearchTerm]);
+
+  // Fetch exchange rates when payment modal opens
+  useEffect(() => {
+    if (isPaymentModalOpen) {
+      setLoadingExchangeRate(true);
+      fetch("https://test.bondify.uz/api/v1/currency/rates")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data && data.length > 0 && data[0].rate) {
+            const rate = parseFloat(data[0].rate);
+            setExchangeRate(rate);
+            console.log("Exchange rate fetched:", rate);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching exchange rate:", error);
+          toast.error("Ошибка при загрузке курса валюты");
+        })
+        .finally(() => setLoadingExchangeRate(false));
+    }
+  }, [isPaymentModalOpen]);
 
   // Handle adding product directly to cart
   const handleProductDirectAdd = useCallback(
@@ -1253,6 +1278,25 @@ const POSInterfaceCore = () => {
                 {
                   amount: remaining > 0 ? remaining : 0,
                   payment_method: "Перечисление",
+                },
+              ]);
+            }
+          }
+          return;
+        case "F5":
+          e.preventDefault();
+          if (isPaymentModalOpen) {
+            const hasValyuta = paymentMethods.some(
+              (p) => p.payment_method === "Валюта",
+            );
+            if (!hasValyuta) {
+              setPaymentMethods((prev) => [
+                ...prev,
+                {
+                  amount: 0,
+                  payment_method: "Валюта",
+                  exchange_rate: exchangeRate,
+                  usd_amount: 0,
                 },
               ]);
             }
@@ -2763,7 +2807,35 @@ const POSInterfaceCore = () => {
         onOpenChange={setIsQuantityModalOpen}
       >
         <WideDialogContent className="max-w-md p-0">
-
+          <WideDialogHeader className="p-4 pb-3">
+            <WideDialogTitle className="text-lg font-bold text-center">
+              Выберите количество
+            </WideDialogTitle>
+            {selectedProductForQuantity && (
+              <div className="text-center mt-2">
+                <p className="text-sm text-gray-600">
+                  {selectedProductForQuantity.name}
+                </p>
+                <p className="text-xs text-green-600 font-medium mt-1">
+                  В наличии:{" "}
+                  {parseFloat(
+                    String(selectedProductForQuantity.product.quantity),
+                  ).toFixed(2)}{" "}
+                  {selectedProductForQuantity.selectedUnit?.short_name || "шт"}
+                </p>
+                {selectedProductForQuantity.product.barcode && (
+                  <p className="text-xs text-gray-500">
+                    Штрихкод: {selectedProductForQuantity.product.barcode}
+                  </p>
+                )}
+                {selectedProductForQuantity.product.ikpu && (
+                  <p className="text-xs text-gray-500">
+                    ИКПУ: {selectedProductForQuantity.product.ikpu}
+                  </p>
+                )}
+              </div>
+            )}
+          </WideDialogHeader>
 
           <div className="p-4 pt-2">
             {!isManualQuantityMode ? (
@@ -2932,7 +3004,22 @@ const POSInterfaceCore = () => {
       {/* Price Input Modal */}
       <WideDialog open={isPriceModalOpen} onOpenChange={setIsPriceModalOpen}>
         <WideDialogContent className="max-w-md p-0">
-
+          <WideDialogHeader className="p-4 pb-3">
+            <WideDialogTitle className="text-lg font-bold text-center">
+              Введите цену
+            </WideDialogTitle>
+            {selectedProductForPrice && (
+              <div className="text-center mt-2">
+                <p className="text-sm text-gray-600">
+                  {selectedProductForPrice.name}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Количество: {selectedProductForPrice.quantity.toFixed(2)}{" "}
+                  {selectedProductForPrice.selectedUnit?.short_name || "шт"}
+                </p>
+              </div>
+            )}
+          </WideDialogHeader>
 
           <div className="p-4 pt-2">
             {/* Price Display */}
@@ -3098,10 +3185,28 @@ const POSInterfaceCore = () => {
                       total_amount: total.toFixed(2),
                       discount_amount: discountAmount.toFixed(2),
                       sale_payments: paymentMethods
-                        .map((payment) => ({
-                          payment_method: payment.payment_method,
-                          amount: (payment.amount || (total - discountAmount)).toFixed(2),
-                        }))
+                        .map((payment) => {
+                          if (payment.payment_method === "Валюта") {
+                            // For currency payment, amount should be in USD, not UZS
+                            const usdAmount = payment.usd_amount || 0;
+                            const rate = payment.exchange_rate || exchangeRate;
+                            const uzsEquivalent = usdAmount * rate;
+                            const changeAmount = Math.max(0, uzsEquivalent - (total - discountAmount));
+                            
+                            return {
+                              payment_method: payment.payment_method,
+                              amount: usdAmount.toFixed(2), // USD amount, not UZS
+                              exchange_rate: rate,
+                              change_amount: changeAmount.toFixed(2),
+                            };
+                          }
+                          
+                          // For other payment methods, amount is in UZS
+                          return {
+                            payment_method: payment.payment_method,
+                            amount: (payment.amount || (total - discountAmount)).toFixed(2),
+                          };
+                        })
                         .filter((p) => Number(p.amount) > 0),
                       ...(onCredit &&
                         selectedClient && {
@@ -3441,6 +3546,50 @@ const POSInterfaceCore = () => {
               <button
                 onClick={() => {
                   if (onCredit) return; // Disable when in credit mode
+                  const hasValyuta = paymentMethods.some(
+                    (p) => p.payment_method === "Валюта",
+                  );
+                  if (!hasValyuta) {
+                    // Replace all payment methods with Валюта only
+                    setPaymentMethods([
+                      {
+                        amount: 0,
+                        payment_method: "Валюта",
+                        exchange_rate: exchangeRate,
+                        usd_amount: 0,
+                      },
+                    ]);
+                  }
+                }}
+                disabled={onCredit}
+                className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                  onCredit 
+                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50" 
+                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                }`}
+              >
+                <svg
+                  className="w-6 h-6 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-gray-700 font-medium">Валюта</span>
+                <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                  F5
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (onCredit) return; // Disable when in credit mode
                   const totalPaid = paymentMethods.reduce(
                     (sum, p) => sum + (p.amount || 0),
                     0,
@@ -3495,27 +3644,92 @@ const POSInterfaceCore = () => {
                     {payment.payment_method}
                   </div>
 
-                  <input
-                    type="number"
-                    value={payment.amount || (total - discountAmount)}
-                    onChange={(e) => {
-                      if (onCredit) return;
-                      const updated = [...paymentMethods];
-                      updated[index].amount = Number(e.target.value);
-                      setPaymentMethods(updated);
-                    }}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                    }}
-                    onBlur={(e) => {
-                      e.stopPropagation();
-                    }}
-                    placeholder="0"
-                    disabled={onCredit}
-                    className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
-                      onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                    }`}
-                  />
+                  {payment.payment_method === "Валюта" ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Курс (UZS/USD):</label>
+                        <input
+                          type="number"
+                          value={payment.exchange_rate || exchangeRate}
+                          onChange={(e) => {
+                            if (onCredit) return;
+                            const newRate = Number(e.target.value);
+                            const updated = [...paymentMethods];
+                            updated[index].exchange_rate = newRate;
+                            // Recalculate UZS amount if USD amount exists
+                            if (updated[index].usd_amount) {
+                              updated[index].amount = updated[index].usd_amount! * newRate;
+                            }
+                            setPaymentMethods(updated);
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                          }}
+                          placeholder="12200"
+                          disabled={onCredit}
+                          className={`w-full text-lg font-semibold bg-white border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 ${
+                            onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">USD:</label>
+                        <input
+                          type="number"
+                          value={payment.usd_amount || ""}
+                          onChange={(e) => {
+                            if (onCredit) return;
+                            const usdAmount = Number(e.target.value);
+                            const rate = payment.exchange_rate || exchangeRate;
+                            const updated = [...paymentMethods];
+                            updated[index].usd_amount = usdAmount;
+                            updated[index].amount = usdAmount * rate;
+                            updated[index].exchange_rate = rate;
+                            setPaymentMethods(updated);
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                          }}
+                          placeholder=""
+                          disabled={onCredit}
+                          className={`w-full text-3xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                            onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                          }`}
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600 pt-2 border-t border-gray-300">
+                        = {payment.amount?.toLocaleString() || 0} UZS
+                      </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={payment.amount || (total - discountAmount)}
+                      onChange={(e) => {
+                        if (onCredit) return;
+                        const updated = [...paymentMethods];
+                        updated[index].amount = Number(e.target.value);
+                        setPaymentMethods(updated);
+                      }}
+                      onFocus={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onBlur={(e) => {
+                        e.stopPropagation();
+                      }}
+                      placeholder="0"
+                      disabled={onCredit}
+                      className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                        onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                      }`}
+                    />
+                  )}
                 </div>
               ))}
             </div>

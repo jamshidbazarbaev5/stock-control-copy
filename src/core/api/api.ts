@@ -8,11 +8,17 @@ import { refreshToken } from "./auth";
 import { useErrorStore, parseErrorMessage } from "../store/errorStore";
 
 // Constants
-const BASE_URL = "https://test.bondify.uz/api/v1/";
+
+// const BASE/_URL = 'https://test.bondify.uz/api/v1/'
+
+const getBaseURL = (): string => {
+  const hostname = window.location.hostname;
+  return `https://${hostname}/api/v1/`;
+};
 
 // Create API instance
 const api: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL:getBaseURL(),
   headers: {
     "Content-Type": "application/json",
   },

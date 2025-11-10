@@ -22,6 +22,7 @@ import {
   Wallet,
   DollarSign,
   Package,
+  ChevronDown,
 } from "lucide-react";
 import { useGetStocks, useDeleteStock, useUpdateExtraQuantity } from "../api/stock";
 import { useGetStores } from "../api/store";
@@ -221,7 +222,7 @@ export default function StocksPage() {
     {
       header: t("table.product"),
       accessorKey: "product",
-      cell: (row: Stock) => {
+      cell: (row: any) => {
         const productName =
             row.product?.product_name || row.product_read?.product_name || "-";
 
@@ -231,14 +232,114 @@ export default function StocksPage() {
                 : productName;
 
         return (
-            <span className="inline-flex items-center gap-2">
-              <span className="border-r border-gray-300 pr-2">{label}</span>
+            <div className="inline-flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors border-r border-gray-300 pr-2">
+                    <span>{label}</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => navigate(`/stocks/${row.id}/history`)}>
+                    <span className="flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 3v5h5" />
+                        <path d="M3 3l6.1 6.1" />
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 3" />
+                      </svg>
+                      {t("navigation.history")}
+                    </span>
+                  </DropdownMenuItem>
+                  {(row.stock_entry?.supplier?.id || row.supplier_read?.id) && Number(row.quantity) === Number(row.quantity_for_history) && (
+                    <DropdownMenuItem onClick={() => handleEdit(row)}>
+                      {t("common.edit")}
+                    </DropdownMenuItem>
+                  )}
+                  {currentUser?.is_superuser && !row.is_recycled && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setStockToDelete(row);
+                        setDeleteModalOpen(true);
+                      }}
+                    >
+                      {t("common.remove")}
+                    </DropdownMenuItem>
+                  )}
+                  {row.is_debt && (
+                    <DropdownMenuItem onClick={() => handlePayDebt(row)}>
+                      <span className="flex items-center gap-2">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 1v6l3-3m-3 3l-3-3" />
+                          <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.35 0 4.5.9 6.1 2.4" />
+                        </svg>
+                        {t("common.pay_debt")}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                  {currentUser?.role?.toLowerCase() !== "продавец" && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          navigate(
+                            `/create-transfer?fromProductId=${row.product?.id || row.product_read?.id}&fromStockId=${row.id}`,
+                          )
+                        }
+                      >
+                        {t("common.create")} {t("navigation.transfer")}
+                      </DropdownMenuItem>
+                      {(isProductRecyclable(row.product) ||
+                        isProductRecyclable(row.product_read)) && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            navigate(
+                              `/create-recycling?fromProductId=${row.product?.id || row.product_read?.id}&fromStockId=${row.id}&storeId=${row.store?.id || row.store_read?.id}`,
+                            )
+                          }
+                        >
+                          {t("common.create")} {t("navigation.recycling")}
+                        </DropdownMenuItem>
+                      )}
+                    </>
+                  )}
+                  {(row.product?.category_read?.category_name === "Лист" || 
+                    row.product_read?.category_read?.category_name === "Лист") && (
+                    <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
+                      <span className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Добавить количество
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {row.is_recycled ? (
                   <span className="text-[10px] leading-none px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
                 {t("stock.recycled")}
               </span>
               ) : null}
-          </span>
+          </div>
         );
       },
     },
@@ -369,12 +470,11 @@ export default function StocksPage() {
                 {t("navigation.history")}
               </span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleEdit(row)}
-                disabled={Number(row.quantity) !== Number(row.quantity_for_history)}
-              >
-                {t("common.edit")}
-              </DropdownMenuItem>
+              {(row.stock_entry?.supplier?.id || row.supplier_read?.id) && Number(row.quantity) === Number(row.quantity_for_history) && (
+                <DropdownMenuItem onClick={() => handleEdit(row)}>
+                  {t("common.edit")}
+                </DropdownMenuItem>
+              )}
               {/* Only show remove if superuser and stock is not recycled */}
               {currentUser?.is_superuser && !row.is_recycled ? (
                   <DropdownMenuItem

@@ -124,7 +124,7 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Партия</p>
+                      <p className="text-xs text-gray-500">Рулон</p>
                       <p className="font-medium">
                         {stock.stock_name || "-"}
                       </p>

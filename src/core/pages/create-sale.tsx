@@ -12,7 +12,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import type { Product } from "../api/product";
-import { fetchAllProducts } from "../api/fetchAllProducts";
+import { fetchFirstPageProducts } from "../api/fetchAllProducts";
 import { OpenShiftForm } from "@/components/OpenShiftForm";
 import type { Stock } from "../api/stock";
 import { StockSelectionModal } from "@/components/StockSelectionModal";
@@ -207,7 +207,7 @@ function CreateSale() {
         {
           product_write: productId ? Number(productId) : 0,
           selling_unit: 0,
-          quantity: 1,
+          quantity: '' as any,
           price_per_unit: "0",
         },
       ],
@@ -265,7 +265,7 @@ function CreateSale() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setLoadingProducts(true);
-      fetchAllProducts({
+      fetchFirstPageProducts({
         product_name: productSearchTerm.length > 0 ? productSearchTerm : undefined,
       })
         .then((data) => setFetchedProducts(data))
@@ -478,8 +478,8 @@ function CreateSale() {
         ? parseFloat(String(selectedProduct.min_price))
         : 10000;
 
-    // Preserve existing quantity if product is already in cart, otherwise use 1
-    const existingQuantity = cartProducts[index]?.quantity || 1;
+    // Always use empty quantity
+    const existingQuantity = '' as any;
 
     // Update cart products
     const newCartProducts = [...cartProducts];
@@ -503,8 +503,8 @@ function CreateSale() {
         productId: selectedProduct.id || 0,
         name: selectedProduct.product_name,
         price: price,
-        quantity: 1,
-        total: price,
+        quantity: 0,
+        total: 0,
         product: selectedProduct,
         barcode: selectedProduct.barcode,
         selectedUnit: defaultUnit,
@@ -886,7 +886,7 @@ const handleQuantityChange = (
       ...currentItems,
       {
         product_write: 0,
-        quantity: 1,
+        quantity: '' as any,
         selling_unit: 0,
         price_per_unit: "0",
       },
@@ -907,7 +907,7 @@ const handleQuantityChange = (
         productId: 0,
         name: "",
         price: 0,
-        quantity: 1,
+        quantity: 0,
         total: 0,
         product: {} as Product,
         barcode: "",

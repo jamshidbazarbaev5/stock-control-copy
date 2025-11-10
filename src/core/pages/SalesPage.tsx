@@ -77,6 +77,7 @@ const COLUMN_CONFIG = [
   { key: "worker", label: "Работник" },
   { key: "sale_items", label: "Товары" },
   { key: "quantity", label: "Количество" },
+  { key: "price_per_unit", label: "Цена за ед." },
   { key: "total_amount", label: "Общая сумма" },
   { key: "total_pure_revenue", label: "Чистая прибыль" },
   { key: "on_credit", label: "Статус" },
@@ -909,6 +910,23 @@ export default function SalesPage() {
               {quantities}
             </p>
           </div>
+        );
+      },
+    },
+    {
+      header: "Цена за ед.",
+      accessorKey: "price_per_unit",
+      cell: (row: Sale) => {
+        if (!row.sale_items?.length) return "-";
+        if (row.sale_items.length === 1) {
+          return (
+            <span className="font-medium text-emerald-600">
+              {formatCurrency(row.sale_items[0].price_per_unit)}
+            </span>
+          );
+        }
+        return (
+          <span className="text-xs text-blue-600 italic">↓ в деталях</span>
         );
       },
     },

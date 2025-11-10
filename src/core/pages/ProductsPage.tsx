@@ -188,15 +188,15 @@ export default function ProductsPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const { t } = useTranslation();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedMeasurement, setSelectedMeasurement] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem("products_searchTerm") || "");
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => localStorage.getItem("products_selectedCategory") || "");
+  const [selectedMeasurement, setSelectedMeasurement] = useState<string>(() => localStorage.getItem("products_selectedMeasurement") || "");
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [isRevaluationDialogOpen, setIsRevaluationDialogOpen] = useState(false);
   const [priceEdits, setPriceEdits] = useState<Record<number, PriceEdit>>({});
   const [productTab, setProductTab] = useState<
     "with_quantity" | "without_quantity" | "imported"
-  >("with_quantity");
+  >(() => (localStorage.getItem("products_productTab") as "with_quantity" | "without_quantity" | "imported") || "with_quantity");
   const [expandedRows, setExpandedRows] = useState<Record<number, Stock[]>>({});
 
   // Import dialog state
@@ -210,6 +210,23 @@ export default function ProductsPage() {
         updated: number;
       }
   >(null);
+
+  // Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem("products_searchTerm", searchTerm);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    localStorage.setItem("products_selectedCategory", selectedCategory);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    localStorage.setItem("products_selectedMeasurement", selectedMeasurement);
+  }, [selectedMeasurement]);
+
+  useEffect(() => {
+    localStorage.setItem("products_productTab", productTab);
+  }, [productTab]);
 
   // Reset to page 1 when filters change
   useEffect(() => {

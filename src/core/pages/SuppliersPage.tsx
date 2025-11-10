@@ -129,6 +129,7 @@ export default function SuppliersPage() {
     exchange_rate: "",
   });
   const [selectedMassPaymentStore, setSelectedMassPaymentStore] = useState<Store | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
@@ -385,12 +386,14 @@ export default function SuppliersPage() {
             currentPage={page}
             onPageChange={(newPage) => setPage(newPage)}
             actions={(supplier: Supplier) => (
-                <div className="relative">
+                <div className="relative" style={{ position: 'static' }}>
                   <Button 
                     variant="outline" 
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
                       setOpenDropdown(openDropdown === supplier.id ? null : supplier.id!);
                     }}
                   >
@@ -402,7 +405,7 @@ export default function SuppliersPage() {
                         className="fixed inset-0 z-10" 
                         onClick={() => setOpenDropdown(null)}
                       />
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 border">
+                      <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
                         <button
                           className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
                           onClick={(e) => {

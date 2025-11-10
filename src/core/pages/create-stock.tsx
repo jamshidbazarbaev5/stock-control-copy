@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+  import { useNavigate } from "react-router-dom";
 import type { DynamicField, StockItemEntry } from "../api/stock";
 import { calculateStock, createBulkStockEntry } from "../api/stock";
 import {
@@ -1335,7 +1335,7 @@ export default function CreateStock() {
                 </SelectTrigger>
                 <SelectContent>
                   {stores
-                    .filter((store) => store.is_main)
+                    
                     .map((store) => (
                       <SelectItem key={store.id} value={String(store.id)}>
                         {store.name}
@@ -1951,7 +1951,18 @@ export default function CreateStock() {
                                 autoFocus
                               />
                             </div>
-                            <div className="max-h-[300px] overflow-y-auto">
+                            <div 
+                              className="overflow-y-auto" 
+                              style={{ 
+                                maxHeight: `${typeof window !== 'undefined' 
+                                  ? Math.min(
+                                      Math.max(200, window.innerHeight * 0.4), 
+                                      500
+                                    )
+                                  : 300
+                                }px` 
+                              }}
+                            >
                               {(() => {
                                 const options = [...allProducts];
                                 const sel = item.selectedProduct as any;
@@ -2067,11 +2078,11 @@ export default function CreateStock() {
                     </div>
 
                     {/* Stock Name Field - Show only for category Лист (id: 3) */}
-                    {item.selectedProduct?.category_read?.name === 'Лист' && (
+                    {item.selectedProduct?.category_read?.category_name === 'Лист' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor={`stock_name-${item.id}`}>
-                            Партия
+                            Рулон
                           </Label>
                           <Input
                             id={`stock_name-${item.id}`}
@@ -2084,7 +2095,7 @@ export default function CreateStock() {
                                 e.target.value,
                               );
                             }}
-                            placeholder="Партия"
+                            placeholder="Рулон"
                           />
                         </div>
 

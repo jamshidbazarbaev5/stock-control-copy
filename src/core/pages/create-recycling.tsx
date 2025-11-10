@@ -616,8 +616,9 @@ export default function CreateRecycling() {
                           />
                         </SelectTrigger>
                         <SelectContent
-                          side="bottom"
-                          avoidCollisions={false}
+                          className="max-h-[400px]"
+                          position="popper"
+                          sideOffset={5}
                           onPointerDownOutside={(e) => {
                             const target = e.target as Node;
                             const selectContent = document.querySelector(
@@ -649,16 +650,14 @@ export default function CreateRecycling() {
                               autoFocus
                             />
                           </div>
-                          <div className="max-h-[200px] overflow-y-auto">
-                            {getProductOptions().map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value.toString()}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </div>
+                          {getProductOptions().map((option) => (
+                            <SelectItem
+                              key={option.value}
+                              value={option.value.toString()}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
