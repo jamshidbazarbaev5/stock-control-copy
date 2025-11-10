@@ -749,42 +749,57 @@ export default function ProductsPage() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-        <Input
-          type="text"
-          placeholder={t("placeholders.search_product")}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex gap-2 mb-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1">
+          <Input
+            type="text"
+            placeholder={t("placeholders.search_product")}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger>
-            <SelectValue placeholder={t("placeholders.select_category")} />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={String(category.id)}>
-                {category.category_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("placeholders.select_category")} />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={String(category.id)}>
+                  {category.category_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select
-          value={selectedMeasurement}
-          onValueChange={setSelectedMeasurement}
+          <Select
+            value={selectedMeasurement}
+            onValueChange={setSelectedMeasurement}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("placeholders.select_measurement")} />
+            </SelectTrigger>
+            <SelectContent>
+              {measurementsList?.map((measurement) => (
+                <SelectItem key={measurement.id} value={String(measurement.id)}>
+                  {measurement.measurement_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearchTerm("");
+            setSelectedCategory("");
+            setSelectedMeasurement("");
+            localStorage.removeItem("products_searchTerm");
+            localStorage.removeItem("products_selectedCategory");
+            localStorage.removeItem("products_selectedMeasurement");
+          }}
         >
-          <SelectTrigger>
-            <SelectValue placeholder={t("placeholders.select_measurement")} />
-          </SelectTrigger>
-          <SelectContent>
-            {measurementsList?.map((measurement) => (
-              <SelectItem key={measurement.id} value={String(measurement.id)}>
-                {measurement.measurement_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {t("buttons.clear_filters") || "Очистить"}
+        </Button>
       </div>
 
       <ResourceTable

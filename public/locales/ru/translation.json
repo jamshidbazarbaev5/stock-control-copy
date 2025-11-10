@@ -12,6 +12,7 @@
     "max_quantity": "Максимальное количество"
   },
   "buttons": {
+    "clear_filters":"Очистить фильтры",
     "select_all": "Выбрать все",
     "deselect_all": "Не выбрать все",
     "save": "Сохранить",
