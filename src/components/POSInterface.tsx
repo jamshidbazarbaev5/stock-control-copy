@@ -2807,35 +2807,7 @@ const POSInterfaceCore = () => {
         onOpenChange={setIsQuantityModalOpen}
       >
         <WideDialogContent className="max-w-md p-0">
-          <WideDialogHeader className="p-4 pb-3">
-            <WideDialogTitle className="text-lg font-bold text-center">
-              Выберите количество
-            </WideDialogTitle>
-            {selectedProductForQuantity && (
-              <div className="text-center mt-2">
-                <p className="text-sm text-gray-600">
-                  {selectedProductForQuantity.name}
-                </p>
-                <p className="text-xs text-green-600 font-medium mt-1">
-                  В наличии:{" "}
-                  {parseFloat(
-                    String(selectedProductForQuantity.product.quantity),
-                  ).toFixed(2)}{" "}
-                  {selectedProductForQuantity.selectedUnit?.short_name || "шт"}
-                </p>
-                {selectedProductForQuantity.product.barcode && (
-                  <p className="text-xs text-gray-500">
-                    Штрихкод: {selectedProductForQuantity.product.barcode}
-                  </p>
-                )}
-                {selectedProductForQuantity.product.ikpu && (
-                  <p className="text-xs text-gray-500">
-                    ИКПУ: {selectedProductForQuantity.product.ikpu}
-                  </p>
-                )}
-              </div>
-            )}
-          </WideDialogHeader>
+         
 
           <div className="p-4 pt-2">
             {!isManualQuantityMode ? (
@@ -3004,22 +2976,7 @@ const POSInterfaceCore = () => {
       {/* Price Input Modal */}
       <WideDialog open={isPriceModalOpen} onOpenChange={setIsPriceModalOpen}>
         <WideDialogContent className="max-w-md p-0">
-          <WideDialogHeader className="p-4 pb-3">
-            <WideDialogTitle className="text-lg font-bold text-center">
-              Введите цену
-            </WideDialogTitle>
-            {selectedProductForPrice && (
-              <div className="text-center mt-2">
-                <p className="text-sm text-gray-600">
-                  {selectedProductForPrice.name}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Количество: {selectedProductForPrice.quantity.toFixed(2)}{" "}
-                  {selectedProductForPrice.selectedUnit?.short_name || "шт"}
-                </p>
-              </div>
-            )}
-          </WideDialogHeader>
+         
 
           <div className="p-4 pt-2">
             {/* Price Display */}

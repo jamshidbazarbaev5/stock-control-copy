@@ -487,7 +487,7 @@ export default function CreateStock() {
     setStockItems((items) =>
       items.map((item) => {
         if (item.id === itemId) {
-          const needsRecalculation = ['currency', 'purchase_unit'].includes(field);
+          const needsRecalculation = ['currency', 'purchase_unit', 'product'].includes(field);
           return {
             ...item,
             form: {
@@ -500,24 +500,6 @@ export default function CreateStock() {
         return item;
       }),
     );
-
-    // Trigger recalculation for currency and purchase_unit changes
-    if (['currency', 'purchase_unit'].includes(field)) {
-      const item = stockItems.find((i) => i.id === itemId);
-      const commonValues = commonForm.getValues();
-      const updatedForm = { ...item?.form, [field]: value };
-      
-      if (
-        commonValues.store &&
-        commonValues.supplier &&
-        commonValues.date_of_arrived &&
-        updatedForm.product &&
-        updatedForm.currency &&
-        updatedForm.purchase_unit
-      ) {
-        setTimeout(() => getFieldConfiguration(itemId), 100);
-      }
-    }
   };
 
   // Get field configuration for a stock item
@@ -1935,16 +1917,17 @@ export default function CreateStock() {
                           <SelectTrigger>
                             <SelectValue placeholder={t("common.product")} />
                           </SelectTrigger>
-                          <SelectContent>
+                        <SelectContent position="popper" sideOffset={5}>
                             <div className="p-2 sticky top-0 bg-white z-10 border-b">
                               <Input
                                 placeholder={t(
                                   "common.search_product_placeholder",
                                 )}
                                 value={productSearchTerm}
-                                onChange={(e) =>
-                                  setProductSearchTerm(e.target.value)
-                                }
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setProductSearchTerm(e.target.value);
+                                }}
                                 onKeyDown={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
@@ -1954,17 +1937,11 @@ export default function CreateStock() {
                             <div 
                               className="overflow-y-auto" 
                               style={{ 
-                                maxHeight: `${typeof window !== 'undefined' 
-                                  ? Math.min(
-                                      Math.max(200, window.innerHeight * 0.4), 
-                                      500
-                                    )
-                                  : 300
-                                }px` 
+                                maxHeight: '400px'
                               }}
                             >
                               {(() => {
-                                const options = [...allProducts];
+                                let options = [...allProducts];
                                 const sel = item.selectedProduct as any;
                                 if (
                                   sel &&
@@ -1972,6 +1949,15 @@ export default function CreateStock() {
                                 ) {
                                   options.unshift(sel);
                                 }
+                                
+                                // Filter products based on search term
+                                if (productSearchTerm.trim()) {
+                                  const searchLower = productSearchTerm.toLowerCase().trim();
+                                  options = options.filter((p: any) => 
+                                    p.product_name?.toLowerCase().includes(searchLower)
+                                  );
+                                }
+                                
                                 return options.length > 0 ? (
                                   options.map((product: any) => (
                                     <SelectItem
@@ -1998,7 +1984,7 @@ export default function CreateStock() {
                                   ))
                                 ) : (
                                   <div className="px-4 py-4 text-center text-gray-600 text-sm">
-                                    No products found
+                                    {productSearchTerm.trim() ? "No matching products found" : "No products found"}
                                   </div>
                                 );
                               })()}
@@ -2171,6 +2157,20 @@ export default function CreateStock() {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Add Product Button at Bottom */}
+          <div className="mt-4 flex justify-center">
+            <Button 
+              type="button" 
+              onClick={addStockItem}
+              variant="outline"
+              size="lg"
+              className="w-full max-w-md"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              {t("common.add_stock_item")}
+            </Button>
           </div>
         </div>
 

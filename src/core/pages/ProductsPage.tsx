@@ -121,8 +121,7 @@ const columns = (
       const editValue = priceEdits[product?.id]?.selling_price;
       return (
         <Input
-          type="number"
-          step="0.01"
+          type="text"
           value={
             editValue !== undefined ? editValue : product?.selling_price || ""
           }
@@ -145,8 +144,7 @@ const columns = (
       const editValue = priceEdits[product?.id]?.min_price;
       return (
         <Input
-          type="number"
-          step="0.01"
+          type="text"
           value={editValue !== undefined ? editValue : product?.min_price || ""}
           onChange={(e) => {
             e.stopPropagation();
@@ -198,6 +196,7 @@ export default function ProductsPage() {
     "with_quantity" | "without_quantity" | "imported"
   >(() => (localStorage.getItem("products_productTab") as "with_quantity" | "without_quantity" | "imported") || "with_quantity");
   const [expandedRows, setExpandedRows] = useState<Record<number, Stock[]>>({});
+  const [loadingRows, setLoadingRows] = useState<Set<number>>(new Set());
 
   // Import dialog state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -389,10 +388,6 @@ export default function ProductsPage() {
         edit.min_price !== undefined,
     );
 
-    console.log("🚀 handleSavePrices called");
-    console.log("📝 Current priceEdits:", priceEdits);
-    console.log("💾 Edits to save:", editsToSave);
-
     if (editsToSave.length === 0) {
       toast.error(
         t("messages.error.noPriceChanges") || "No price changes to save",
@@ -401,17 +396,13 @@ export default function ProductsPage() {
     }
 
     const totalToSave = editsToSave.length;
-    console.log(`📊 Total to save: ${totalToSave}`);
 
     // Process all edits in parallel using Promise.allSettled
-    const promises = editsToSave.map(async (edit, index) => {
+    const promises = editsToSave.map(async (edit) => {
       const product = products.find((p) => p.id === edit.productId);
       if (!product) {
-        console.warn(`⚠️ Product not found for edit:`, edit);
         return { success: false, productId: edit.productId, error: "Product not found" };
       }
-
-      console.log(`🔄 Processing edit ${index + 1}/${totalToSave} for product ${edit.productId} (${product.product_name})`);
 
       const newSellingPrice =
         edit.selling_price !== undefined
@@ -437,11 +428,6 @@ export default function ProductsPage() {
           product_ids: [edit.productId],
         });
 
-        console.log(`✅ Success for product ${edit.productId} (${product.product_name})`);
-        toast.success(
-          t("messages.success.priceUpdated") ||
-            `Price updated for ${product.product_name}`,
-        );
         return { success: true, productId: edit.productId };
       } catch (error) {
         return { success: false, productId: edit.productId, error };
@@ -450,8 +436,6 @@ export default function ProductsPage() {
 
     // Wait for all promises to settle
     const results = await Promise.allSettled(promises);
-    
-    console.log("📊 All operations completed:", results);
 
     // Collect successful product IDs
     const productIdsToRemove: number[] = [];
@@ -461,26 +445,33 @@ export default function ProductsPage() {
       }
     });
 
-    console.log(`✅ Successful saves: ${productIdsToRemove.length}/${totalToSave}`);
-    console.log(`🗑️ Removing IDs:`, productIdsToRemove);
+    // Show single toast message
+    if (productIdsToRemove.length > 0) {
+      toast.success(
+        t("messages.success.pricesSaved") || "Идет сохранение",
+      );
+    }
+
+    if (productIdsToRemove.length < totalToSave) {
+      const failedCount = totalToSave - productIdsToRemove.length;
+      toast.error(
+        t("messages.error.somePricesFailed") || `Не удалось сохранить ${failedCount} цен`,
+      );
+    }
 
     // Clear successful edits from state
     setPriceEdits((prev) => {
-      console.log("📋 Previous priceEdits:", prev);
       const newEdits = { ...prev };
       productIdsToRemove.forEach(id => {
-        console.log(`🗑️ Deleting product ${id} from priceEdits`);
         delete newEdits[id];
       });
-      console.log("📋 New priceEdits:", newEdits);
-      console.log("📊 New count:", Object.keys(newEdits).length);
       return newEdits;
     });
   };
 
   // Fetch stock data for expanded row
   const fetchStockForProduct = async (productId: number) => {
-    if (expandedRows[productId]) {
+    if (expandedRows[productId] !== undefined) {
       // Already loaded, just toggle
       setExpandedRows((prev) => {
         const newRows = { ...prev };
@@ -489,6 +480,8 @@ export default function ProductsPage() {
       });
       return;
     }
+
+    setLoadingRows((prev) => new Set(prev).add(productId));
 
     try {
       const response = await api.get(`items/stock/?product=${productId}`);
@@ -500,12 +493,31 @@ export default function ProductsPage() {
     } catch (error) {
       console.error("Error fetching stock data:", error);
       toast.error("Ошибка при загрузке данных партии");
+      setExpandedRows((prev) => ({
+        ...prev,
+        [productId]: [],
+      }));
+    } finally {
+      setLoadingRows((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(productId);
+        return newSet;
+      });
     }
   };
 
   // Render expanded row content
   const renderExpandedRow = (row: Product) => {
+    const isLoading = loadingRows.has(row.id!);
     const stockData = expandedRows[row.id!];
+    
+    if (isLoading) {
+      return (
+        <div className="p-4 bg-gray-50 text-center text-gray-500">
+          Загрузка данных...
+        </div>
+      );
+    }
     
     if (!stockData || stockData.length === 0) {
       return (

@@ -5,6 +5,30 @@ export interface CurrentUser {
   name: string;
   phone_number: string;
   role: string;
+  shift: {
+    id: number;
+    store: {
+      id: number;
+      name: string;
+      address: string;
+      phone_number: string;
+      budget: string;
+      created_at: string;
+      is_main: boolean;
+      parent_store: number | null;
+      owner: number;
+      budgets: {
+        id: number;
+        amount: string;
+        budget_type: string;
+        store: number;
+      }[];
+    };
+    user: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  };
   can_view_quantity: boolean;
   is_superuser: boolean;
   has_active_shift: boolean;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ResourceForm } from '../helpers/ResourceForm';
@@ -36,7 +36,7 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
     },
     {
       name: 'amount',
-      label: `${t('forms.amount3')} (${t('table.budget')}: ${storeBudget.toLocaleString()} UZS)`,
+      label: isSuperuser ? `${t('forms.amount3')} (${t('table.budget')}: ${storeBudget.toLocaleString()} UZS)` : t('forms.amount3'),
       type: 'text',
       placeholder: t('placeholders.enter_amount'),
       required: true,
@@ -47,7 +47,7 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
         }
       }
     },
-    {
+    ...(isSuperuser ? [{
       name: 'payment_type',
       label: t('forms.payment_method'),
       type: 'select',
@@ -61,7 +61,7 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
          { value: 'Валюта', label: t('forms.rate') },
       ],
       onChange: (value: string) => onPaymentTypeChange(value)
-    },
+    }] : []),
     {
       name: 'comment',
       label: t('forms.comment'),
@@ -93,6 +93,15 @@ export default function CreateExpense() {
 
   const updateBudget = (storeId: number | null, paymentType: string) => {
     if (!storeId) return;
+    
+    // For sellers, use shift.store.budgets
+    if (!isSuperuser && currentUser?.shift?.store?.budgets) {
+      const budgetForType = currentUser.shift.store.budgets.find(b => b.budget_type === paymentType);
+      setStoreBudget(budgetForType ? parseFloat(budgetForType.amount) : 0);
+      return;
+    }
+    
+    // For superusers, use selected store budgets
     const selectedStore = stores.find(store => store.id === storeId);
     if (selectedStore?.budgets) {
       const budgetForType = selectedStore.budgets.find(b => b.budget_type === paymentType);
@@ -111,9 +120,17 @@ export default function CreateExpense() {
     setSelectedPaymentType(paymentType);
     updateBudget(selectedStoreId, paymentType);
   };
+  const isSuperuser = currentUser?.is_superuser || false;
+
+  // Initialize budget for non-superuser on component mount
+  useEffect(() => {
+    if (!isSuperuser && currentUser?.shift?.store?.id) {
+      setSelectedStoreId(currentUser.shift.store.id);
+      updateBudget(currentUser.shift.store.id, selectedPaymentType);
+    }
+  }, [currentUser, stores, isSuperuser, selectedPaymentType]);
 
   // Update fields with dynamic data
-  const isSuperuser = currentUser?.is_superuser || false;
   const fields = expenseFields(t, storeBudget, handleStoreChange, handlePaymentTypeChange, isSuperuser).map(field => {
     if (field.name === 'store') {
       return {
@@ -146,14 +163,15 @@ export default function CreateExpense() {
         return;
       }
 
-      // If user is not superuser, use their store_read.id
-      const submissionData = {
+      // If user is not superuser, use their shift.store.id and set payment_type to Наличные
+      const submissionData :any = {
         ...data,
         amount: data.amount.toString()
       };
       
-      if (!isSuperuser && currentUser?.store_read?.id) {
-        submissionData.store = currentUser.store_read.id;
+      if (!isSuperuser && currentUser?.shift?.store?.id) {
+        submissionData.store = currentUser.shift.store.id;
+        submissionData.payment_type = 'Наличные';
       }
 
       await createExpense.mutateAsync(submissionData);

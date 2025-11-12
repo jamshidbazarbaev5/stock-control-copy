@@ -753,6 +753,8 @@
     "no_payments_found": "Платежи не найдены",
     "created_successfully": "Успешно создано",
     "success": {
+      "pricesSaved":"Успешно",
+      "somePricesFailed":"Некоторые товары не сохранёни",
       "balance_added": "Баланс успешно добавлен",
       "created": " успешно создан",
       "expense_created": "Расход успешно создан",
@@ -993,6 +995,8 @@
     "create": "Создать",
     "no_data_to_display": "Нет данных для отображения",
     "success": {
+      "pricesSaved":"Успешно",
+      "somePricesFailed":"Некоторые товары не сохранёни",
       "created": " успешно создан",
       "expense_created": "Расход успешно создан",
       "money_added": "Депозит успешно добавлен",

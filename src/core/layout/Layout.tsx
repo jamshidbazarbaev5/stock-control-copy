@@ -571,7 +571,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-2">
                 {!isCollapsed && (
                   <div className="font-semibold text-sidebar-foreground">
-                    Stock-control
+                  Smart-Sawda
                   </div>
                 )}
               </div>
