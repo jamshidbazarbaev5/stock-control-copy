@@ -16,6 +16,8 @@ export interface UnsoldProductsResponse {
 export interface SalesSummaryResponse {
   total_sales: number;
   total_revenue: number;
+  total_sales_amount: number;
+  total_sales_debt: number;
   trend: {
     month: string;
     total: number;
@@ -277,8 +279,8 @@ export const getSalesProfitReport = async (period?: PeriodType, dateParams?: str
 // };
 
 // Add this function to fetch net profit from the API
-export const getNetProfit = async (period?: 'day' | 'week' | 'month', dateParams?: string) => {
-  let url = 'reports/net-profit';
+export const getNetProfit = async (period?: 'day' | 'week' | 'month', dateParams?: string, userRole?: string) => {
+  let url = userRole === 'Продавец' ? 'reports/net-profit/' : 'reports/net-profit';
   if (dateParams && period) {
     url += `?${dateParams}&period=${period}`;
   } else if (dateParams) {

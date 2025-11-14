@@ -165,6 +165,12 @@ class ShiftClosureReceiptService {
         "🖨️ Starting automatic thermal receipt printing via service...",
       );
 
+      // Add extra spacing at the end for better printer height
+      const shiftDataWithSpacing = {
+        ...shiftData,
+        _extraSpacing: "60px", // Signal to printer service to add spacing
+      };
+
       const response = await fetch(
         `${this.PRINT_SERVICE_URL}/print-shift-closure`,
         {
@@ -172,7 +178,7 @@ class ShiftClosureReceiptService {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(shiftData),
+          body: JSON.stringify(shiftDataWithSpacing),
           signal: AbortSignal.timeout(this.PRINT_TIMEOUT),
         },
       );

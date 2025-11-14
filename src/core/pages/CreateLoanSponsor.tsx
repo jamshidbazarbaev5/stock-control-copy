@@ -29,6 +29,7 @@ export default function CreateLoanSponsor() {
       options: sponsors.map((s: any) => ({ value: s.id, label: s.name })),
       placeholder: t('placeholders.select_sponsor'),
     },
+  
     {
       name: 'total_amount',
       label: t('forms.total_amount'),

@@ -59,7 +59,7 @@ export const RevaluationHistory: React.FC = () => {
         <Input
           value={productName}
           onChange={(e) => setProductName(e.target.value)}
-          placeholder={t("forms.search_by_product_name", "Поиск по названию товара")}
+          placeholder={t("forms.search_by_product_name")}
         />
       </div>
       <ResourceTable

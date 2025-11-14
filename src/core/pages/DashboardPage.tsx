@@ -272,6 +272,8 @@ const DashboardPage = () => {
 
   // Fetch net profit data
   useEffect(() => {
+    if (currentUser?.role === "Продавец") return;
+    
     setNetProfitLoading(true);
     setNetProfitError(null);
 
@@ -294,11 +296,11 @@ const DashboardPage = () => {
           ? `${dateParams}&store=${selectedStore}`
           : `store=${selectedStore}`;
     }
-    getNetProfit(apiPeriod, dateParams || undefined)
+    getNetProfit(apiPeriod, dateParams || undefined, currentUser?.role)
         .then((data) => setNetProfitData(data))
         .catch((err) => setNetProfitError(err?.message || "Error"))
         .finally(() => setNetProfitLoading(false));
-  }, [period, startDate, endDate, selectedStore]);
+  }, [period, startDate, endDate, selectedStore, currentUser?.role]);
   // Place this helper function near the top of your component file
   const EXPENSE_OTHER_THRESHOLD = 0.01; // 5%
   const getGroupedExpenses = (expenses: any) => {
@@ -746,6 +748,50 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
+          {/* <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("dashboard.total_sales_amount") || "Сумма продаж"}
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(salesData?.total_sales_amount || 0)
+                    .replace("UZS", "")
+                    .trim()}
+              </div>
+            </CardContent>
+          </Card> */}
+
+          <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("dashboard.total_sales_debt") || "Долг по продажам"}
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {new Intl.NumberFormat("uz-UZ", {
+                  style: "currency",
+                  currency: "UZS",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+                    .format(salesData?.total_sales_debt || 0)
+                    .replace("UZS", "")
+                    .trim()}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -804,28 +850,6 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
-          {/* <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("dashboard.other_expenses") || "Прочие расходы"}
-              </CardTitle>
-              <BarChart2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {new Intl.NumberFormat("uz-UZ", {
-                  style: "currency",
-                  currency: "UZS",
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })
-                    .format(expensesSummary?.other_expense_total || 0)
-                    .replace("UZS", "")
-                    .trim()}
-              </div>
-            </CardContent>
-          </Card> */}
-          {/* Store Balance Card */}
           <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -836,7 +860,6 @@ const DashboardPage = () => {
               <div className="text-2xl font-bold">
                 {(() => {
                   if (selectedStore === "all") {
-                    // Sum all store budgets
                     const total = stores.reduce(
                         (sum, store) => sum + Number(store.budget),
                         0
@@ -886,7 +909,6 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
-          {/* Supplier Debts Card */}
           <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">

@@ -4,7 +4,7 @@ import { ResourceTable } from "../helpers/ResourseTable";
 import {
   type Client,
   useGetClients,
-  useDeleteClient,
+    useDeleteClientCustom,
   useIncrementBalance,
   useClientCashOut,
 } from "../api/client";
@@ -322,7 +322,7 @@ export default function ClientsPage() {
   const { data: clientsData, isLoading } = useGetClients({
     params: selectedType === "all" ? {} : { type: selectedType },
   });
-  const deleteClient = useDeleteClient();
+  const deleteClient = useDeleteClientCustom();
   const { data: currentUser } = useCurrentUser();
   const clients = Array.isArray(clientsData)
       ? clientsData
@@ -361,12 +361,14 @@ export default function ClientsPage() {
       accessorKey: "id",
       cell: (row: Client) => (
           <div className="flex gap-2">
-            <Button
-                variant="outline"
-                onClick={() => navigate(`/clients/${row.id}/history`)}
-            >
-              {t("common.history")}
-            </Button>
+            {row.type === "Юр.лицо" && (
+              <Button
+                  variant="outline"
+                  onClick={() => navigate(`/clients/${row.id}/history`)}
+              >
+                {t("common.history")}
+              </Button>
+            )}
             <Button
                 variant="outline"
                 onClick={() => navigate(`/debts/${row.id}`)}
@@ -396,12 +398,10 @@ export default function ClientsPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      if (currentUser?.is_superuser) {
-        await deleteClient.mutateAsync(id);
-        toast.success(
-            t("messages.success.deleted", { item: t("navigation.clients") }),
-        );
-      }
+      await deleteClient.mutateAsync(id);
+      toast.success(
+          t("messages.success.deleted", { item: t("navigation.clients") }),
+      );
     } catch (error) {
       toast.error(
           t("messages.error.delete", { item: t("navigation.clients") }),

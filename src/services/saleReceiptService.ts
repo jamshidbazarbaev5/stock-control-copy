@@ -228,6 +228,31 @@ class SaleReceiptService {
 
       console.log("📄 Using template:", template.name);
 
+      // Add extra spacing at the end for better printer height
+      const templateWithSpacing = {
+        ...template,
+        style: {
+          ...template.style,
+          components: [
+            ...template.style.components,
+            {
+              id: "printer-spacing",
+              type: "spacer" as const,
+              data: {},
+              styles: { height: "60px" },
+              enabled: true,
+              order: 9999,
+            },
+          ],
+        },
+      };
+
+      console.log("✅ Added extra spacing component:", {
+        totalComponents: templateWithSpacing.style.components.length,
+        spacerHeight: "60px",
+        lastComponent: templateWithSpacing.style.components[templateWithSpacing.style.components.length - 1]
+      });
+
       const response = await fetch(
         `${this.PRINT_SERVICE_URL}/print-sale-receipt`,
         {
@@ -237,7 +262,7 @@ class SaleReceiptService {
           },
           body: JSON.stringify({
             saleData,
-            template,
+            template: templateWithSpacing,
           }),
           signal: AbortSignal.timeout(this.PRINT_TIMEOUT),
         },

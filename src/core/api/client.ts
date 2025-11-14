@@ -162,5 +162,23 @@ export const useCreateClient = () => {
     },
   });
 };
+
+export const useDeleteClientCustom = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await api.delete(`${CLIENT_URL}${id}/delete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (error: any) => {
+      console.error("Error deleting client:", error);
+      toast.error(error?.response?.data?.detail || "Failed to delete client");
+    },
+  });
+};
+
 export { api };
 

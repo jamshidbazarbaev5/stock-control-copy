@@ -9,7 +9,7 @@ import { useErrorStore, parseErrorMessage } from "../store/errorStore";
 
 // Constants
 
-// const BASE_URL = 'https://test.bondify.uz/api/v1/'
+ const BASE_URL = 'https://test.bondify.uz/api/v1/'
 
 const getBaseURL = (): string => {
   const hostname = window.location.hostname;
@@ -18,7 +18,7 @@ const getBaseURL = (): string => {
 
 // Create API instance
 const api: AxiosInstance = axios.create({
-  baseURL:getBaseURL(),
+  baseURL:BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

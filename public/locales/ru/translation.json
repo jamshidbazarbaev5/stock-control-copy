@@ -31,6 +31,8 @@
 
   "dashboard": {
     "other": "Другие",
+    "total_sales_debt":"Общая сумма долгов",
+    "total_sales_amount":"Общая сумма продаж",
     "clients": "Клиенты",
     "supplier_debts":"Долги поставщикам",
     "total_supplier_debts":"Общий долг поставщикам",
@@ -445,6 +447,17 @@
     "deposit_payment_description": "Выберите способ оплаты для аванса",
     "payments_description": "Разделить платеж между несколькими способами"
   },
+  "writeoff": {
+    "title": "Списание",
+    "not_found": "Списание не найдено",
+    "back_to_list": "Вернуться к списку",
+    "created": "Создано",
+    "main_info": "Основная информация",
+    "creator": "Создатель",
+    "items_count": "Количество товаров",
+    "items": "Товары",
+    "notes_updated": "Примечания обновлены"
+  },
   "navigation": {
     "shift": "Смена",
     "writeoff": "Списание",
@@ -535,6 +548,7 @@
   },
 
   "forms": {
+    "search_by_product_name": "Поиск по названию товара",
     "can_view_quantity": "Может просматривать количество",
     "budget_type": "Тип оплаты",
     "rate":"Валюта",

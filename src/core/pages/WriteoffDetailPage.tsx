@@ -6,8 +6,10 @@ import { ArrowLeft, Edit2, Save, X } from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export default function WriteoffDetailPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const writeoffId = parseInt(id || "0");
@@ -26,7 +28,7 @@ export default function WriteoffDetailPage() {
   const handleSaveNotes = async () => {
     try {
       await updateMutation.mutateAsync({ id: writeoffId, notes });
-      toast.success("Примечания обновлены");
+      toast.success(t("writeoff.notes_updated"));
       setIsEditingNotes(false);
     } catch (error) {
     }
@@ -44,10 +46,10 @@ export default function WriteoffDetailPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Списание не найдено</p>
+          <p className="text-red-600 mb-4">{t("writeoff.not_found")}</p>
           <Button onClick={() => navigate("/writeoffs")} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Вернуться к списку
+            {t("writeoff.back_to_list")}
           </Button>
         </div>
       </div>
@@ -67,14 +69,14 @@ export default function WriteoffDetailPage() {
               className="flex-shrink-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Назад</span>
+              <span className="hidden sm:inline">{t("common.back")}</span>
             </Button>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
-              Списание #{writeoff.id}
+              {t("writeoff.title")} #{writeoff.id}
             </h1>
           </div>
           <p className="text-gray-600 text-sm sm:text-base">
-            Создано: {new Date(writeoff.created_at).toLocaleString("ru-RU")}
+            {t("writeoff.created")}: {new Date(writeoff.created_at).toLocaleString("ru-RU")}
           </p>
         </div>
       </div>
@@ -82,23 +84,23 @@ export default function WriteoffDetailPage() {
       <div className="space-y-4 sm:space-y-6">
         {/* Main Information */}
         <Card className="p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4">Основная информация</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">{t("writeoff.main_info")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
-              <label className="text-sm font-medium text-gray-500">Магазин</label>
+              <label className="text-sm font-medium text-gray-500">{t("common.store")}</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
                 {writeoff.items?.[0]?.stock_read?.store?.name || "-"}
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">Причина</label>
+              <label className="text-sm font-medium text-gray-500">{t("common.reason")}</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
                 {writeoff.reason}
               </p>
             </div>
             <div className="md:col-span-2">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-500">Примечания</label>
+                <label className="text-sm font-medium text-gray-500">{t("common.notes")}</label>
                 {!isEditingNotes ? (
                   <Button onClick={handleEditNotes} variant="ghost" size="sm">
                     <Edit2 className="w-4 h-4" />
@@ -121,13 +123,13 @@ export default function WriteoffDetailPage() {
               )}
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">Создатель</label>
+              <label className="text-sm font-medium text-gray-500">{t("writeoff.creator")}</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
                 {writeoff.created_by.name}
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">Количество товаров</label>
+              <label className="text-sm font-medium text-gray-500">{t("writeoff.items_count")}</label>
               <p className="text-base sm:text-lg font-semibold mt-1">
                 {writeoff.items?.length || 0}
               </p>
@@ -137,7 +139,7 @@ export default function WriteoffDetailPage() {
 
         {/* Items */}
         <Card className="p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4">Товары</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">{t("writeoff.items")}</h2>
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <table className="w-full min-w-[800px]">
               <thead>
@@ -146,16 +148,16 @@ export default function WriteoffDetailPage() {
                     №
                   </th>
                   <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Товар
+                    {t("table.product")}
                   </th>
                   <th className="text-right p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Количество
+                    {t("common.quantity")}
                   </th>
                   <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Ед. изм.
+                    {t("table.measurement")}
                   </th>
                   <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                    Валюта
+                    {t("common.currency")}
                   </th>
                 </tr>
               </thead>
@@ -207,7 +209,7 @@ export default function WriteoffDetailPage() {
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${
                           attrValue.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {attrValue.value ? 'Да' : 'Нет'}
+                          {attrValue.value ? t("common.yes") : t("common.no")}
                         </span>
                       ) : attrValue.attribute.field_type === 'many2many' && attrValue.attribute.related_objects ? (
                         <div className="flex flex-wrap gap-1">
