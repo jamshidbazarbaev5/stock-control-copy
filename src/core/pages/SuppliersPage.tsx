@@ -84,16 +84,8 @@ const columns = (t: (key: string) => string) => [
     accessorKey: "balance_in_usd",
     cell: (row: Supplier) => formatPrice(row.balance_in_usd),
   },
-  {
-    header: t("table.total_debt"),
-    accessorKey: "total_debt",
-    cell: (row: Supplier) => formatPrice(row.total_debt),
-  },
-  {
-    header: t("table.total_paid"),
-    accessorKey: "total_paid",
-    cell: (row: Supplier) => formatPrice(row.total_paid),
-  },
+
+
   {
     header: t("table.remaining_debt"),
     accessorKey: "remaining_debt",
@@ -382,7 +374,7 @@ export default function SuppliersPage() {
             onAdd={() => navigate("/create-supplier")}
             onRowClick={handleRowClick}
             totalCount={totalCount}
-            pageSize={10}
+            pageSize={30}
             currentPage={page}
             onPageChange={(newPage) => setPage(newPage)}
             actions={(supplier: Supplier) => (

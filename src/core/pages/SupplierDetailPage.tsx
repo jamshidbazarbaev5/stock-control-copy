@@ -33,7 +33,7 @@ export default function SupplierDetailPage() {
   const [paymentComment, setPaymentComment] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   
-  // Fetch stock entries for this supplier
+  // Fetch stock entries for this supplierp
   const { data: stockEntriesData, isLoading: isLoadingEntries } = useGetStockEntries({
     params: { supplier: id },
   });
@@ -204,7 +204,7 @@ export default function SupplierDetailPage() {
                           }`}
                         >
                           {!entry.is_debt
-                            ? t('common.paid2') // Not for debt
+                            ? t('common.paid3') // Not for debt
                             : entry.is_paid
                             ? t('common.paid') // Debt paid
                             : t('common.unpaid')}

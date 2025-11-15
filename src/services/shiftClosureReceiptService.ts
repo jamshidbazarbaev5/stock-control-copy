@@ -240,6 +240,44 @@ class ShiftClosureReceiptService {
    */
 
   /**
+   * Print brief report with mock data
+   */
+  async printBriefReport(data?: any): Promise<PrintServiceResponse> {
+    try {
+      console.log("🖨️ Printing brief report...");
+
+      const response = await fetch(
+        `${this.PRINT_SERVICE_URL}/print-brief-report`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data || {}),
+          signal: AbortSignal.timeout(this.PRINT_TIMEOUT),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(
+          errorData.error ||
+            `Print failed: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const responseData: PrintServiceResponse = await response.json();
+      console.log("✅ Brief report printed successfully:", responseData);
+      return responseData;
+    } catch (error) {
+      console.error("❌ Brief report printing failed:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Show user notification about print status
    */
   showPrintNotification(result: {

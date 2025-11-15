@@ -59,7 +59,19 @@ export interface SaleData {
     selling_unit: number;
     subtotal: string;
   }>;
-  sale_debt: unknown;
+  sale_debt: {
+    client_read: {
+      id: number;
+      type: string;
+      name: string;
+      phone_number: string;
+      address: string;
+    };
+    due_date: string;
+    deposit: string;
+    deposit_payment_method: string;
+    total_amount: string;
+  } | null;
   total_amount: string;
   total_pure_revenue: string;
   sale_payments: Array<{

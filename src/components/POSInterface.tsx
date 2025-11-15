@@ -31,7 +31,7 @@ import {
 import type { Product } from "@/core/api/product";
 import { useCurrentUser } from "@/core/hooks/useCurrentUser";
 import { useGetUsers } from "@/core/api/user";
-import { useGetClients, useCreateClient, api } from "@/core/api/client";
+import { useGetClients, useCreateClient } from "@/core/api/client";
 import type { User } from "@/core/api/user";
 import { OpenShiftForm } from "./OpenShiftForm";
 import { useCreateSale, type Sale } from "@/core/api/sale";
@@ -251,6 +251,28 @@ const POSInterfaceCore = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(12200);
   const [_loadingExchangeRate, setLoadingExchangeRate] = useState(false);
 
+  // Recalculate payment amounts when discount changes
+  useEffect(() => {
+    if (!isPaymentModalOpen || paymentMethods.length === 0) return;
+    
+    const finalTotal = total - discountAmount;
+    const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    // Only adjust if there's a mismatch
+    if (Math.abs(totalPaid - finalTotal) > 0.01) {
+      if (paymentMethods.length === 1) {
+        setPaymentMethods([{ ...paymentMethods[0], amount: finalTotal }]);
+      } else {
+        // Adjust last payment
+        const otherPaymentsTotal = paymentMethods.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+        const lastPaymentAmount = Math.max(0, finalTotal - otherPaymentsTotal);
+        const updated = [...paymentMethods];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], amount: lastPaymentAmount };
+        setPaymentMethods(updated);
+      }
+    }
+  }, [discountAmount, isPaymentModalOpen]);
+
   // Sale API
   const createSaleMutation = useCreateSale();
   const [isProcessingSale, setIsProcessingSale] = useState(false);
@@ -434,10 +456,11 @@ const POSInterfaceCore = () => {
   useEffect(() => {
     if (isPaymentModalOpen) {
       setLoadingExchangeRate(true);
-      api.get("currency/rates")
-        .then((response) => {
-          if (response.data && response.data.length > 0 && response.data[0].rate) {
-            const rate = parseFloat(response.data[0].rate);
+      fetch("https://test.bondify.uz/api/v1/currency/rates")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data && data.length > 0 && data[0].rate) {
+            const rate = parseFloat(data[0].rate);
             setExchangeRate(rate);
             console.log("Exchange rate fetched:", rate);
           }
@@ -1189,8 +1212,7 @@ const POSInterfaceCore = () => {
         case "L":
           e.preventDefault();
           if (cartProducts.length > 0) {
-            setDiscountAmount(0);
-            setPaymentMethods([{ amount: total, payment_method: "Наличные" }]);
+            setDiscountAmount(0);            setPaymentMethods([{ amount: total, payment_method: "Наличные" }]);
             setIsPaymentModalOpen(true);
           }
           return;
@@ -3080,13 +3102,7 @@ const POSInterfaceCore = () => {
               <button
                 onClick={async () => {
                   // Validate payment total
-                  const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
-                  const finalTotal = total - discountAmount;
-                  
-                  if (!onCredit && totalPaid < finalTotal) {
-                    toast.error(`Недостаточная сумма оплаты! Необходимо: ${finalTotal.toLocaleString()} сум, Оплачено: ${totalPaid.toLocaleString()} сум`);
-                    return;
-                  }
+                 
                  
                   // Validate debt fields when onCredit is true
                   if (onCredit && !selectedClient) {
@@ -3676,7 +3692,8 @@ const POSInterfaceCore = () => {
                       onChange={(e) => {
                         if (onCredit) return;
                         const updated = [...paymentMethods];
-                        updated[index].amount = Number(e.target.value) || 0;
+                        const value = e.target.value;
+                        updated[index].amount = value === "" ? 0 : Number(value);
                         setPaymentMethods(updated);
                       }}
                       onFocus={(e) => {
