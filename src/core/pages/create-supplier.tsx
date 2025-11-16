@@ -20,6 +20,18 @@ const supplierFields = (t: any) => [
     placeholder: t('placeholders.enter_phone'),
     required: true,
   },
+  {
+    name: 'balance_type',
+    label: t('forms.balance_type') || 'Balance Type',
+    type: 'select',
+    placeholder: t('placeholders.select_currency') || 'Select currency',
+    options: [
+      { value: 'USD', label: 'USD' },
+      { value: 'UZS', label: 'UZS' },
+    ],
+    required: true,
+    defaultValue: 'USD',
+  },
 ];
 
 export default function CreateSupplier() {
@@ -29,7 +41,8 @@ export default function CreateSupplier() {
 
   const handleSubmit = async (data: Supplier) => {
     try {
-      await createSupplier.mutateAsync(data);
+      const balanceType = (data as any).balance_type === 'USD' || (data as any).balance_type === 'UZS' ? (data as any).balance_type : 'USD';
+      await createSupplier.mutateAsync({ ...data, balance_type: balanceType } as any);
       toast.success(t('messages.success.created', { item: t('table.supplier') }));
       navigate('/suppliers');
     } catch (error) {

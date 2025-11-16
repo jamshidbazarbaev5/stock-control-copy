@@ -8,6 +8,11 @@ export interface ShiftClosureData {
   id: number;
   store: {
     id: number;
+    budgets?: Array<{
+      id: number;
+      budget_type: string;
+      amount: string;
+    }>;
     name: string;
     address: string;
     phone_number: string;
@@ -21,6 +26,11 @@ export interface ShiftClosureData {
     id: number;
     store: {
       id: number;
+      budgets?: Array<{
+        id: number;
+        budget_type: string;
+        amount: string;
+      }>;
       name: string;
       address: string;
       phone_number: string;
@@ -33,6 +43,7 @@ export interface ShiftClosureData {
     name: string;
     is_active: boolean;
     last_opened_at: string | null;
+    current_budget?: string;
     last_closing_cash: number;
   };
   cashier: {
@@ -41,15 +52,6 @@ export interface ShiftClosureData {
     phone_number: string;
     role: string;
   };
-  total_expected: string;
-  total_actual: string;
-  total_sales_amount: number;
-  total_debt_amount: number;
-  total_sales_count: number;
-  total_returns_amount: number;
-  total_returns_count: number;
-  total_income: number;
-  total_expense: number;
   opened_at: string;
   closed_at: string;
   opening_cash: string;
@@ -61,7 +63,8 @@ export interface ShiftClosureData {
   is_awaiting_approval: boolean;
   is_approved: boolean;
   approved_by: null | number;
-  payments: Array<{
+  // Old payment structure (fallback)
+  payments?: Array<{
     id: number;
     payment_method: string;
     income: string;
@@ -69,6 +72,78 @@ export interface ShiftClosureData {
     expected: string;
     actual: string;
   }>;
+  total_sales_count?: number;
+  total_sales_amount?: number;
+  total_returns_count?: number;
+  total_returns_amount?: number;
+  total_debt_amount?: number;
+  total_income?: number;
+  total_expense?: number;
+  total_expected?: string;
+  total_actual?: string;
+  // New summary_data structure
+  summary_data?: {
+    shift_id: number;
+    cashier: string;
+    store: string;
+    opened_at: string;
+    closed_at: string | null;
+    total_sales_count: number;
+    total_sales_amount: string | number;
+    total_debt_amount: string | number;
+    total_returns_count: number;
+    total_returns_amount: string | number;
+    sales_payments: {
+      total: string | number;
+      total_in_usd: string | number;
+      by_type: Array<{
+        payment_method: string;
+        amount: string | number;
+      }>;
+    };
+    deposit_payments: {
+      total: string | number;
+      total_in_usd: string | number;
+      by_type: Array<{
+        payment_method: string;
+        amount: string | number;
+      }>;
+    };
+    debt_payments: {
+      total: string | number;
+      total_in_usd: string | number;
+      by_type: Array<{
+        payment_method: string;
+        amount: string | number;
+      }>;
+    };
+    expenses: {
+      total: string | number;
+      total_in_usd: string | number;
+      by_type: Array<{
+        payment_method: string;
+        amount: string | number;
+      }>;
+    };
+    remaining: {
+      total: string | number;
+      total_in_usd: string | number;
+      by_type: Array<{
+        payment_method: string;
+        amount: string | number;
+      }>;
+    };
+    debt_clients: Array<{
+      client_name: string;
+      amount: number;
+      payment_method: string;
+    }>;
+    deposit_clients: Array<{
+      client_name: string;
+      deposit: number;
+      deposit_payment_method: string;
+    }>;
+  };
 }
 
 export interface PrintServiceResponse {

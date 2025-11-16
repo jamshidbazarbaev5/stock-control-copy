@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 export interface Supplier {
   id?: number;
   name: string;
+  balance_type?:string;
   phone_number: string;
   total_debt?: string;
   total_paid?: string;

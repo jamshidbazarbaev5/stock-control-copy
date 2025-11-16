@@ -22,7 +22,7 @@ import CreateStock from "./core/pages/create-stock";
 import Layout from "./core/layout/Layout";
 import MeasurementsPage from "./core/pages/MeasurementsPage";
 import ShiftsPage from "./core/pages/ShiftsPage";
-import EditShiftPage from "./core/pages/edit-shift";
+import EditShiftPage from "./core/pages/EditShiftPage";
 import CreateMeasurement from "./core/pages/create-measurement";
 import CurrenciesPage from "./core/pages/CurrenciesPage";
 import CreateCurrency from "./core/pages/create-currency";
@@ -93,6 +93,7 @@ import WriteoffDetailPage from "@/core/pages/WriteoffDetailPage.tsx";
 import StockDebtPaymentHistoryPage from "@/core/pages/StockDebtPaymentHistoryPage.tsx";
 import EditStockEntry from "@/core/pages/EditStockEntry.tsx";
 import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage";
+// import W9FormDemo from "./core/pages/W9FormDemo";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
 const queryClient = new QueryClient();
@@ -786,6 +787,7 @@ function App() {
                   </PrivateRoute>
                 }
               />
+
             </Route>
 
             {/* Fullscreen POS route - outside Layout wrapper for touch interface */}

@@ -331,7 +331,7 @@ export default function DebtDetailsPage() {
                               {t("forms.store_name")}
                             </dt>
                             <dd className="font-medium text-gray-900">
-                              {debt.sale_read.store_read.name}
+                              {debt.sale_read?.store_read?.name}
                             </dd>
                           </div>
                         </div>
@@ -342,7 +342,7 @@ export default function DebtDetailsPage() {
                               {t("forms.phone")}
                             </dt>
                             <dd className="font-medium text-gray-900">
-                              {debt.sale_read.store_read.phone_number}
+                              {debt.sale_read?.store_read?.phone_number}
                             </dd>
                           </div>
                         </div>
@@ -374,7 +374,7 @@ export default function DebtDetailsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {debt.sale_read.sale_items.map((item) => (
+                          {debt.sale_read?.sale_items?.map((item) => (
                             <tr
                               key={item.id}
                               className="border-b hover:bg-gray-50/50 transition-colors duration-150"

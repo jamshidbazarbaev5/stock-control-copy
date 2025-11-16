@@ -185,6 +185,8 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "create_debt": "Создать долг",
+    "due_date": "Срок оплаты",
     "balance_history": "История баланса",
     "exchange_rate":"Курс обмена",
     "paid3":"Не в долг",
@@ -337,6 +339,7 @@
     "updating": "Обновление...",
     "paid": "Долг погашен",
     "paid2": "Продано",
+    "paid3": "Не в долг",
     "closed": "Закрыто",
     "Save": "Сохранить",
     "Saving...": "Сохранение...",
@@ -548,6 +551,8 @@
   },
 
   "forms": {
+    "balance_type": "Тип баланса",
+    "budget":"Бюджет",
     "search_by_product_name": "Поиск по названию товара",
     "can_view_quantity": "Может просматривать количество",
     "budget_type": "Тип оплаты",
@@ -1021,7 +1026,8 @@
       "refund_created": "Возврат успешно создан",
       "attribute_deleted": "Атрибут успешно удален",
       "attribute_updated": "Атрибут успешно обновлен",
-      "attribute_created": "Атрибут успешно создан"
+      "attribute_created": "Атрибут успешно создан",
+      "debt_created": "Долг успешно создан"
     },
     "error": {
       "payment_exceeds_budget": "Вы не можете оплатить этот долг бюджет магазина не хватет",
@@ -1042,7 +1048,8 @@
       "failed_to_load_attributes": "Не удалось загрузить атрибуты",
       "failed_to_delete_attribute": "Не удалось удалить атрибут",
       "failed_to_load_attribute": "Не удалось загрузить атрибут",
-      "failed_to_save_attribute": "Не удалось сохранить атрибут"
+      "failed_to_save_attribute": "Не удалось сохранить атрибут",
+      "debt_create": "Не удалось создать долг"
     },
     "confirmation": {
       "delete": "Вы уверены, что хотите удалить это?"

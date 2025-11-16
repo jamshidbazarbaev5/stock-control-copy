@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+  import { MoreHorizontal, Wallet, History, DollarSign, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,8 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../api/client";
 
 const formSchema = z.object({
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -195,6 +198,143 @@ interface CashOutDialogProps {
   onClose: () => void;
 }
 
+// Create Debt dialog
+const createDebtSchema = z.object({
+  total_amount: z.number().min(0.01, "Amount must be greater than 0"),
+  store: z.number().optional(),
+  due_date: z.string().min(1, "Due date is required"),
+});
+
+type CreateDebtForm = z.infer<typeof createDebtSchema>;
+
+interface CreateDebtDialogProps {
+  clientId: number;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
+  const { data: storesData } = useGetStores({});
+  const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
+  
+  const createDebt = useMutation({
+    mutationFn: async (data: { client_write: number; store_write: number; total_amount: number; due_date: string }) => {
+      const response = await api.post('/debts/create/', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+    },
+  });
+
+  const userStoreId = currentUser?.store_read?.id;
+
+  const form = useForm<CreateDebtForm>({
+    resolver: zodResolver(createDebtSchema),
+    defaultValues: { total_amount: 0, store: userStoreId || undefined, due_date: "" },
+  });
+
+  const onSubmit = async (data: CreateDebtForm) => {
+    try {
+      const storeId = currentUser?.is_superuser ? data.store : userStoreId;
+      await createDebt.mutateAsync({
+        client_write: clientId,
+        store_write: storeId!,
+        total_amount: data.total_amount,
+        due_date: data.due_date,
+      });
+      toast.success(t("messages.success.debt_created", "Debt created successfully"));
+      form.reset();
+      onClose();
+    } catch (error) {
+      toast.error(t("messages.error.debt_create", "Failed to create debt"));
+      console.error("Failed to create debt:", error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("common.create_debt", "Create Debt")}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {currentUser?.is_superuser && (
+              <FormField
+                control={form.control}
+                name="store"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("forms.store")}</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={field.value?.toString()} 
+                        onValueChange={(val) => field.onChange(parseInt(val))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("placeholders.select_store")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stores.map((store) => (
+                            <SelectItem key={store.id} value={store.id!.toString()}>
+                              {store.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+            <FormField
+              control={form.control}
+              name="total_amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("common.amount")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="due_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("common.due_date", "Due Date")}</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" disabled={createDebt.isPending}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
   const { t } = useTranslation();
   const cashOut = useClientCashOut();
@@ -319,6 +459,9 @@ export default function ClientsPage() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [cashOutClientId, setCashOutClientId] = useState<number | null>(null);
+  const [createDebtClientId, setCreateDebtClientId] = useState<number | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
   const { data: clientsData, isLoading } = useGetClients({
     params: selectedType === "all" ? {} : { type: selectedType },
   });
@@ -355,45 +498,7 @@ export default function ClientsPage() {
       header: t("forms.balance"),
       accessorKey: (row: Client) => ("balance" in row ? row.balance : "-"),
     },
-    {
-      header: "",
-      id: "actions",
-      accessorKey: "id",
-      cell: (row: Client) => (
-          <div className="flex gap-2">
-            {row.type === "Юр.лицо" && (
-              <Button
-                  variant="outline"
-                  onClick={() => navigate(`/clients/${row.id}/history`)}
-              >
-                {t("common.history")}
-              </Button>
-            )}
-            <Button
-                variant="outline"
-                onClick={() => navigate(`/debts/${row.id}`)}
-            >
-              Долги
-            </Button>
-            {currentUser?.is_superuser && row.type === "Юр.лицо" && (
-                <>
-                  <Button
-                      variant="outline"
-                      onClick={() => row.id && setSelectedClientId(row.id)}
-                  >
-                    {t("common.increment_balance")}
-                  </Button>
-                  <Button
-                      variant="outline"
-                      onClick={() => row.id && setCashOutClientId(row.id)}
-                  >
-                    Обналичичка
-                  </Button>
-                </>
-            )}
-          </div>
-      ),
-    },
+
   ];
 
   const handleDelete = async (id: number) => {
@@ -432,6 +537,93 @@ export default function ClientsPage() {
             onEdit={!currentUser?.is_superuser ? (client) => navigate(`/edit-client/${client.id}`) : undefined}
             onDelete={!currentUser?.is_superuser ? handleDelete : undefined}
             totalCount={totalCount}
+            actions={(client: Client) => (
+              <div className="relative" style={{ position: 'static' }}>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                    setOpenDropdown(openDropdown === client.id ? null : client.id!);
+                  }}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+                {openDropdown === client.id && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setOpenDropdown(null)}
+                    />
+                    <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
+                      {client.type === "Юр.лицо" && (
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(null);
+                            navigate(`/clients/${client.id}/history`);
+                          }}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          {t("common.history")}
+                        </button>
+                      )}
+                      <button
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdown(null);
+                          navigate(`/debts/${client.id}`);
+                        }}
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Долги
+                      </button>
+                      <button
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdown(null);
+                          client.id && setCreateDebtClientId(client.id);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t("common.create_debt", "Create Debt")}
+                      </button>
+                      {currentUser?.is_superuser && client.type === "Юр.лицо" && (
+                        <>
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdown(null);
+                              client.id && setSelectedClientId(client.id);
+                            }}
+                          >
+                            <Wallet className="h-4 w-4 mr-2" />
+                            {t("common.increment_balance")}
+                          </button>
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdown(null);
+                              client.id && setCashOutClientId(client.id);
+                            }}
+                          >
+                            <Wallet className="h-4 w-4 mr-2" />
+                            Обналичичка
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
         />
         {selectedClientId && (
             <BalanceIncrementDialog
@@ -445,6 +637,13 @@ export default function ClientsPage() {
                 clientId={cashOutClientId}
                 isOpen={!!cashOutClientId}
                 onClose={() => setCashOutClientId(null)}
+            />
+        )}
+        {createDebtClientId && (
+            <CreateDebtDialog
+                clientId={createDebtClientId}
+                isOpen={!!createDebtClientId}
+                onClose={() => setCreateDebtClientId(null)}
             />
         )}
       </div>

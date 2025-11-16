@@ -25,6 +25,7 @@ export interface Register {
   name: string;
   is_active: boolean;
   last_opened_at: string | null;
+  current_budget?: string;
   last_closing_cash: number;
 }
 
@@ -63,6 +64,7 @@ export interface Shift {
   is_approved: boolean;
   approved_by: number | null;
   payments: Payment[];
+  summary_data?: ShiftSummary;
 }
 
 export interface OpenShiftData {
@@ -105,20 +107,47 @@ export interface ShiftSummaryPayment {
   actual: number;
 }
 
+export interface PaymentByType {
+  payment_method: string;
+  amount: number;
+}
+
+export interface PaymentSummary {
+  total: number;
+  total_in_usd: number;
+  by_type: PaymentByType[];
+}
+
+export interface DepositClient {
+  client_name: string;
+  deposit: number;
+  deposit_payment_method: string;
+}
+
+export interface DebtClient {
+  client_name: string;
+  amount: number;
+  payment_method: string;
+}
+
 export interface ShiftSummary {
   shift_id: number;
-  total_debt_amount: number;
-  cashier: string | null;
+  cashier: string;
   store: string;
   opened_at: string;
-  payments: ShiftSummaryPayment[];
-  total_expected: number;
-  total_sales_amount: number;
+  closed_at: string | null;
   total_sales_count: number;
-  total_returns_amount: number;
+  total_sales_amount: number;
+  total_debt_amount: number;
   total_returns_count: number;
-  total_income: number;
-  total_expense: number;
+  total_returns_amount: number;
+  sales_payments: PaymentSummary;
+  deposit_payments: PaymentSummary;
+  debt_payments: PaymentSummary;
+  expenses: PaymentSummary;
+  remaining: PaymentSummary;
+  debt_clients: DebtClient[];
+  deposit_clients: DepositClient[];
 }
 
 export interface CloseShiftPayment {
@@ -147,8 +176,8 @@ export interface ShiftResponse {
   page_range: number[];
   page_size: number;
 }
-const BASE_URL = "pos/shifts/";
-const OPEN_SHIFT_URL = "pos/shifts/open/";
+const BASE_URL = "pos/pos-shifts/";
+const OPEN_SHIFT_URL = "pos/pos-shifts/open/";
 
 export const shiftsApi = {
   getAll: (params?: {

@@ -1304,6 +1304,18 @@ export default function EditStockEntry() {
         return;
       }
 
+      // Validate payment method if required
+      if (
+        commonValues.is_debt &&
+        commonValues.advance_of_debt &&
+        !commonValues.use_supplier_balance &&
+        !commonValues.deposit_payment_method
+      ) {
+        toast.error("Please select a payment method for the advance payment.");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Check supplier balance if using supplier balance
       if (commonValues.use_supplier_balance) {
         const selectedSupplier = suppliers.find(
@@ -1316,7 +1328,9 @@ export default function EditStockEntry() {
             }
             return sum;
           }, 0);
-          const balance = Number(selectedSupplier.balance) || 0;
+          // Add back the already-paid amount from this entry for validation
+          const originalPaidAmount = Number(stockEntryData?.from_balance_supplier) || 0;
+          const balance = (Number(selectedSupplier.balance) || 0) + originalPaidAmount;
           if (balance < totalAmount) {
             toast.error(
                 `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} UZS, Требуется: ${formatPrice(totalAmount)} UZS`,
@@ -1813,7 +1827,9 @@ export default function EditStockEntry() {
                             }
                             return sum;
                           }, 0);
-                          const balance = Number(selectedSupplier.balance) || 0;
+                          // Add back the already-paid amount from this entry for validation
+                          const originalPaidAmount = Number(stockEntryData?.from_balance_supplier) || 0;
+                          const balance = (Number(selectedSupplier.balance) || 0) + originalPaidAmount;
                           const canPay = balance >= totalAmount;
 
                           return (
@@ -1838,6 +1854,11 @@ export default function EditStockEntry() {
                                           className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
                                       >
                                 {formatPrice(balance)} UZS
+                                {originalPaidAmount > 0 && (
+                                  <span className="text-xs block text-gray-500">
+                                    (включая {formatPrice(originalPaidAmount)} UZS из этой записи)
+                                  </span>
+                                )}
                               </span>
                                     </div>
                                     <div className="flex justify-between border-t pt-2">
@@ -2527,7 +2548,9 @@ export default function EditStockEntry() {
                               }
                               return sum;
                             }, 0);
-                            const balance = Number(selectedSupplier.balance) || 0;
+                            // Add back the already-paid amount from this entry for validation
+                            const originalPaidAmount = Number(stockEntryData?.from_balance_supplier) || 0;
+                            const balance = (Number(selectedSupplier.balance) || 0) + originalPaidAmount;
                             return balance < totalAmount;
                           }
                         }

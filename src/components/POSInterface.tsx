@@ -239,7 +239,7 @@ const POSInterfaceCore = () => {
     useState<ProductInCart | null>(null);
   const [selectedProductIndexForQuantity, setSelectedProductIndexForQuantity] =
     useState<number | null>(null);
-  const [isManualQuantityMode, setIsManualQuantityMode] = useState(false);
+  const [isManualQuantityMode, setIsManualQuantityMode] = useState(true);
   const [manualQuantityInput, setManualQuantityInput] = useState("");
 
   // Payment modal state
@@ -1107,7 +1107,7 @@ const POSInterfaceCore = () => {
     setSelectedProductForQuantity(product);
     setSelectedProductIndexForQuantity(index ?? null);
     setIsQuantityModalOpen(true);
-    setIsManualQuantityMode(false);
+    setIsManualQuantityMode(true);
     setManualQuantityInput("");
   };
 
@@ -1162,9 +1162,7 @@ const POSInterfaceCore = () => {
 
   const handleManualQuantityMode = () => {
     setIsManualQuantityMode(true);
-    if (selectedProductForQuantity) {
-      setManualQuantityInput(selectedProductForQuantity.quantity.toString());
-    }
+    setManualQuantityInput("");
   };
 
   const handleManualQuantitySubmit = () => {
@@ -3247,10 +3245,13 @@ const POSInterfaceCore = () => {
                       { amount: 0, payment_method: "Наличные" },
                     ]);
 
-                    // Reset other states
+                    // Reset other states including debt-related fields
                     setSelectedClient(null);
                     setSelectedSeller(null);
                     setOnCredit(false);
+                    setDebtDeposit("");
+                    setDebtDueDate("");
+                    setDepositPaymentMethod("Наличные");
 
                     // Clear persisted state after successful sale
                     clearPersistedState();

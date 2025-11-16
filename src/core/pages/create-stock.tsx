@@ -1,4 +1,4 @@
-  import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { DynamicField, StockItemEntry } from "../api/stock";
 import { calculateStock, createBulkStockEntry } from "../api/stock";
 import {
@@ -44,6 +44,8 @@ import {
   Save,
   RotateCcw,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
 
 interface CommonFormValues {
   store: number | string;
@@ -53,6 +55,7 @@ interface CommonFormValues {
   amount_of_debt?: number | string;
   advance_of_debt?: number | string;
   use_supplier_balance?: boolean;
+  supplier_balance_type?: "USD" | "UZS";
   deposit_payment_method?: string;
   payments?: Array<{
     amount: number | string;
@@ -277,11 +280,7 @@ export default function CreateStock() {
     },
   });
 
-  const [createProductOpen, setCreateProductOpen] = useState(false);
-  const [createSupplierOpen, setCreateSupplierOpen] = useState(false);
 
-  const productForm = useForm<CreateProductForm>();
-  const supplierForm = useForm<CreateSupplierForm>();
 
   const commonForm = useForm<CommonFormValues>({
     defaultValues: {
@@ -301,12 +300,40 @@ export default function CreateStock() {
     },
   });
 
+  interface CurrencyRate {
+    created_at: string;
+    rate: string;
+    currency_detail: { id: number; name: string; short_name: string; is_base: boolean };
+  }
+  const { data: currencyRates } = useQuery<CurrencyRate[]>({
+    queryKey: ["currency-rates"],
+    queryFn: async () => {
+      const response = await api.get("/currency/rates/");
+      return response.data;
+    },
+    enabled: commonForm.watch("use_supplier_balance") === true,
+  });
+
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [createSupplierOpen, setCreateSupplierOpen] = useState(false);
+
+  const productForm = useForm<CreateProductForm>();
+  const supplierForm = useForm<CreateSupplierForm>();
+
   const stores = Array.isArray(storesData)
     ? storesData
     : storesData?.results || [];
   const suppliers = Array.isArray(suppliersData)
     ? suppliersData
     : suppliersData?.results || [];
+
+  useEffect(() => {
+    if (commonForm.watch("use_supplier_balance") && commonForm.watch("supplier")) {
+      const sel = suppliers.find((s: Supplier) => s.id === Number(commonForm.watch("supplier")));
+      const bt = (sel as any)?.balance_type;
+      commonForm.setValue("supplier_balance_type", bt === "USD" || bt === "UZS" ? bt : "USD");
+    }
+  }, [commonForm.watch("use_supplier_balance"), commonForm.watch("supplier"), suppliers]);
   const categories = Array.isArray(categoriesData)
     ? categoriesData
     : categoriesData?.results || [];
@@ -1025,16 +1052,19 @@ export default function CreateStock() {
           (s: Supplier) => s.id === Number(commonValues.supplier),
         );
         if (selectedSupplier) {
-          const totalAmount = stockItems.reduce((sum, item) => {
+          const totalUZS = stockItems.reduce((sum, item) => {
             if (item.isCalculated) {
               return sum + (Number(item.form.total_price_in_uz) || 0);
             }
             return sum;
           }, 0);
-          const balance = Number(selectedSupplier.balance) || 0;
+          const type = commonForm.getValues("supplier_balance_type") === "USD" ? "USD" : "UZS";
+          const usdRate = Number(currencyRates?.[0]?.rate) || 0;
+          const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
+          const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
           if (balance < totalAmount) {
             toast.error(
-              `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} UZS, Требуется: ${formatPrice(totalAmount)} UZS`,
+              `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} ${type}, Требуется: ${formatPrice(totalAmount)} ${type}`,
             );
             setIsSubmitting(false);
             return;
@@ -1109,6 +1139,7 @@ export default function CreateStock() {
         }),
         ...(commonValues.use_supplier_balance && {
           use_supplier_balance: true,
+          balance_type: commonForm.getValues("supplier_balance_type") || "USD",
         }),
         ...(commonValues.deposit_payment_method && {
           deposit_payment_method: commonValues.deposit_payment_method,
@@ -1467,6 +1498,23 @@ export default function CreateStock() {
               {t("common.use_supplier_balance") || "Use Supplier Balance"}
             </Label>
           </div>
+          {commonForm.watch("use_supplier_balance") && commonForm.watch("supplier") && (
+            <div className="space-y-2">
+              <Label htmlFor="supplier_balance_type">{t("forms.balance_type") || "Balance Type"} *</Label>
+              <Select
+                value={commonForm.watch("supplier_balance_type") || ""}
+                onValueChange={(value) => commonForm.setValue("supplier_balance_type", value as any)}
+              >
+                <SelectTrigger id="supplier_balance_type">
+                  <SelectValue placeholder={t("placeholders.select_currency") || "Select currency"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="UZS">UZS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Show supplier balance info when use_supplier_balance is checked */}
           {commonForm.watch("use_supplier_balance") &&
@@ -1481,13 +1529,16 @@ export default function CreateStock() {
                       s.id === Number(commonForm.watch("supplier")),
                   );
                   if (selectedSupplier) {
-                    const totalAmount = stockItems.reduce((sum, item) => {
+                    const totalUZS = stockItems.reduce((sum, item) => {
                       if (item.isCalculated) {
                         return sum + (Number(item.form.total_price_in_uz) || 0);
                       }
                       return sum;
                     }, 0);
-                    const balance = Number(selectedSupplier.balance) || 0;
+                    const type = commonForm.watch("supplier_balance_type") === "USD" ? "USD" : "UZS";
+                    const usdRate = Number(currencyRates?.[0]?.rate) || 0;
+                    const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
+                    const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
                     const canPay = balance >= totalAmount;
                     return (
                       <div className="space-y-3">
@@ -1510,7 +1561,7 @@ export default function CreateStock() {
                               <span
                                 className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
                               >
-                                {formatPrice(balance)} UZS
+                                {formatPrice(balance)} {type}
                               </span>
                             </div>
                             <div className="flex justify-between border-t pt-2">
@@ -1518,7 +1569,7 @@ export default function CreateStock() {
                                 {t("common.total_amount") || "Purchase Amount"}:
                               </span>
                               <span className="font-semibold">
-                                {formatPrice(totalAmount)} UZS
+                                {formatPrice(totalAmount)} {type}
                               </span>
                             </div>
                           </div>
@@ -1533,10 +1584,8 @@ export default function CreateStock() {
                                   Недостаточный баланс
                                 </p>
                                 <p className="text-xs mt-1">
-                                  Баланс поставщика ({formatPrice(balance)} UZS)
-                                  меньше суммы покупки ({formatPrice(totalAmount)}{" "}
-                                  UZS). Нехватка:{" "}
-                                  {formatPrice(totalAmount - balance)} UZS
+                                  Баланс поставщика ({formatPrice(balance)} {type})
+                                  меньше суммы покупки ({formatPrice(totalAmount)} {type}). Нехватка: {formatPrice(totalAmount - balance)} {type}
                                 </p>
                               </div>
                             </div>
@@ -1551,7 +1600,7 @@ export default function CreateStock() {
                                 <p className="font-semibold">Оплата доступна</p>
                                 <p className="text-xs mt-1">
                                   Остаток баланса после покупки:{" "}
-                                  {(balance - totalAmount).toFixed(2)} UZS
+                                  {(balance - totalAmount).toFixed(2)} {type}
                                 </p>
                               </div>
                             </div>
@@ -2199,13 +2248,16 @@ export default function CreateStock() {
                       s.id === Number(commonForm.watch("supplier")),
                   );
                   if (selectedSupplier) {
-                    const totalAmount = stockItems.reduce((sum, item) => {
+                    const totalUZS = stockItems.reduce((sum, item) => {
                       if (item.isCalculated) {
                         return sum + (Number(item.form.total_price_in_uz) || 0);
                       }
                       return sum;
                     }, 0);
-                    const balance = Number(selectedSupplier.balance) || 0;
+                    const type = commonForm.watch("supplier_balance_type") === "USD" ? "USD" : "UZS";
+                    const usdRate = Number(currencyRates?.[0]?.rate) || 0;
+                    const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
+                    const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
                     return balance < totalAmount;
                   }
                 }

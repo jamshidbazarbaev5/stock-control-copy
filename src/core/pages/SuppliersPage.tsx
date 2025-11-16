@@ -10,7 +10,6 @@ import {
   useUpdateSupplier,
   useDeleteSupplier,
   useAddSupplierBalance,
-  type AddSupplierBalanceRequest,
 } from "../api/supplier";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -54,6 +53,18 @@ const supplierFields = (t: (key: string) => string) => [
     placeholder: t("placeholders.enter_phone"),
     required: true,
   },
+  {
+    name: "balance_type",
+    label: t("forms.balance_type") || "Balance Type",
+    type: "select",
+    placeholder: t("placeholders.select_currency") || "Select currency",
+    options: [
+      { value: "USD", label: "USD" },
+      { value: "UZS", label: "UZS" },
+    ],
+    required: true,
+    defaultValue: "USD",
+  },
 ];
 
 const formatPrice = (value: number | string | null | undefined) => {
@@ -77,15 +88,13 @@ const columns = (t: (key: string) => string) => [
   {
     header: t("table.balance"),
     accessorKey: "balance",
-    cell: (row: Supplier) => formatPrice(row.balance),
+    cell: (row: Supplier) => {
+      const s: any = row;
+      const type = s.balance_type === "USD" || s.balance_type === "UZS" ? s.balance_type : "USD";
+      const value = type === "USD" ? s.balance_in_usd : s.balance;
+      return `${formatPrice(value)} ${type}`;
+    },
   },
-    {
-    header: t("table.balance_in_usd"),
-    accessorKey: "balance_in_usd",
-    cell: (row: Supplier) => formatPrice(row.balance_in_usd),
-  },
-
-
   {
     header: t("table.remaining_debt"),
     accessorKey: "remaining_debt",
@@ -246,12 +255,16 @@ export default function SuppliersPage() {
       return;
     }
 
-    const data: AddSupplierBalanceRequest = {
+    const balanceType = (selectedSupplierForBalance?.balance_type === "USD" || selectedSupplierForBalance?.balance_type === "UZS")
+      ? (selectedSupplierForBalance as any).balance_type
+      : "USD";
+    const data: any = {
       supplier: selectedSupplierForBalance.id,
       store: Number(balanceForm.store),
       amount: Number(balanceForm.amount),
       payment_method: balanceForm.payment_method,
-      ...(balanceForm.payment_method === "Валюта" && balanceForm.exchange_rate && {
+      balance_type: balanceType,
+      ...(balanceForm.exchange_rate && {
         exchange_rate: Number(balanceForm.exchange_rate),
       }),
     };
@@ -309,13 +322,19 @@ export default function SuppliersPage() {
       }
     }
 
+    const supplierCurrency = (() => {
+      const s = suppliers.find((sup: Supplier) => sup.id === Number(massPaymentForm.supplier));
+      const bt = (s as any)?.balance_type;
+      return bt === "USD" || bt === "UZS" ? bt : "USD";
+    })();
     const data = {
       supplier: Number(massPaymentForm.supplier),
       store: Number(massPaymentForm.store),
       amount: Number(massPaymentForm.amount),
       payment_type: massPaymentForm.payment_type,
       comment: massPaymentForm.comment,
-      ...(massPaymentForm.payment_type === "Валюта" && massPaymentForm.exchange_rate && {
+      balance_type: supplierCurrency,
+      ...(massPaymentForm.exchange_rate && {
         exchange_rate: Number(massPaymentForm.exchange_rate),
       }),
     };
@@ -481,24 +500,21 @@ export default function SuppliersPage() {
                 </Select>
               </div>
 
-              {balanceForm.payment_method === "Валюта" && (
-                <div className="space-y-2">
-                  <Label htmlFor="exchange_rate">
-                    {t("common.exchange_rate") || "Exchange Rate"} *
-                  </Label>
-                  <Input
-                    id="exchange_rate"
-                    type="number"
-                    step="0.01"
-                    value={balanceForm.exchange_rate}
-                    onChange={(e) =>
-                      setBalanceForm({ ...balanceForm, exchange_rate: e.target.value })
-                    }
-                    placeholder={t("placeholders.enter_exchange_rate") || "Enter exchange rate"}
-                  />
-                
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="exchange_rate">
+                  {t("common.exchange_rate") || "Exchange Rate"}
+                </Label>
+                <Input
+                  id="exchange_rate"
+                  type="number"
+                  step="0.01"
+                  value={balanceForm.exchange_rate}
+                  onChange={(e) =>
+                    setBalanceForm({ ...balanceForm, exchange_rate: e.target.value })
+                  }
+                  placeholder={t("placeholders.enter_exchange_rate") || "Enter exchange rate"}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="store">{t("forms.store")} *</Label>
@@ -716,24 +732,21 @@ export default function SuppliersPage() {
                 </Select>
               </div>
 
-              {massPaymentForm.payment_type === "Валюта" && (
-                <div className="space-y-2">
-                  <Label htmlFor="mass_exchange_rate">
-                    {t("common.exchange_rate") || "Exchange Rate"} *
-                  </Label>
-                  <Input
-                    id="mass_exchange_rate"
-                    type="number"
-                    step="0.01"
-                    value={massPaymentForm.exchange_rate}
-                    onChange={(e) =>
-                      setMassPaymentForm({ ...massPaymentForm, exchange_rate: e.target.value })
-                    }
-                    placeholder={t("placeholders.enter_exchange_rate") || "Enter exchange rate"}
-                  />
-                
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="mass_exchange_rate">
+                  {t("common.exchange_rate") || "Exchange Rate"}
+                </Label>
+                <Input
+                  id="mass_exchange_rate"
+                  type="number"
+                  step="0.01"
+                  value={massPaymentForm.exchange_rate}
+                  onChange={(e) =>
+                    setMassPaymentForm({ ...massPaymentForm, exchange_rate: e.target.value })
+                  }
+                  placeholder={t("placeholders.enter_exchange_rate") || "Enter exchange rate"}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="mass_comment">{t("common.comment")}</Label>

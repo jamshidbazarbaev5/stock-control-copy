@@ -309,6 +309,7 @@ export interface UpdateStockEntryRequest extends BulkStockEntryRequest {
 // Stock Entry types
 export interface StockEntry {
   id: number;
+  from_balance_supplier:number;
   use_supplier_balance: boolean;
   is_paid: boolean;
   supplier: {

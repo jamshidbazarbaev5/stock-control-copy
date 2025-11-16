@@ -3,12 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Calculator, Printer } from "lucide-react";
+import { ArrowLeft, Save, Printer } from "lucide-react";
 import {
   shiftsApi,
   type ShiftSummary,
   type CloseShiftData,
-  type CloseShiftPayment,
 } from "@/core/api/shift";
 import { useCurrentUser } from "@/core/hooks/useCurrentUser";
 import { useAuth } from "@/core/context/AuthContext";
@@ -29,8 +28,6 @@ const CloseShiftPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [payments, setPayments] = useState<CloseShiftPayment[]>([]);
   const [closingCash, setClosingCash] = useState<number>(0);
   const [closingComment, setClosingComment] = useState<string>("");
 
@@ -42,13 +39,9 @@ const CloseShiftPage = () => {
 
   useEffect(() => {
     const fetchSummary = async () => {
-      // Handle the case where shiftId is "active" - we need to get the actual shift ID
       let actualShiftId: number;
 
       if (shiftId === "active") {
-        // For now, we'll need to get the shift ID from the user data or make an API call
-        // Since the user data structure doesn't include shift ID, we'll use a different approach
-        // We can get all shifts and find the active one, or modify the API to support /active endpoint
         try {
           const shiftsResponse = await shiftsApi.getAll();
           const activeShift = shiftsResponse.data.results.find(
@@ -79,14 +72,6 @@ const CloseShiftPage = () => {
         const response = await shiftsApi.getSummary(actualShiftId);
         setSummary(response.data);
 
-        // Initialize payments with expected values
-        const initialPayments = response.data.payments.map((payment) => ({
-          payment_method: payment.payment_method,
-          actual: payment.expected,
-        }));
-        setPayments(initialPayments);
-
-        // Set initial closing cash to a default value
         setClosingCash(0);
       } catch (err) {
         setError("Ошибка при загрузке данных смены");
@@ -115,28 +100,7 @@ const CloseShiftPage = () => {
     checkPrinter();
   }, []);
 
-  const handlePaymentChange = (index: number, value: number) => {
-    const updatedPayments = [...payments];
-    updatedPayments[index].actual = value;
-    setPayments(updatedPayments);
-  };
 
-  const calculateDifference = (expected: number, actual: number) => {
-    const diff = actual - expected;
-    return {
-      amount: Math.abs(diff),
-      isPositive: diff >= 0,
-      isZero: diff === 0,
-    };
-  };
-
-  const getTotalActual = () => {
-    return payments.reduce((sum, payment) => sum + payment.actual, 0);
-  };
-
-  const getTotalExpected = () => {
-    return summary?.total_expected || 0;
-  };
 
   const handleSubmit = async () => {
     if (!summary) return;
@@ -148,7 +112,10 @@ const CloseShiftPage = () => {
       const actualShiftId = summary.shift_id;
 
       const closeData: CloseShiftData = {
-        payments,
+        payments: summary.remaining.by_type.map(p => ({
+          payment_method: p.payment_method,
+          actual: p.amount
+        })),
         closing_cash: closingCash,
         closing_comment: closingComment,
       };
@@ -164,22 +131,12 @@ const CloseShiftPage = () => {
       const shiftData = closeResponse.data;
       console.log("📊 Shift close response data:", shiftData);
 
-      // Prepare data for printing using the close endpoint response
-      // Use the summary data we fetched before closing for sales statistics
+      // Prepare data for printing with summary_data
       const printData: ShiftClosureData = {
         id: shiftData.id,
         store: shiftData.store,
         register: shiftData.register,
         cashier: shiftData.cashier,
-        total_expected: shiftData.total_expected,
-        total_actual: shiftData.total_actual || "0",
-        total_sales_amount: shiftData.total_sales_amount || 0,
-        total_debt_amount: shiftData.total_debt_amount || 0,
-        total_sales_count: shiftData.total_sales_count || 0,
-        total_returns_amount: shiftData.total_returns_amount || 0,
-        total_returns_count: shiftData.total_returns_count || 0,
-        total_income: shiftData.total_income || 0,
-        total_expense: shiftData.total_expense || 0,
         opened_at: shiftData.opened_at,
         closed_at: shiftData.closed_at || new Date().toISOString(),
         opening_cash: shiftData.opening_cash,
@@ -191,7 +148,7 @@ const CloseShiftPage = () => {
         is_awaiting_approval: shiftData.is_awaiting_approval,
         is_approved: shiftData.is_approved,
         approved_by: shiftData.approved_by,
-        payments: shiftData.payments,
+        summary_data: shiftData.summary_data || summary,
       };
 
       // Attempt automatic printing
@@ -272,10 +229,7 @@ const CloseShiftPage = () => {
     );
   }
 
-  const totalDifference = calculateDifference(
-    getTotalExpected(),
-    getTotalActual(),
-  );
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-2 sm:p-4 md:p-6">
@@ -354,105 +308,122 @@ const CloseShiftPage = () => {
         </div>
 
         <div className="space-y-4 sm:space-y-6">
-          {/* Payment Methods */}
+          {/* Sales Payments */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 sm:p-4 md:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-white flex items-center">
-                <Calculator className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                Способы оплаты
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-3 sm:p-4">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+                <span>💰 Продажи</span>
+                <span className="text-sm">{summary.sales_payments.total.toLocaleString()} UZS</span>
               </h2>
             </div>
-            <div className="p-3 sm:p-4 md:p-6">
-              <div className="overflow-x-auto -mx-3 sm:mx-0">
-                <table className="w-full min-w-[800px]">
-                  <thead>
-                    <tr className="bg-gray-50 rounded-lg">
-                      <th className="text-left py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 font-semibold text-gray-700 rounded-l-lg text-xs sm:text-sm">
-                        Тип
-                      </th>
-                      <th className="text-right py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 text-xs sm:text-sm">
-                        Поступило
-                      </th>
-                      <th className="text-right py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 text-xs sm:text-sm">
-                        Ушло
-                      </th>
-                      <th className="text-right py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 text-xs sm:text-sm">
-                        Ожидается
-                      </th>
-                      <th className="text-right py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 text-xs sm:text-sm">
-                        Фактически
-                      </th>
-                      <th className="text-right py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 font-semibold text-gray-700 rounded-r-lg text-xs sm:text-sm">
-                        Разница
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="space-y-2">
-                    {summary.payments.map((payment, index) => {
-                      const actualValue = payments[index]?.actual || 0;
-                      const difference = calculateDifference(
-                        payment.expected,
-                        actualValue,
-                      );
+            <div className="p-3 sm:p-4">
+              <div className="space-y-2">
+                {summary.sales_payments.by_type.map((payment) => (
+                  <div key={payment.payment_method} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-700">{payment.payment_method}</span>
+                    <span className="font-bold text-green-700">{payment.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                      return (
-                        <tr
-                          key={payment.payment_method}
-                          className="hover:bg-blue-50 transition-colors duration-200 border-b border-gray-100"
-                        >
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 font-semibold text-gray-800 text-xs sm:text-sm">
-                            {payment.payment_method_display}
-                          </td>
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right text-gray-600">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">
-                              {payment.income.toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right text-gray-600">
-                            <span className="bg-orange-100 text-orange-800 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">
-                              {payment.expense.toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right">
-                            <span className="bg-purple-100 text-purple-800 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap">
-                              {payment.expected.toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right">
-                            <Input
-                              type="number"
-                              value={actualValue}
-                              onChange={(e) =>
-                                handlePaymentChange(
-                                  index,
-                                  parseFloat(e.target.value) || 0,
-                                )
-                              }
-                              className="w-24 sm:w-32 md:w-36 text-right border-2 border-blue-200 focus:border-blue-500 rounded-xl bg-blue-50 font-semibold text-xs sm:text-sm"
-                              step="0.01"
-                            />
-                          </td>
-                          <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-4 md:px-6 text-right">
-                            <span
-                              className={`inline-flex items-center px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-bold shadow-md whitespace-nowrap ${
-                                difference.isZero
-                                  ? "bg-green-500 text-white"
-                                  : difference.isPositive
-                                    ? "bg-green-500 text-white"
-                                    : "bg-red-500 text-white"
-                              }`}
-                            >
-                              {difference.isZero
-                                ? "0"
-                                : (difference.isPositive ? "+" : "-") +
-                                  difference.amount.toLocaleString()}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {/* Deposit Payments */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 sm:p-4">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+                <span>📥 Депозиты</span>
+                <span className="text-sm">{summary.deposit_payments.total.toLocaleString()} UZS</span>
+              </h2>
+            </div>
+            <div className="p-3 sm:p-4">
+              <div className="space-y-2">
+                {summary.deposit_payments.by_type.map((payment) => (
+                  <div key={payment.payment_method} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-700">{payment.payment_method}</span>
+                    <span className="font-bold text-blue-700">{payment.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              {summary.deposit_clients.length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <h3 className="font-semibold text-gray-700 mb-2">Клиенты:</h3>
+                  {summary.deposit_clients.map((client, idx) => (
+                    <div key={idx} className="text-sm py-1 px-2 bg-blue-50 rounded mb-1">
+                      {client.client_name} - {client.deposit.toLocaleString()} ({client.deposit_payment_method})
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Debt Payments */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-3 sm:p-4">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+                <span>💳 Погашение долгов</span>
+                <span className="text-sm">{summary.debt_payments.total.toLocaleString()} UZS</span>
+              </h2>
+            </div>
+            <div className="p-3 sm:p-4">
+              <div className="space-y-2">
+                {summary.debt_payments.by_type.map((payment) => (
+                  <div key={payment.payment_method} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-700">{payment.payment_method}</span>
+                    <span className="font-bold text-amber-700">{payment.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              {summary.debt_clients.length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <h3 className="font-semibold text-gray-700 mb-2">Клиенты:</h3>
+                  {summary.debt_clients.map((client, idx) => (
+                    <div key={idx} className="text-sm py-1 px-2 bg-amber-50 rounded mb-1">
+                      {client.client_name} - {client.amount.toLocaleString()} ({client.payment_method})
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Expenses */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-3 sm:p-4">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+                <span>📤 Расходы</span>
+                <span className="text-sm">{summary.expenses.total.toLocaleString()} UZS</span>
+              </h2>
+            </div>
+            <div className="p-3 sm:p-4">
+              <div className="space-y-2">
+                {summary.expenses.by_type.map((payment) => (
+                  <div key={payment.payment_method} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-700">{payment.payment_method}</span>
+                    <span className="font-bold text-red-700">{payment.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Remaining - READ ONLY */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 sm:p-4">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+                <span>💵 Остаток</span>
+                <span className="text-sm">{summary.remaining.total.toLocaleString()} UZS</span>
+              </h2>
+            </div>
+            <div className="p-3 sm:p-4">
+              <div className="space-y-2">
+                {summary.remaining.by_type.map((payment) => (
+                  <div key={payment.payment_method} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-700">{payment.payment_method}</span>
+                    <span className="font-bold text-purple-700">{payment.amount.toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -555,44 +526,7 @@ const CloseShiftPage = () => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center py-3 border-b border-gray-200">
-                  <span className="text-lg font-semibold text-gray-700">
-                    Ожидается:
-                  </span>
-                  <span className="text-2xl font-bold text-purple-600">
-                    {getTotalExpected().toLocaleString()} UZS
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b border-gray-200">
-                  <span className="text-lg font-semibold text-gray-700">
-                    Фактически:
-                  </span>
-                  <span className="text-2xl font-bold text-blue-600">
-                    {getTotalActual().toLocaleString()} UZS
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-4 bg-white rounded-xl px-6 shadow-md">
-                  <span className="text-xl font-bold text-gray-800">
-                    Разница:
-                  </span>
-                  <span
-                    className={`text-3xl font-black px-6 py-2 rounded-full shadow-lg ${
-                      totalDifference.isZero
-                        ? "bg-green-500 text-white"
-                        : totalDifference.isPositive
-                          ? "bg-green-500 text-white"
-                          : "bg-red-500 text-white"
-                    }`}
-                  >
-                    {totalDifference.isZero
-                      ? "0"
-                      : (totalDifference.isPositive ? "+" : "-") +
-                        totalDifference.amount.toLocaleString()}{" "}
-                    UZS
-                  </span>
-                </div>
-              </div>
+
             </div>
           </div>
         </div>

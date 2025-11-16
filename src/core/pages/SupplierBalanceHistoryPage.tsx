@@ -8,13 +8,34 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Wallet, DollarSign, Calendar, CreditCard, Store } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
+interface Budget {
+  id: number;
+  budget_type: string;
+  amount: string;
+}
+
+interface StoreRead {
+  id: number;
+  budgets: Budget[];
+  name: string;
+  address: string;
+  phone_number: string;
+  budget: string;
+  created_at: string;
+  is_main: boolean;
+  color: string;
+  parent_store: number | null;
+}
+
 interface BalanceHistoryItem {
   id: number;
   supplier: number;
   amount: string;
   payment_method: string;
+  exchange_rate: string;
   created_at: string;
   store: number;
+  store_read: StoreRead;
 }
 
 interface BalanceHistoryResponse {
@@ -121,7 +142,7 @@ export default function SupplierBalanceHistoryPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="flex items-start gap-3">
                       <div className="p-2 bg-green-100 rounded-lg">
                         <DollarSign className="h-5 w-5 text-green-600" />
@@ -146,6 +167,19 @@ export default function SupplierBalanceHistoryPage() {
                         <p className="font-semibold text-lg">{item.payment_method}</p>
                       </div>
                     </div>
+                    {item.exchange_rate && Number(item.exchange_rate) > 0 && (
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-orange-100 rounded-lg">
+                          <DollarSign className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <span className="text-sm text-muted-foreground block mb-1">
+                            {t('common.exchange_rate')}
+                          </span>
+                          <p className="font-semibold text-lg">{formatNumber(item.exchange_rate)}</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-start gap-3">
                       <div className="p-2 bg-purple-100 rounded-lg">
                         <Store className="h-5 w-5 text-purple-600" />
@@ -154,7 +188,7 @@ export default function SupplierBalanceHistoryPage() {
                         <span className="text-sm text-muted-foreground block mb-1">
                           {t('forms.store')}
                         </span>
-                        <p className="font-semibold text-lg">{item.store}</p>
+                        <p className="font-semibold text-lg">{item.store_read?.name || item.store}</p>
                       </div>
                     </div>
                   </div>
