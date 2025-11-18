@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, DollarSign,History, Edit } from 'lucide-react';
+import { ChevronDown, ChevronUp, DollarSign, History, Edit, MoreHorizontal } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -32,7 +32,18 @@ export default function SupplierDetailPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [paymentComment, setPaymentComment] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
   
+  // Fetch supplier details
+  const { data: supplierData } = useQuery<any>({
+    queryKey: ['supplier', id],
+    queryFn: async () => {
+      const response = await api.get(`/suppliers/${id}/`);
+      return response.data;
+    },
+  });
+
   // Fetch stock entries for this supplierp
   const { data: stockEntriesData, isLoading: isLoadingEntries } = useGetStockEntries({
     params: { supplier: id },
@@ -142,6 +153,10 @@ export default function SupplierDetailPage() {
     });
   };
 
+  const getCurrencySymbol = () => {
+    return supplierData?.balance_type === 'USD' ? '$' : t('common.uzs');
+  };
+
   if (isLoadingEntries) {
     return (
       <div className="container mx-auto py-6">
@@ -186,7 +201,7 @@ export default function SupplierDetailPage() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">{t('common.total_amount')}:</span>{' '}
-                        <span className="font-medium">{formatNumber(entry.total_amount)} {t('common.uzs')}</span>
+                        <span className="font-medium">{formatNumber(entry.total_amount)} {getCurrencySymbol()}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">{t('common.stock_count')}:</span>{' '}
@@ -210,75 +225,103 @@ export default function SupplierDetailPage() {
                             : t('common.unpaid')}
                         </span>
                       </div>
+                      {entry.rate_at_purchase && (
+                        <div>
+                          <span className="text-muted-foreground">{t('common.exchange_rate')}:</span>{' '}
+                          <span className="font-medium text-blue-600">{formatNumber(entry.rate_at_purchase)}</span>
+                        </div>
+                      )}
                     </div>
                     {entry.is_debt && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
                         {entry.amount_of_debt && Number(entry.amount_of_debt) > 0 && (
                           <div>
                             <span className="text-muted-foreground">{t('common.amount_of_debt')}:</span>{' '}
-                            <span className="font-medium text-red-500">{Number(entry.amount_of_debt).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {t('common.uzs')}</span>
+                            <span className="font-medium text-red-500">{Number(entry.amount_of_debt).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {getCurrencySymbol()}</span>
                           </div>
                         )}
                         {entry.advance_of_debt && (
                           <div>
                             <span className="text-muted-foreground">{t('common.advance_payment')}:</span>{' '}
-                            <span className="font-medium text-green-500">{formatNumber(entry.advance_of_debt)} {t('common.uzs')}</span>
+                            <span className="font-medium text-green-500">{formatNumber(entry.advance_of_debt)} {getCurrencySymbol()}</span>
                           </div>
                         )}
                         <div>
                           <span className="text-muted-foreground">{t('dashboard.total_paid')}:</span>{' '}
-                          <span className="font-medium text-blue-500">{formatNumber(entry.total_paid)} {t('common.uzs')}</span>
+                          <span className="font-medium text-blue-500">{formatNumber(entry.total_paid)} {getCurrencySymbol()}</span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">{t('dashboard.remaining_debt')}:</span>{' '}
-                          <span className="font-medium text-orange-500">{formatNumber(entry.remaining_debt)} {t('common.uzs')}</span>
+                          <span className="font-medium text-orange-500">{formatNumber(entry.remaining_debt)} {getCurrencySymbol()}</span>
                         </div>
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                   
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Link to={`/suppliers/${id}/stock-entries/${entry.id}/edit`}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        {t('common.edit')}
-                      </Link>
-                    </Button>
-                    {entry.is_debt && (
-                      <>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link to={`/suppliers/${id}/stock-entries/${entry.id}/payments`}>
-                            <History className="h-4 w-4 mr-2" />
-                            {t('common.payment_history')}
-                          </Link>
-                        </Button>
-                        {Number(entry.remaining_debt) > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePaymentClick(entry);
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <DollarSign className="h-4 w-4" />
-                            {t('common.pay_debt')}
-                          </Button>
-                        )}
-                      </>
-                    )}
-                    <Button variant="ghost" size="icon">
+                  <div className="flex gap-2 items-center">
+                    <div className="relative" style={{ position: 'static' }}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                          setOpenDropdown(openDropdown === entry.id ? null : entry.id);
+                        }}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                      {openDropdown === entry.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setOpenDropdown(null)}
+                          />
+                          <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
+                            <Link
+                              to={`/suppliers/${id}/stock-entries/${entry.id}/edit`}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              {t('common.edit')}
+                            </Link>
+                            {entry.is_debt && (
+                              <>
+                                <Link
+                                  to={`/suppliers/${id}/stock-entries/${entry.id}/payments`}
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenDropdown(null);
+                                  }}
+                                >
+                                  <History className="h-4 w-4 mr-2" />
+                                  {t('common.payment_history')}
+                                </Link>
+                                {Number(entry.remaining_debt) > 0 && (
+                                  <button
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenDropdown(null);
+                                      handlePaymentClick(entry);
+                                    }}
+                                  >
+                                    <DollarSign className="h-4 w-4 mr-2" />
+                                    {t('common.pay_debt')}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                       {expandedEntry === entry.id ? <ChevronUp /> : <ChevronDown />}
                     </Button>
                   </div>
@@ -306,15 +349,15 @@ export default function SupplierDetailPage() {
               <div className="space-y-2 p-4 bg-muted rounded-lg">
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">{t('common.total_amount')}:</span>
-                  <span className="font-medium">{formatNumber(selectedEntry.total_amount)} {t('common.uzs')}</span>
+                  <span className="font-medium">{formatNumber(selectedEntry.total_amount)} {getCurrencySymbol()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">{t('dashboard.total_paid')}:</span>
-                  <span className="font-medium text-blue-500">{formatNumber(selectedEntry.total_paid)} {t('common.uzs')}</span>
+                  <span className="font-medium text-blue-500">{formatNumber(selectedEntry.total_paid)} {getCurrencySymbol()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">{t('dashboard.remaining_debt')}:</span>
-                  <span className="font-medium text-orange-500">{formatNumber(selectedEntry.remaining_debt)} {t('common.uzs')}</span>
+                  <span className="font-medium text-orange-500">{formatNumber(selectedEntry.remaining_debt)} {getCurrencySymbol()}</span>
                 </div>
               </div>
             )}
@@ -452,33 +495,114 @@ function StockDetailsAccordion({ stockEntryId }: { stockEntryId: number }) {
   }
 
   return (
-    <div className="space-y-3">
-      <h3 className="font-semibold text-lg mb-3">{t('common.stock_items')}</h3>
-      {stocks.map((stock) => (
-        <Card key={stock.id} className="border-l-4 border-l-primary">
-          <CardContent className="pt-4">
-            <div className="space-y-2">
-              <h4 className="font-semibold text-base">
-                {stock.product?.product_name || 'N/A'}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm text-muted-foreground">{t('common.quantity')}:</span>
-                  <p className="font-medium">{formatNumber(stock.quantity || 0)} {stock.purchase_unit?.short_name || ''}</p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-lg">{t('common.stock_items')}</h3>
+        <span className="text-xs font-medium bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+          {stocks.length} {stocks.length === 1 ? t('common.item') : t('common.items')}
+        </span>
+      </div>
+      
+      <div className="grid gap-3">
+        {stocks.map((stock, index) => (
+          <Card key={stock.id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="space-y-4">
+                {/* Product Name Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {t('common.product')} #{index + 1}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-base text-gray-900 break-words">
+                      {stock.product?.product_name || 'N/A'}
+                    </h4>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">{t('common.currency')}:</span>
-                  <p className="font-medium">{stock.currency?.name || stock.currency?.short_name || 'UZS'}</p>
+
+                {/* Main Info Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {/* Quantity */}
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 font-medium mb-1">{t('common.quantity')}</p>
+                    <p className="font-bold text-sm text-gray-900">
+                      {formatNumber(stock.quantity || 0)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {stock.purchase_unit?.short_name || ''}
+                    </p>
+                  </div>
+
+                  {/* Currency */}
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 font-medium mb-1">{t('common.currency')}</p>
+                    <p className="font-bold text-sm text-gray-900">
+                      {stock.currency?.short_name || 'UZS'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {stock.currency?.name || ''}
+                    </p>
+                  </div>
+
+                  {/* Total Price */}
+                  <div className="bg-blue-50 p-3 rounded-lg md:col-span-1 col-span-2">
+                    <p className="text-xs text-blue-600 font-medium mb-1">{t('common.total_price')} (UZS)</p>
+                    <p className="font-bold text-lg text-blue-700">
+                      {formatNumber(stock.total_price_in_uz || 0)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">{t('common.total_price')} (UZS):</span>
-                  <p className="font-medium text-lg text-primary">{formatNumber(stock.total_price_in_uz || 0)} {t('common.uzs')}</p>
-                </div>
+
+                {/* Exchange Rate at Purchase */}
+                {stock.rate_at_purchase && (
+                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-green-600 font-medium">
+                        {t('common.exchange_rate') || 'Exchange Rate at Purchase'}
+                      </p>
+                      <p className="font-bold text-green-700">
+                        {formatNumber(stock.rate_at_purchase)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Details - More Prices */}
+                {/* <div className="border-t pt-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {stock.price_per_unit_currency && (
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.price_per_unit')}</p>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {formatNumber(stock.price_per_unit_currency)}
+                        </p>
+                      </div>
+                    )}
+                    {stock.price_per_unit_uz && (
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.price_per_unit')} (UZS)</p>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {formatNumber(stock.price_per_unit_uz)}
+                        </p>
+                      </div>
+                    )}
+                    {stock.base_unit_in_uzs && (
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.base_unit')} (UZS)</p>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {formatNumber(stock.base_unit_in_uzs)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div> */}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

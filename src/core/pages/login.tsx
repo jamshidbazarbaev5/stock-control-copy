@@ -48,7 +48,12 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-        <div>
+        <div className="flex flex-col items-center space-y-4">
+          <img
+            src="/smart-sawda.png"
+            alt="Smart Sawda Logo"
+            className="h-16 w-auto"
+          />
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             Войти в аккаунт
           </h2>

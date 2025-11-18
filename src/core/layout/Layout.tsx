@@ -401,7 +401,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       <header className="md:hidden shadow-sm px-4 py-2 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center gap-2">
-          <div className="font-semibold text-foreground">Stock-control</div>
+          <img
+            src="/smart-sawda.png"
+            alt="Smart Sawda Logo"
+            className="h-10 w-auto"
+          />
+          {/*<div className="font-semibold text-foreground">Stock-control</div>*/}
         </div>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
@@ -568,12 +573,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Desktop Logo and Language Switcher */}
           <div className="hidden md:block px-6 py-6 border-b border-sidebar-border ">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {!isCollapsed && (
-                  <div className="font-semibold text-sidebar-foreground">
-                  Smart-Sawda
-                  </div>
-                )}
+              <div className="flex items-center gap-3">
+                <img
+                  src="/smart-sawda.png"
+                  alt="Smart Sawda Logo"
+                  className="h-10 w-auto"
+                />
+
+
+
               </div>
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}

@@ -2,12 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResourceTable } from "../helpers/ResourseTable";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ResourceForm } from "../helpers/ResourceForm";
 import { toast } from "sonner";
 import {
   type Supplier,
   useGetSuppliers,
-  useUpdateSupplier,
   useDeleteSupplier,
   useAddSupplierBalance,
 } from "../api/supplier";
@@ -37,35 +35,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Wallet, ArrowUp, ArrowDown, CreditCard, History, MoreHorizontal } from "lucide-react";
-
-const supplierFields = (t: (key: string) => string) => [
-  {
-    name: "name",
-    label: t("forms.supplier_name"),
-    type: "text",
-    placeholder: t("placeholders.enter_name"),
-    required: true,
-  },
-  {
-    name: "phone_number",
-    label: t("forms.phone"),
-    type: "text",
-    placeholder: t("placeholders.enter_phone"),
-    required: true,
-  },
-  {
-    name: "balance_type",
-    label: t("forms.balance_type") || "Balance Type",
-    type: "select",
-    placeholder: t("placeholders.select_currency") || "Select currency",
-    options: [
-      { value: "USD", label: "USD" },
-      { value: "UZS", label: "UZS" },
-    ],
-    required: true,
-    defaultValue: "USD",
-  },
-];
 
 const formatPrice = (value: number | string | null | undefined) => {
   if (value === undefined || value === null || value === "") return "0";
@@ -98,7 +67,12 @@ const columns = (t: (key: string) => string) => [
   {
     header: t("table.remaining_debt"),
     accessorKey: "remaining_debt",
-    cell: (row: Supplier) => formatPrice(row.remaining_debt),
+    cell: (row: Supplier) => {
+      const s: any = row;
+      const type = s.balance_type === "USD" || s.balance_type === "UZS" ? s.balance_type : "USD";
+      const currencySymbol = type === "USD" ? "$" : "UZS";
+      return `${formatPrice(row.remaining_debt)} ${currencySymbol}`;
+    },
   },
 ];
 
@@ -107,8 +81,6 @@ export default function SuppliersPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
   const [selectedSupplierForBalance, setSelectedSupplierForBalance] =
       useState<Supplier | null>(null);
@@ -137,7 +109,6 @@ export default function SuppliersPage() {
     params: { page },
   });
   const { data: storesData } = useGetStores({});
-  const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
   const addSupplierBalance = useAddSupplierBalance();
 
@@ -178,29 +149,6 @@ export default function SuppliersPage() {
       : suppliersData?.count || 0;
 
   // Handlers
-  const handleEdit = (supplier: Supplier) => {
-    setEditingSupplier(supplier);
-    setIsFormOpen(true);
-  };
-
-  const handleUpdateSubmit = (data: Supplier) => {
-    if (!editingSupplier?.id) return;
-
-    updateSupplier.mutate(
-        { ...data, id: editingSupplier.id },
-        {
-          onSuccess: () => {
-            toast.success(
-                t("messages.success.updated", { item: t("navigation.suppliers") }),
-            );
-            setIsFormOpen(false);
-            setEditingSupplier(null);
-          },
-        
-        },
-    );
-  };
-
   const handleDelete = (id: number) => {
     deleteSupplier.mutate(id, {
       onSuccess: () =>
@@ -388,7 +336,6 @@ export default function SuppliersPage() {
             data={suppliers}
             columns={columns(t)}
             isLoading={isLoading}
-            onEdit={handleEdit}
             onDelete={handleDelete}
             onAdd={() => navigate("/create-supplier")}
             onRowClick={handleRowClick}
@@ -456,18 +403,6 @@ export default function SuppliersPage() {
                 </div>
             )}
         />
-
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent>
-            <ResourceForm
-                fields={supplierFields(t)}
-                onSubmit={handleUpdateSubmit}
-                defaultValues={editingSupplier || undefined}
-                isSubmitting={updateSupplier.isPending}
-                title={t("common.edit") + " " + t("navigation.suppliers")}
-            />
-          </DialogContent>
-        </Dialog>
 
         {/* Add Balance Dialog */}
         <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>

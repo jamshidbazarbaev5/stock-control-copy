@@ -185,6 +185,8 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "item":"Кол",
+    "supplier_balance_type":"Тип баланса",
     "create_debt": "Создать долг",
     "due_date": "Срок оплаты",
     "balance_history": "История баланса",

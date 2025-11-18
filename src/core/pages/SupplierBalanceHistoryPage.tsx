@@ -53,11 +53,33 @@ interface BalanceHistoryResponse {
   count: number;
 }
 
+interface Supplier {
+  id: number;
+  name: string;
+  phone_number: string;
+  total_debt: string;
+  total_paid: string;
+  remaining_debt: string;
+  balance: string;
+  balance_in_usd: string;
+  debt_grows_with_currency: boolean;
+  balance_type: string;
+}
+
 export default function SupplierBalanceHistoryPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
+
+  const { data: supplierData } = useQuery<Supplier>({
+    queryKey: ['supplier', id],
+    queryFn: async () => {
+      const response = await api.get(`/suppliers/${id}/`);
+      return response.data;
+    },
+    enabled: !!id,
+  });
 
   const { data, isLoading } = useQuery<BalanceHistoryResponse>({
     queryKey: ['supplier-balance-history', id, currentPage],
@@ -177,6 +199,21 @@ export default function SupplierBalanceHistoryPage() {
                             {t('common.exchange_rate')}
                           </span>
                           <p className="font-semibold text-lg">{formatNumber(item.exchange_rate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {supplierData?.balance_type === 'USD' && item.exchange_rate && Number(item.exchange_rate) > 0 && (
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-red-100 rounded-lg">
+                          <DollarSign className="h-5 w-5 text-red-600" />
+                        </div>
+                        <div>
+                          <span className="text-sm text-muted-foreground block mb-1">
+                            БАЛАНС В $
+                          </span>
+                          <p className="font-bold text-lg text-red-600">
+                            ${formatNumber(Number(item.amount) / Number(item.exchange_rate))}
+                          </p>
                         </div>
                       </div>
                     )}

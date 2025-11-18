@@ -101,6 +101,7 @@ export interface Stock {
   is_recycled?: boolean;
   // Additional fields used in various pages
   exchange_rate?: number | string;
+  rate_at_purchase?: number | string;
   selling_price?: number | string;
   min_price?: number | string;
   purchase_price_in_us?: number | string;
@@ -311,6 +312,7 @@ export interface StockEntry {
   id: number;
   from_balance_supplier:number;
   use_supplier_balance: boolean;
+  balance_type?: "USD" | "UZS";
   is_paid: boolean;
   supplier: {
     id: number;
@@ -328,6 +330,7 @@ export interface StockEntry {
   date_of_arrived: string;
   total_paid: string;
   remaining_debt: string;
+  rate_at_purchase?: string | number;
 }
 
 export interface StockEntryResponse {

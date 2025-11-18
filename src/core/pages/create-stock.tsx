@@ -1501,18 +1501,9 @@ export default function CreateStock() {
           {commonForm.watch("use_supplier_balance") && commonForm.watch("supplier") && (
             <div className="space-y-2">
               <Label htmlFor="supplier_balance_type">{t("forms.balance_type") || "Balance Type"} *</Label>
-              <Select
-                value={commonForm.watch("supplier_balance_type") || ""}
-                onValueChange={(value) => commonForm.setValue("supplier_balance_type", value as any)}
-              >
-                <SelectTrigger id="supplier_balance_type">
-                  <SelectValue placeholder={t("placeholders.select_currency") || "Select currency"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="UZS">UZS</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="p-3 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium">
+                {commonForm.watch("supplier_balance_type") || "USD"}
+              </div>
             </div>
           )}
 

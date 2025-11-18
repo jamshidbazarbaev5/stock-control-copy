@@ -1283,7 +1283,8 @@ export default function SalesPage() {
               totalCount={totalCount}
               onRefund={
                 currentUser?.is_mobile_user === false &&
-                (currentUser?.role === "Продавец" ||
+                (currentUser?.is_superuser ||
+                  currentUser?.role === "Продавец" ||
                   currentUser?.role === "Админ")
                   ? handleOpenRefundModal
                   : undefined
@@ -1672,7 +1673,7 @@ export default function SalesPage() {
                           key={item.id}
                           className="bg-white border rounded-lg p-4 hover:border-blue-300 transition-colors"
                         >
-                          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                             <div className="md:col-span-2">
                               <div className="font-medium">
                                 {product?.product_name || "-"}
@@ -1695,20 +1696,7 @@ export default function SalesPage() {
                               </div>
                             </div>
 
-                            <div>
-                              <div className="text-sm text-gray-500">
-                                {t("table.price")}
-                              </div>
-                              <div className="font-medium">
-                                {formatCurrency(
-                                  (
-                                    parseFloat(item?.price_per_unit || "0") /
-                                    parseFloat(item.quantity.toString())
-                                  ).toString(),
-                                )}{" "}
-                                UZS
-                              </div>
-                            </div>
+                          
 
                             <div>
                               <label className="text-sm text-gray-600 mb-1 block">
@@ -1739,41 +1727,35 @@ export default function SalesPage() {
 
                                   // Auto-calculate and update refund payment amount
                                   if (numValue > 0) {
-                                    const refundAmount = (
-                                      parseFloat(item?.price_per_unit || "0") *
-                                      numValue
-                                    ).toFixed(2);
                                     setRefundPayments((prev) => {
                                       const updated = [...prev];
-                                      if (updated.length === 0) {
-                                        updated.push({
-                                          payment_method: "Наличные",
-                                          amount: refundAmount,
-                                        });
-                                      } else {
-                                        // Calculate total from all refund items
-                                        let totalRefundAmount = 0;
-                                        Object.entries(
-                                          refundQuantities,
-                                        ).forEach(([saleItemId, qty]) => {
+                                      // Calculate total from all refund items including the current one
+                                      let totalRefundAmount = 0;
+                                      const updatedRefundQuantities = {
+                                        ...refundQuantities,
+                                        [item.id!]: value,
+                                      };
+                                      Object.entries(updatedRefundQuantities).forEach(
+                                        ([saleItemId, qty]) => {
                                           const foundItem =
                                             selectedSaleForRefund.sale_items?.find(
                                               (si) =>
-                                                si.id?.toString() ===
-                                                saleItemId,
+                                                si.id?.toString() === saleItemId,
                                             );
                                           if (foundItem && qty) {
                                             totalRefundAmount +=
                                               parseFloat(
                                                 foundItem.price_per_unit || "0",
-                                              ) * parseFloat(qty);
+                                              ) * parseFloat(qty as string);
                                           }
+                                        },
+                                      );
+                                      if (updated.length === 0) {
+                                        updated.push({
+                                          payment_method: "Наличные",
+                                          amount: totalRefundAmount.toFixed(2),
                                         });
-                                        // Add current item amount
-                                        totalRefundAmount +=
-                                          parseFloat(
-                                            item?.price_per_unit || "0",
-                                          ) * numValue;
+                                      } else {
                                         updated[0].amount =
                                           totalRefundAmount.toFixed(2);
                                       }
