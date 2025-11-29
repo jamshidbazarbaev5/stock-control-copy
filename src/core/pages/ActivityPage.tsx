@@ -39,11 +39,191 @@ import {
   Printer,
   CheckCircle2,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   saleReceiptService,
   type SaleData,
 } from '@/services/saleReceiptService';
+
+const formatCurrency = (amount: string | number | undefined) => {
+  return new Intl.NumberFormat('ru-RU').format(Number(amount));
+};
+
+const formatDate = (dateString: string) => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error) {
+    return '-';
+  }
+};
+
+const PaymentIcon = ({ method }: { method: string }) => {
+  switch (method) {
+    case 'Наличные':
+      return <Wallet className="h-4 w-4 text-green-600" />;
+    case 'Карта':
+      return <CreditCard className="h-4 w-4 text-blue-600" />;
+    case 'Click':
+      return <SmartphoneNfc className="h-4 w-4 text-purple-600" />;
+    case 'Перечисление':
+      return <Landmark className="h-4 w-4 text-orange-500" />;
+    case 'Валюта':
+      return <DollarSign className="h-4 w-4 text-yellow-600" />;
+    default:
+      return null;
+  }
+};
+
+interface SummaryCardProps {
+  title: string;
+  totals: TotalWithPayments | undefined;
+  debtTotal?: number;
+  variant?: 'sales' | 'expenses' | 'debt' | 'default';
+}
+
+const SummaryCard = ({
+  title,
+  totals,
+  debtTotal,
+  variant = 'default',
+}: SummaryCardProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!totals) return null;
+
+  const styles = {
+    sales: {
+      border: 'border-emerald-200 dark:border-emerald-800',
+      bg: 'bg-emerald-50 dark:bg-emerald-900/10',
+      text: 'text-emerald-700 dark:text-emerald-400',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      icon: 'text-emerald-600 dark:text-emerald-400',
+    },
+    expenses: {
+      border: 'border-red-200 dark:border-red-800',
+      bg: 'bg-red-50 dark:bg-red-900/10',
+      text: 'text-red-700 dark:text-red-400',
+      iconBg: 'bg-red-100 dark:bg-red-900/30',
+      icon: 'text-red-600 dark:text-red-400',
+    },
+    debt: {
+      border: 'border-purple-200 dark:border-purple-800',
+      bg: 'bg-purple-50 dark:bg-purple-900/10',
+      text: 'text-purple-700 dark:text-purple-400',
+      iconBg: 'bg-purple-100 dark:bg-purple-900/30',
+      icon: 'text-purple-600 dark:text-purple-400',
+    },
+    default: {
+      border: 'border-blue-200 dark:border-blue-800',
+      bg: 'bg-blue-50 dark:bg-blue-900/10',
+      text: 'text-blue-700 dark:text-blue-400',
+      iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+      icon: 'text-blue-600 dark:text-blue-400',
+    },
+  };
+
+  const style = styles[variant];
+
+  const HeaderIcon = () => {
+    if (variant === 'sales')
+      return <Wallet className={`w-6 h-6 ${style.icon}`} />;
+    if (variant === 'expenses')
+      return <CreditCard className={`w-6 h-6 ${style.icon}`} />;
+    if (variant === 'debt')
+      return <Landmark className={`w-6 h-6 ${style.icon}`} />;
+    return <DollarSign className={`w-6 h-6 ${style.icon}`} />;
+  };
+
+  return (
+    <div
+      className={`mt-4 rounded-xl border ${style.border} ${style.bg} overflow-hidden transition-all duration-200`}
+    >
+      <div
+        className="p-4 cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-full ${style.iconBg}`}>
+              <HeaderIcon />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">
+                {title}
+              </h3>
+              {debtTotal !== undefined && debtTotal > 0 && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                    Долг: {formatCurrency(debtTotal)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <div className={`text-2xl font-bold ${style.text}`}>
+                {formatCurrency(totals.total)}
+              </div>
+              {totals.total_in_currency > 0 && (
+                <div className="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mt-0.5">
+                  ${' '}
+                  {totals.total_in_currency.toLocaleString('ru-RU', {
+                    minimumFractionDigits: 2,
+                  })}
+                </div>
+              )}
+            </div>
+            <div
+              className={`transition-transform duration-200 ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            >
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="p-4 pt-0 border-t border-gray-200/50 dark:border-gray-700/50">
+          <div className="flex flex-col gap-2 mt-4">
+            {Object.entries(totals.by_payment_type).map(([method, amount]) =>
+              amount > 0 ? (
+                <div
+                  key={method}
+                  className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+                    <PaymentIcon method={method} />
+                    {method}
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-right">
+                    {formatCurrency(amount)}
+                  </span>
+                </div>
+              ) : null
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function ActivityPage() {
   const { t } = useTranslation();
@@ -166,24 +346,6 @@ export default function ActivityPage() {
     debtPaymentsClient,
   ]);
 
-  const formatCurrency = (amount: string | number | undefined) => {
-    return new Intl.NumberFormat('ru-RU').format(Number(amount));
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('ru-RU', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return '-';
-    }
-  };
 
   // Sales columns
   const salesColumns = [
@@ -431,92 +593,6 @@ export default function ActivityPage() {
     }
   };
 
-  const getPaymentIcon = (method: string) => {
-    switch (method) {
-      case 'Наличные':
-        return <Wallet className="h-4 w-4 text-green-600" />;
-      case 'Карта':
-        return <CreditCard className="h-4 w-4 text-blue-600" />;
-      case 'Click':
-        return <SmartphoneNfc className="h-4 w-4 text-purple-600" />;
-      case 'Перечисление':
-        return <Landmark className="h-4 w-4 text-orange-500" />;
-      case 'Валюта':
-        return <DollarSign className="h-4 w-4 text-yellow-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const renderPaymentBreakdown = (byPaymentType: Record<string, number>) => {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-        {Object.entries(byPaymentType).map(([method, amount]) => (
-          amount > 0 && (
-            <div
-              key={method}
-              className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg"
-            >
-              {getPaymentIcon(method)}
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500">{method}</span>
-                <span className="text-sm font-semibold">
-                  {formatCurrency(amount)}
-                </span>
-              </div>
-            </div>
-          )
-        ))}
-      </div>
-    );
-  };
-
-  const renderTotalsSummary = (
-    title: string,
-    totals: TotalWithPayments | undefined,
-    debtTotal?: number,
-    bgColor: string = 'bg-blue-50 dark:bg-blue-900/20',
-    borderColor: string = 'border-blue-200 dark:border-blue-800'
-  ) => {
-    if (!totals) return null;
-
-    return (
-      <Card className={`p-4 ${bgColor} border-2 ${borderColor}`}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
-            {title}
-          </h3>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(totals.total)}
-            </div>
-            {totals.total_in_currency > 0 && (
-              <div className="text-sm text-yellow-600 font-semibold flex items-center gap-1 justify-end">
-                <DollarSign className="h-4 w-4" />
-                {totals.total_in_currency.toLocaleString('ru-RU', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-        {debtTotal !== undefined && debtTotal > 0 && (
-          <div className="mb-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Долг:
-              </span>
-              <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
-                {formatCurrency(debtTotal)}
-              </span>
-            </div>
-          </div>
-        )}
-        {renderPaymentBreakdown(totals.by_payment_type)}
-      </Card>
-    );
-  };
 
   const renderExpandedSaleRow = (row: ActivitySale) => {
     const hasItems = row.sale_items?.length > 0;
@@ -799,6 +875,30 @@ export default function ActivityPage() {
             pageSize={activityData?.page_size || 30}
             expandedRowRenderer={(row: ActivitySale) => renderExpandedSaleRow(row)}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <SummaryCard
+              title="Итого за страницу"
+              totals={activityData?.page_totals}
+              debtTotal={activityData?.page_totals?.debt_total}
+              variant="sales"
+            />
+            <SummaryCard
+              title="Продажи (Общее)"
+              totals={activityData?.overall_totals?.sales_total}
+              debtTotal={activityData?.overall_totals?.debt_total}
+              variant="sales"
+            />
+            <SummaryCard
+              title="Расходы (Общее)"
+              totals={activityData?.overall_totals?.expenses_total}
+              variant="expenses"
+            />
+            <SummaryCard
+              title="Оплаты долгов (Общее)"
+              totals={activityData?.overall_totals?.debt_payments_total}
+              variant="debt"
+            />  
+          </div>
         </TabsContent>
 
         {/* Expenses Tab */}
@@ -850,6 +950,18 @@ export default function ActivityPage() {
             totalCount={activityData?.total_pages ? activityData.total_pages * (activityData.page_size || 30) : 0}
             pageSize={activityData?.page_size || 30}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SummaryCard
+              title="Итого за страницу"
+              totals={activityData?.page_totals}
+              variant="expenses"
+            />
+            <SummaryCard
+              title="Общий итог за все время"
+              totals={activityData?.overall_totals?.expenses_total}
+              variant="expenses"
+            />
+          </div>
         </TabsContent>
 
         {/* Debt Payments Tab */}
@@ -882,6 +994,18 @@ export default function ActivityPage() {
             totalCount={activityData?.total_pages ? activityData.total_pages * (activityData.page_size || 30) : 0}
             pageSize={activityData?.page_size || 30}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SummaryCard
+              title="Итого за страницу"
+              totals={activityData?.page_totals}
+              variant="debt"
+            />
+            <SummaryCard
+              title="Общий итог за все время"
+              totals={activityData?.overall_totals?.debt_payments_total}
+              variant="debt"
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
