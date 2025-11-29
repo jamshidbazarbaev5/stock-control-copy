@@ -907,6 +907,7 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "total_cost":"Общая цена",
     "balance_in_usd": "Баланс в USD",
     "discount":"Скидка",
      "discount_amount":"Скидка",

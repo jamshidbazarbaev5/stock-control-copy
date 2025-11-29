@@ -213,17 +213,18 @@ export default function CreateRecycling() {
     }
   }, [currentUser, form, storeIdFromUrl]);
 
-  // Fetch all stocks on mount
+  // Fetch specific stock if ID provided, otherwise fetch all stocks on mount
   useEffect(() => {
     setLoadingStocks(true);
-    fetchAllStocks()
+    const stockId = fromStockId ? Number(fromStockId) : undefined;
+    fetchAllStocks(stockId)
       .then(setStocks)
       .catch((err) => {
-        console.error("Error fetching all stocks:", err);
+        console.error("Error fetching stocks:", err);
         toast.error(t("messages.error.load", { item: t("navigation.stocks") }));
       })
       .finally(() => setLoadingStocks(false));
-  }, [t]);
+  }, [t, fromStockId]);
 
   // Watch for changes in the from_to field to update allowed categories
   useEffect(() => {

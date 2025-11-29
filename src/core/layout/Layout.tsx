@@ -247,6 +247,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ]
         : []),
       { icon: ShoppingBag, label: t("navigation.sale"), href: "/sales" },
+      { icon: Receipt, label: "Активность", href: "/activity" },
       { icon: UserCheck, label: t("navigation.clients"), href: "/clients" },
       { icon: ShoppingBag, label: t("navigation.debt"), href: "/debts" },
       {
@@ -289,6 +290,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           href: "/dashboard",
         },
         { icon: ShoppingBag, label: t("navigation.sale"), href: "/sales" },
+        { icon: Receipt, label: "Активность", href: "/activity" },
         ...(currentUser?.can_view_quantity !== false
           ? [
               {

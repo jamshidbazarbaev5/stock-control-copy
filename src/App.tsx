@@ -62,7 +62,7 @@ import StockPriceHistoryPage from "./core/pages/StockPriceHistoryPage";
 import EditStock from "./core/pages/edit-stock-2";
 import ReceiptDesignerPage from "./pages/ReceiptDesignerPage";
 import IncomePage from "./core/pages/IncomePage";
-import EditSale from "./core/pages/edit-sale";
+// import EditSale from "./core/pages/edit-sale";
 import DashboardPage from "./core/pages/DashboardPage";
 import EditTransfer from "./core/pages/edit-transfer";
 import ProductStockBalancePage from "./core/pages/ProductStockBalancePage";
@@ -93,6 +93,7 @@ import WriteoffDetailPage from "@/core/pages/WriteoffDetailPage.tsx";
 import StockDebtPaymentHistoryPage from "@/core/pages/StockDebtPaymentHistoryPage.tsx";
 import EditStockEntry from "@/core/pages/EditStockEntry.tsx";
 import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage";
+import ActivityPage from "./core/pages/ActivityPage";
 // import W9FormDemo from "./core/pages/W9FormDemo";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
@@ -432,6 +433,14 @@ function App() {
                 }
               />
               <Route
+                path="/activity"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор", "Продавец"]}>
+                    <ActivityPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/staff"
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
@@ -570,14 +579,14 @@ function App() {
                   </PrivateRoute>
                 }
               />
-              <Route
-                path="/edit-sale/:id"
-                element={
-                  <PrivateRoute allowedRoles={["Администратор", "Продавец"]}>
-                    <EditSale />
-                  </PrivateRoute>
-                }
-              />
+              {/*<Route*/}
+              {/*  path="/edit-sale/:id"*/}
+              {/*  element={*/}
+              {/*    <PrivateRoute allowedRoles={["Администратор", "Продавец"]}>*/}
+              {/*      <EditSale />*/}
+              {/*    </PrivateRoute>*/}
+              {/*  }*/}
+              {/*/>*/}
               <Route
                 path="/profile"
                 element={

@@ -39,6 +39,7 @@ interface StockBalanceResponse {
   results: {
     total_product: number;
     total: number;
+    total_cost: number;
     info_products: ProductStockBalance[];
     total_volume: number;
   };
@@ -51,6 +52,13 @@ export default function ProductStockBalancePage() {
   const [showZeroStock, setShowZeroStock] = useState<"true" | "false">("false");
   const [productName, setProductName] = useState("");
 
+
+  const formatNumber = (value: string | number) => {
+    return Number(value).toLocaleString('ru-RU', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
   // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1);
@@ -79,7 +87,7 @@ export default function ProductStockBalancePage() {
       params.append("product_zero", showZeroStock);
       if (productName) params.append("product_name", productName);
       const response = await api.get(
-        `/dashboard/item_dashboard/?${params.toString()}`,
+        `/dashboard/item_dashboard/?${params.toString()}`
       );
       return response.data;
     },
@@ -99,6 +107,11 @@ export default function ProductStockBalancePage() {
       header: t("table.quantity"),
       accessorKey: "total_quantity",
       cell: (row: any) => row.total_quantity?.toLocaleString(),
+    },
+    {
+      header: t("table.total_cost"),
+      accessorKey: "total_cost",
+      cell: (row: any) => row.total_cost?.toLocaleString(),
     },
     {
       header: t("table.total_kub_volume"),
@@ -140,7 +153,7 @@ export default function ProductStockBalancePage() {
         `/dashboard/excel_export/?${params.toString()}`,
         {
           responseType: "blob",
-        },
+        }
       );
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -154,6 +167,7 @@ export default function ProductStockBalancePage() {
       alert("Ошибка при экспорте Excel");
     }
   };
+  
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -169,7 +183,10 @@ export default function ProductStockBalancePage() {
                 <SelectContent>
                   <SelectItem value="all">{t("forms.all_stores")}</SelectItem>
                   {stores.map((store) => (
-                    <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                    <SelectItem
+                      key={store.id}
+                      value={store.id?.toString() || ""}
+                    >
                       {store.name}
                     </SelectItem>
                   ))}
@@ -195,7 +212,10 @@ export default function ProductStockBalancePage() {
             <Input
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              placeholder={t("forms.search_by_product_name", "Поиск по названию товара")}
+              placeholder={t(
+                "forms.search_by_product_name",
+                "Поиск по названию товара"
+              )}
               className="w-full h-12 text-base px-4"
             />
           </div>
@@ -208,10 +228,25 @@ export default function ProductStockBalancePage() {
               <span> {data.results.total.toFixed(2).replace(".", ",")}</span>
             )}
           </h1>
+
+       
+
           <Button onClick={handleExportExcel} variant="outline">
             {t("buttons.export_excel", "Экспорт в Excel")}
           </Button>
         </div>
+        {currentUser?.is_superuser && (
+          <h1 className="text-lg font-bold">
+            {t("table.total_cost")}
+            {/* Show as 135,37 if value exists */}
+            {typeof data?.results.total_cost === "number" && (
+              <span>
+                {" "}
+                {formatNumber(data.results.total_cost)}
+              </span>
+            )}
+          </h1>
+        )}
       </div>
       <Card className="mt-4">
         <ResourceTable
