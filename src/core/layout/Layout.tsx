@@ -247,7 +247,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ]
         : []),
       { icon: ShoppingBag, label: t("navigation.sale"), href: "/sales" },
-      { icon: Receipt, label: "Активность", href: "/activity" },
+      { icon: Receipt, label: "Отчёт", href: "/activity" },
       { icon: UserCheck, label: t("navigation.clients"), href: "/clients" },
       { icon: ShoppingBag, label: t("navigation.debt"), href: "/debts" },
       {
@@ -401,7 +401,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen bg-background flex flex-col overflow-x-hidden">
       {/* Mobile Header */}
-      <header className="md:hidden shadow-sm px-4 py-2 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
+      <header className="md:hidden bg-background shadow-sm px-4 py-2 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center gap-2">
           <img
             src="/smart-sawda.png"
@@ -420,7 +420,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 e.stopPropagation();
                 setDropdownOpen(!dropdownOpen);
               }}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                 <User size={18} className="text-emerald-600" />
@@ -436,21 +436,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 />
                 {/* Dropdown Content */}
                 <div
-                  className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border py-3 z-[999]"
+                  className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-3 z-[999]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {currentUser && (
                     <>
-                      <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                             <User size={24} className="text-emerald-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-800 text-lg">
+                            <div className="font-semibold text-gray-800 dark:text-gray-200 text-lg">
                               {currentUser.name}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
                               {currentUser.phone_number}
                             </div>
                             <div className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full mt-1">
@@ -459,14 +459,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </div>
                         </div>
                         {currentUser.store_read && (
-                          <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-                            <div className="text-xs font-medium text-gray-600 mb-1">
+                          <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                               Store Information
                             </div>
-                            <div className="text-sm font-medium text-gray-800">
+                            <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                               {currentUser.store_read.name}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                               {currentUser.store_read.address}
                             </div>
                           </div>
@@ -484,7 +484,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             setDropdownOpen(false);
                             navigate("/profile");
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors cursor-pointer"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors cursor-pointer"
                           style={{ pointerEvents: "auto" }}
                         >
                           <User size={16} className="text-gray-500" />
@@ -503,7 +503,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 setDropdownOpen(false);
                                 handleCloseShift();
                               }}
-                              className="w-full px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center gap-3 transition-colors cursor-pointer"
+                              className="w-full px-4 py-2 text-left text-sm text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center gap-3 transition-colors cursor-pointer"
                               style={{ pointerEvents: "auto" }}
                             >
                               <LogOut size={16} className="text-orange-500" />
@@ -521,7 +521,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             setDropdownOpen(false);
                             handleLogout();
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors cursor-pointer"
+                          className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors cursor-pointer"
                           style={{ pointerEvents: "auto" }}
                         >
                           <LogOut size={16} className="text-red-500" />
@@ -537,12 +537,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             {mobileMenuOpen ? (
-              <X size={24} className="text-gray-600" />
+              <X size={24} className="text-gray-600 dark:text-gray-300" />
             ) : (
-              <Menu size={24} className="text-gray-600" />
+              <Menu size={24} className="text-gray-600 dark:text-gray-300" />
             )}
           </button>
         </div>
@@ -561,7 +561,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           className={`
           ${mobileMenuOpen ? "block" : "hidden"}
           md:block
-          w-full shadow-lg
+          w-full bg-sidebar shadow-lg
           fixed md:sticky
           top-[3.5rem] md:top-0
           h-[calc(100vh-3.5rem)] md:h-screen
@@ -611,16 +611,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left mb-1 transition-colors
                         ${
                           activeSubmenu === item.id
-                            ? "-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground"
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                         }`}
                     >
                       <item.icon
                         size={20}
                         className={
                           activeSubmenu === item.id
-                            ? "text-emerald-500"
-                            : "text-gray-500"
+                            ? "text-blue-500"
+                            : "text-muted-foreground"
                         }
                       />
                       {!isCollapsed && (
@@ -644,9 +644,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </button>
                     {activeSubmenu === item.id && (
                       <div
-                        className={`ml-2 ${
+                            className={`ml-2 ${
                           isCollapsed
-                            ? "absolute left-full top-0 ml-2 bg-sidebar shadow-lg rounded-lg p-2 min-w-[200px] max-h-[80vh] overflow-y-auto"
+                            ? "absolute left-full top-0 ml-2 bg-sidebar border border-sidebar-border shadow-lg rounded-lg p-2 min-w-[200px] max-h-[80vh] overflow-y-auto dark:bg-gray-800 dark:border-gray-700"
                             : ""
                         }`}
                       >
@@ -663,15 +663,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               ${
                                 location.pathname === subItem.href
                                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                  : "text-sidebar-foreground"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                               }`}
                           >
                             <subItem.icon
                               size={20}
                               className={
                                 location.pathname === subItem.href
-                                  ? "text-emerald-500"
-                                  : "text-gray-500"
+                                  ? "text-blue-500"
+                                  : "text-muted-foreground"
                               }
                             />
                             <span className="font-medium">{subItem.label}</span>
@@ -692,15 +692,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       ${
                         location.pathname === item.href
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                       }`}
                   >
                     <item.icon
                       size={20}
                       className={
                         location.pathname === item.href
-                          ? "text-emerald-500"
-                          : "text-gray-500"
+                          ? "text-blue-500"
+                          : "text-muted-foreground"
                       }
                     />
                     {!isCollapsed && (
@@ -716,11 +716,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Main Content */}
         <main className="flex-1 min-w-0 transition-all duration-300 overflow-x-auto ">
           <div className="h-full flex flex-col min-w-[320px]">
-            <div className=" px-4 md:px-6 py-4 flex items-center justify-end gap-4 sticky top-0 z-30 border-b border-border">
+            <div className="bg-background px-4 md:px-6 py-4 flex items-center justify-end gap-4 sticky top-0 z-30 border-b border-border">
               {currentUser?.is_superuser && (
                 <>
                   <button
-                    className="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition mr-2"
+                    className="px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition mr-2"
                     onClick={() => setCurrencyModalOpen(true)}
                   >
                     {t("currency.set")}
@@ -864,7 +864,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     e.stopPropagation();
                     setDropdownOpen(!dropdownOpen);
                   }}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
                 >
                   <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                     <User size={18} className="text-emerald-600" />
@@ -879,21 +879,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
                 {dropdownOpen && (
                   <div
-                    className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border py-3 z-[9999]"
+                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-3 z-[9999]"
                     style={{ zIndex: 9999 }}
                   >
                     {currentUser && (
                       <>
-                        <div className="px-4 py-3 border-b border-gray-100">
+                        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                               <User size={24} className="text-emerald-600" />
                             </div>
                             <div className="flex-1">
-                              <div className="font-semibold text-gray-800 text-lg">
+                              <div className="font-semibold text-gray-800 dark:text-gray-200 text-lg">
                                 {currentUser.name}
                               </div>
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {currentUser.phone_number}
                               </div>
                               <div className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full mt-1">
@@ -909,7 +909,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               setDropdownOpen(false);
                               navigate("/profile");
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                           >
                             <User size={16} className="text-gray-500" />
                             <span className="font-medium">
@@ -924,7 +924,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                   setDropdownOpen(false);
                                   handleCloseShift();
                                 }}
-                                className="w-full px-4 py-3 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center gap-3 transition-colors"
+                                className="w-full px-4 py-3 text-left text-sm text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center gap-3 transition-colors"
                               >
                                 <LogOut size={16} className="text-orange-500" />
                                 <span className="font-medium">
@@ -938,7 +938,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               setDropdownOpen(false);
                               handleLogout();
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                            className="w-full px-4 py-3 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
                           >
                             <LogOut size={16} className="text-red-500" />
                             <span className="font-medium">

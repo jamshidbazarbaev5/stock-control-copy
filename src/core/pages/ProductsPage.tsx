@@ -189,6 +189,7 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem("products_searchTerm") || "");
   const [selectedCategory, setSelectedCategory] = useState<string>(() => localStorage.getItem("products_selectedCategory") || "");
   const [selectedMeasurement, setSelectedMeasurement] = useState<string>(() => localStorage.getItem("products_selectedMeasurement") || "");
+  const [hasPrice, setHasPrice] = useState<string>(() => localStorage.getItem("products_hasPrice") || "all");
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [isRevaluationDialogOpen, setIsRevaluationDialogOpen] = useState(false);
   const [priceEdits, setPriceEdits] = useState<Record<number, PriceEdit>>({});
@@ -224,13 +225,17 @@ export default function ProductsPage() {
   }, [selectedMeasurement]);
 
   useEffect(() => {
+    localStorage.setItem("products_hasPrice", hasPrice);
+  }, [hasPrice]);
+
+  useEffect(() => {
     localStorage.setItem("products_productTab", productTab);
   }, [productTab]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, selectedCategory, selectedMeasurement, productTab]);
+  }, [searchTerm, selectedCategory, selectedMeasurement, productTab, hasPrice]);
 
   const { data: productsData, isLoading } = useGetProducts({
     params: {
@@ -242,6 +247,7 @@ export default function ProductsPage() {
       ...(searchTerm && { product_name: searchTerm }),
       ...(selectedCategory && { category: selectedCategory }),
       ...(selectedMeasurement && { measurement: selectedMeasurement }),
+      ...(hasPrice !== "all" && { has_price: hasPrice === "true" }),
     },
   });
 
@@ -762,7 +768,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex gap-2 mb-2">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 flex-1">
           <Input
             type="text"
             placeholder={t("placeholders.search_product")}
@@ -798,6 +804,17 @@ export default function ProductsPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={hasPrice} onValueChange={setHasPrice}>
+            <SelectTrigger>
+              <SelectValue placeholder="Наличие цен" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Цены</SelectItem>
+              <SelectItem value="true">Есть цены</SelectItem>
+              <SelectItem value="false">Нет цены</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button
           variant="outline"
@@ -805,9 +822,11 @@ export default function ProductsPage() {
             setSearchTerm("");
             setSelectedCategory("");
             setSelectedMeasurement("");
+            setHasPrice("all");
             localStorage.removeItem("products_searchTerm");
             localStorage.removeItem("products_selectedCategory");
             localStorage.removeItem("products_selectedMeasurement");
+            localStorage.removeItem("products_hasPrice");
           }}
         >
           {t("buttons.clear_filters") || "Очистить"}

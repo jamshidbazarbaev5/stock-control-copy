@@ -20,8 +20,6 @@ import {
   type ActivityExpense,
   type ActivityDebtPayment,
   type TotalWithPayments,
-  type PageTotals,
-  type OverallTotals,
 } from '../api/activity';
 import { useGetStores } from '../api/store';
 import { useGetClients } from '../api/client';
@@ -39,8 +37,6 @@ import {
   Printer,
   CheckCircle2,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import {
   saleReceiptService,
@@ -96,8 +92,6 @@ const SummaryCard = ({
   debtTotal,
   variant = 'default',
 }: SummaryCardProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-
   if (!totals) return null;
 
   const styles = {
@@ -133,30 +127,27 @@ const SummaryCard = ({
 
   const style = styles[variant];
 
-  const HeaderIcon = () => {
-    if (variant === 'sales')
-      return <Wallet className={`w-6 h-6 ${style.icon}`} />;
-    if (variant === 'expenses')
-      return <CreditCard className={`w-6 h-6 ${style.icon}`} />;
-    if (variant === 'debt')
-      return <Landmark className={`w-6 h-6 ${style.icon}`} />;
-    return <DollarSign className={`w-6 h-6 ${style.icon}`} />;
-  };
+  // const HeaderIcon = () => {
+  //   if (variant === 'sales')
+  //     return <Wallet className={`w-6 h-6 ${style.icon}`} />;
+  //   if (variant === 'expenses')
+  //     return <CreditCard className={`w-6 h-6 ${style.icon}`} />;
+  //   if (variant === 'debt')
+  //     return <Landmark className={`w-6 h-6 ${style.icon}`} />;
+  //   return <DollarSign className={`w-6 h-6 ${style.icon}`} />;
+  // };
 
   return (
     <div
-      className={`mt-4 rounded-xl border ${style.border} ${style.bg} overflow-hidden transition-all duration-200`}
+      className={`mt-4 rounded-xl border ${style.border} ${style.bg} overflow-hidden transition-all duration-200 flex flex-col h-full`}
     >
-      <div
-        className="p-4 cursor-pointer hover:opacity-80 transition-opacity"
-        onClick={() => setIsOpen(!isOpen)}
-      >
+      <div className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-full ${style.iconBg}`}>
+            {/* <div className={`p-3 rounded-full ${style.iconBg}`}>
               <HeaderIcon />
-            </div>
-            <div>
+            </div> */}
+            <div className="min-h-[48px] flex flex-col justify-center">
               <h3 className="font-semibold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">
                 {title}
               </h3>
@@ -170,55 +161,38 @@ const SummaryCard = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <div className={`text-2xl font-bold ${style.text}`}>
-                {formatCurrency(totals.total)}
+          <div className="text-right">
+            <div className={`text-2xl font-bold ${style.text}`}>
+              {formatCurrency(totals.total)}
+            </div>
+            {totals.total_in_currency > 0 && (
+              <div className="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mt-0.5">
+                ${' '}
+                {totals.total_in_currency.toLocaleString('ru-RU', {
+                  minimumFractionDigits: 2,
+                })}
               </div>
-              {totals.total_in_currency > 0 && (
-                <div className="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mt-0.5">
-                  ${' '}
-                  {totals.total_in_currency.toLocaleString('ru-RU', {
-                    minimumFractionDigits: 2,
-                  })}
-                </div>
-              )}
-            </div>
-            <div
-              className={`transition-transform duration-200 ${
-                isOpen ? 'rotate-180' : ''
-              }`}
-            >
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="p-4 pt-0 border-t border-gray-200/50 dark:border-gray-700/50">
-          <div className="flex flex-col gap-2 mt-4">
-            {Object.entries(totals.by_payment_type).map(([method, amount]) =>
-              amount > 0 ? (
-                <div
-                  key={method}
-                  className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
-                    <PaymentIcon method={method} />
-                    {method}
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-right">
-                    {formatCurrency(amount)}
-                  </span>
-                </div>
-              ) : null
-            )}
-          </div>
+      <div className="p-4 pt-0 border-t border-gray-200/50 dark:border-gray-700/50 flex-grow">
+        <div className="flex flex-col gap-2 mt-4">
+          {Object.entries(totals.by_payment_type).map(([method, amount]) => (
+            <div
+              key={method}
+              className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+                <PaymentIcon method={method} />
+                {method}
+              </div>
+              <span className="font-semibold text-gray-900 dark:text-gray-100 text-right">
+                {formatCurrency(amount)}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -391,7 +365,7 @@ export default function ActivityPage() {
               </span>
             </div>
           ) : (
-            row.sale_payments.map((payment: any, index: number) => (
+            row?.sale_payments?.map((payment: any, index: number) => (
               <div
                 key={index}
                 className="flex items-center gap-1 text-xs justify-center"
@@ -744,7 +718,7 @@ export default function ActivityPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Активность</h1>
+        <h1 className="text-2xl font-bold">Отчёт</h1>
         <Button onClick={handleClearFilters} variant="outline">
           Очистить все фильтры
         </Button>
@@ -877,7 +851,7 @@ export default function ActivityPage() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <SummaryCard
-              title="Итого за страницу"
+              title="На странице"
               totals={activityData?.page_totals}
               debtTotal={activityData?.page_totals?.debt_total}
               variant="sales"
@@ -952,7 +926,7 @@ export default function ActivityPage() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SummaryCard
-              title="Итого за страницу"
+              title="На странице"
               totals={activityData?.page_totals}
               variant="expenses"
             />
@@ -996,7 +970,7 @@ export default function ActivityPage() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SummaryCard
-              title="Итого за страницу"
+              title="На странице"
               totals={activityData?.page_totals}
               variant="debt"
             />

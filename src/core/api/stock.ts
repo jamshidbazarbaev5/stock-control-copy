@@ -183,6 +183,10 @@ export interface Stock {
     purchase_price_in_uz: number;
     date_of_arrived: Date;
   };
+  // Dynamic fields containing calculated values
+  dynamic_fields?: {
+    [fieldName: string]: DynamicField;
+  };
 }
 
 // API response type

@@ -276,9 +276,13 @@ export default function CreateRecycling() {
     if (fromProductId) {
       const idNum = Number(fromProductId);
       const stockWithProduct = stocks.find(
-        (stock) =>
-          (stock.product?.id === idNum || stock.product_read?.id === idNum) &&
-          stock.quantity > 0,
+        (stock) => {
+          const productMatches = stock.product?.id === idNum || stock.product_read?.id === idNum;
+          const quantity = stock.dynamic_fields?.quantity?.value || 
+                          stock.dynamic_fields?.purchase_unit_quantity?.value || 
+                          stock.quantity || 0;
+          return productMatches && Number(quantity) > 0;
+        }
       );
 
       if (stockWithProduct) {
@@ -333,9 +337,13 @@ export default function CreateRecycling() {
                 "Unknown";
               const storeName =
                 stock.store?.name || stock.store_read?.name || "Unknown";
+              // Get quantity from dynamic_fields or fallback to legacy quantity field
+              const quantity = stock.dynamic_fields?.quantity?.value || 
+                              stock.dynamic_fields?.purchase_unit_quantity?.value || 
+                              stock.quantity || 0;
               return {
                 value: stock.id,
-                label: `${productName} (${stock.quantity || 0}) [${storeName}]`,
+                label: `${productName} (${quantity}) [${storeName}]`,
               };
             })
             .filter((opt: any) => opt.value),

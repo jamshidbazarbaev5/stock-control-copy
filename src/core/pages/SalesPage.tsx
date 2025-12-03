@@ -916,23 +916,35 @@ export default function SalesPage() {
       accessorKey: "quantity",
       cell: (row: Sale) => {
         if (!row.sale_items?.length) return "-";
-        const quantities = row.sale_items
-          .map((item) => {
-            const unitName =
-              item.product_read?.available_units?.find(
-                (u: any) => u.id === item.selling_unit,
-              )?.short_name || "";
-            // Format quantity to remove trailing zeros
-            const formattedQuantity = parseFloat(item.quantity).toString();
-            return `${formattedQuantity} ${unitName}`;
-          })
-          .join(" • ");
+        
+        // If only one item, show the quantity directly
+        if (row.sale_items.length === 1) {
+          const item = row.sale_items[0];
+          const unitName =
+            item.product_read?.available_units?.find(
+              (u: any) => u.id === item.selling_unit,
+            )?.short_name || "";
+          const formattedQuantity = parseFloat(item.quantity).toString();
+          return (
+            <div className="max-w-[200px]">
+              <p className="text-sm font-medium">
+                {formattedQuantity} {unitName}
+              </p>
+            </div>
+          );
+        }
+        
+        // If multiple items, show "в деталях" (in details)
         return (
-          <div className="max-w-[200px]">
-            <p className="text-sm truncate" title={quantities}>
-              {quantities}
-            </p>
-          </div>
+          <span 
+            className="text-xs text-blue-600 italic cursor-pointer hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRowClick(row);
+            }}
+          >
+            ↓ в деталях
+          </span>
         );
       },
     },

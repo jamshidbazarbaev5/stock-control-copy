@@ -18,7 +18,7 @@ const getBaseURL = (): string => {
 
 // Create API instance
 const api: AxiosInstance = axios.create({
-  baseURL:BASE_URL,
+  baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

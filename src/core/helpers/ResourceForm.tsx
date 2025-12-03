@@ -126,7 +126,7 @@ export function ResourceForm<T extends Record<string, any>>({
                             placeholder={field.placeholder}
                             {...formField}
                             readOnly={field.readOnly}
-                            className={field.readOnly ? 'bg-gray-100' : ''}
+                            className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}
                           />
                         ) : field.type === 'select' ? (
                           <>
@@ -140,7 +140,7 @@ export function ResourceForm<T extends Record<string, any>>({
                               value={formField.value !== undefined && formField.value !== null ? formField.value.toString() : undefined}
                               defaultValue={field.defaultValue !== undefined ? field.defaultValue.toString() : undefined}
                             >
-                              <SelectTrigger className={field.readOnly ? 'bg-gray-100' : ''}>
+                              <SelectTrigger className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}>
                                 <SelectValue placeholder={field.placeholder || t('placeholders.select')} />
                               </SelectTrigger>
                               <SelectContent>
@@ -179,7 +179,7 @@ export function ResourceForm<T extends Record<string, any>>({
                                 e.preventDefault();
                               }
                             }}>
-                              <div className="p-2 sticky top-0 bg-white z-10 border-b select-content-wrapper">
+                              <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 z-10 border-b border-gray-200 dark:border-gray-700 select-content-wrapper">
                                 <Input
                                   type="text"
                                   placeholder={`Search ${field.label.toLowerCase()}...`}
@@ -204,13 +204,13 @@ export function ResourceForm<T extends Record<string, any>>({
                                     </SelectItem>
                                   ))
                                 ) : (
-                                  <div className="p-2 text-center text-gray-500 text-sm">
+                                  <div className="p-2 text-center text-gray-500 dark:text-gray-400 text-sm">
                                     No results found
                                   </div>
                                 )}
                               </div>
                               {field.showCreateButton && (
-                                <div className="p-2 border-t sticky bottom-0 bg-white z-10">
+                                <div className="p-2 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-800 z-10">
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -295,10 +295,10 @@ export function ResourceForm<T extends Record<string, any>>({
                             placeholder={field.placeholder}
                             {...formField}
                             readOnly={field.readOnly}
-                            className={field.readOnly ? 'bg-gray-100' : ''}
+                            className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}
                           />
                         ) : field.type === 'checkbox' ? (
-                          <div className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                             <Checkbox
                               checked={formField.value || false}
                               onCheckedChange={(checked) => {
@@ -310,7 +310,7 @@ export function ResourceForm<T extends Record<string, any>>({
                               disabled={field.readOnly}
                               className="h-5 w-5"
                             />
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-gray-900 dark:text-gray-100">
                               {field.label}
                             </label>
                           </div>
@@ -320,7 +320,7 @@ export function ResourceForm<T extends Record<string, any>>({
                             placeholder={field.placeholder}
                             {...formField}
                             readOnly={field.readOnly}
-                            className={field.readOnly ? 'bg-gray-100' : ''}
+                            className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}
                           />
                         ) : (
                           <Input
@@ -328,7 +328,7 @@ export function ResourceForm<T extends Record<string, any>>({
                             placeholder={field.placeholder}
                             {...formField}
                             readOnly={field.readOnly}
-                            className={field.readOnly ? 'bg-gray-100' : ''}
+                            className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}
                             onChange={field.onChange
                               ? (e) => {
                                   const formatted = field.onChange!(e.target.value);
@@ -344,7 +344,7 @@ export function ResourceForm<T extends Record<string, any>>({
                         )}
                       </FormControl>
                       {field.helperText && (
-                        <p className="text-sm text-muted-foreground mt-1">{field.helperText}</p>
+                        <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">{field.helperText}</p>
                       )}
                       <FormMessage />
                     </FormItem>
