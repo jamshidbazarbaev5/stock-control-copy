@@ -143,15 +143,15 @@
     };
 
     return (
-      <div className="h-screen flex flex-col bg-gray-50">
+      <div className="h-screen flex flex-col bg-background">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-foreground">
                 {t("receiptDesigner.title")}
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {t("receiptDesigner.description")}
               </p>
             </div>
@@ -210,17 +210,17 @@
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Panel - Preview */}
-          <div className="w-2/5 bg-gray-100 p-6 overflow-y-auto">
+          <div className="w-2/5 bg-muted/30 p-6 overflow-y-auto">
             <Card className="w-full max-w-sm mx-auto">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-foreground">
                     {t("receiptDesigner.preview")}
                   </h2>
-                  <Settings className="w-5 h-5 text-gray-500" />
+                  <Settings className="w-5 h-5 text-muted-foreground" />
                 </div>
 
-                <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <div className="bg-card border-2 border-dashed border-border rounded-lg p-4">
                   <DndContext
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
@@ -243,10 +243,10 @@
           </div>
 
           {/* Separator */}
-          <Separator orientation="vertical" className="bg-gray-300" />
+          <Separator orientation="vertical" className="bg-border" />
 
           {/* Right Panel - Controls */}
-          <div className="w-3/5 bg-white overflow-y-auto">
+          <div className="w-3/5 bg-card overflow-y-auto">
             <DesignerControls
               template={template}
               setTemplate={setTemplate}

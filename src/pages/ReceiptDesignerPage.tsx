@@ -60,7 +60,7 @@ const ReceiptDesignerPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {currentView === "manager" ? (
         <TemplateManager
           onSelectTemplate={handleSelectTemplate}
@@ -69,7 +69,7 @@ const ReceiptDesignerPage: React.FC = () => {
         />
       ) : (
         <div>
-          <div className="bg-white border-b px-6 py-4">
+          <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -84,7 +84,7 @@ const ReceiptDesignerPage: React.FC = () => {
                 <h1 className="text-xl font-semibold">
                   {currentTemplate.name}
                 </h1>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {t("receiptDesigner.editingTemplate")}
                 </p>
               </div>

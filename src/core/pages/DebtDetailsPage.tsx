@@ -186,12 +186,12 @@ export default function DebtDetailsPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="animate-pulse space-y-8">
-          <div className="h-12 bg-gray-200 rounded-lg w-1/3"></div>
+          <div className="h-12 bg-muted rounded-lg w-1/3"></div>
           <div className="grid grid-cols-1 gap-6">
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
-                className="h-48 bg-gray-200 rounded-lg shadow-sm"
+                className="h-48 bg-muted rounded-lg shadow-sm"
               ></div>
             ))}
           </div>
@@ -203,8 +203,8 @@ export default function DebtDetailsPage() {
   if (!Array.isArray(debts) || debts.length === 0) {
     return (
       <div className="container mx-auto py-16 px-4 text-center">
-        <DollarSign className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-gray-600">
+        <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-2xl font-semibold text-muted-foreground">
           {t("common.no_data")}
         </h2>
       </div>
@@ -229,7 +229,7 @@ export default function DebtDetailsPage() {
 
         {debts[0] && (
           <Card className="overflow-hidden mb-6 sm:mb-8">
-            <div className="bg-gray-50/50 rounded-lg p-4 sm:p-6">
+            <div className="bg-muted/50 rounded-lg p-4 sm:p-6">
               <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
                 <User2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                 {t("forms.client_info")}
@@ -238,10 +238,10 @@ export default function DebtDetailsPage() {
                 <div className="flex items-start gap-3">
                   <Phone className="w-4 h-4 text-emerald-500 mt-1" />
                   <div>
-                    <dt className="text-sm text-gray-500">
+                    <dt className="text-sm text-muted-foreground">
                       {t("forms.phone")}
                     </dt>
-                    <dd className="font-medium text-gray-900">
+                    <dd className="font-medium text-foreground">
                       {debts[0].client_read.phone_number}
                     </dd>
                   </div>
@@ -249,10 +249,10 @@ export default function DebtDetailsPage() {
                 <div className="flex items-start gap-3">
                   <MapPin className="w-4 h-4 text-emerald-500 mt-1" />
                   <div>
-                    <dt className="text-sm text-gray-500">
+                    <dt className="text-sm text-muted-foreground">
                       {t("forms.address")}
                     </dt>
-                    <dd className="font-medium text-gray-900">
+                    <dd className="font-medium text-foreground">
                       {debts[0].client_read.address}
                     </dd>
                   </div>
@@ -272,7 +272,7 @@ export default function DebtDetailsPage() {
           >
             <Card className="overflow-hidden hover:shadow-lg transition-all duration-300">
               <div
-                className="flex items-center justify-between p-4 sm:p-6 cursor-pointer transition-colors duration-200 hover:bg-gray-50/80 min-h-[44px]"
+                className="flex items-center justify-between p-4 sm:p-6 cursor-pointer transition-colors duration-200 hover:bg-muted/50 min-h-[44px]"
                 onClick={() => handleDebtClick(debt.id!)}
               >
                 <div className="space-y-2 flex-1 min-w-0">
@@ -280,15 +280,15 @@ export default function DebtDetailsPage() {
                     <span className="text-emerald-600">
                       {formatCurrency(debt.total_amount)}
                     </span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-600 text-sm sm:text-base">
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-foreground text-sm sm:text-base">
                       {formatDate(debt.created_at)}
                     </span>
                   </h3>
-                  <p className="text-xs sm:text-sm text-gray-500 flex flex-wrap items-center gap-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground flex flex-wrap items-center gap-2">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                     {t("forms.due_date")}: {formatDate(debt.due_date)}
-                    <span className="text-gray-400">|</span>
+                    <span className="text-muted-foreground">|</span>
                     <span
                       className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
                         debt.is_paid
@@ -305,7 +305,7 @@ export default function DebtDetailsPage() {
                     isDebtExpanded(debt.id!) ? "rotate-180" : ""
                   }`}
                 >
-                  <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
+                  <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
                 </div>
               </div>
 
@@ -318,7 +318,7 @@ export default function DebtDetailsPage() {
               >
                 <div className="border-t">
                   <div className="grid grid-cols-1 gap-4 sm:gap-6 p-4 sm:p-6">
-                    <div className="bg-gray-50/50 rounded-lg p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
+                    <div className="bg-muted/50 rounded-lg p-4 sm:p-6 hover:bg-muted transition-colors duration-200">
                       <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
                         <Store className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                         {t("forms.store_info")}
@@ -327,10 +327,10 @@ export default function DebtDetailsPage() {
                         <div className="flex items-start gap-3">
                           <Store className="w-4 h-4 text-emerald-500 mt-1" />
                           <div>
-                            <dt className="text-sm text-gray-500">
+                            <dt className="text-sm text-muted-foreground">
                               {t("forms.store_name")}
                             </dt>
-                            <dd className="font-medium text-gray-900">
+                            <dd className="font-medium text-foreground">
                               {debt.sale_read?.store_read?.name}
                             </dd>
                           </div>
@@ -338,10 +338,10 @@ export default function DebtDetailsPage() {
                         <div className="flex items-start gap-3">
                           <Phone className="w-4 h-4 text-emerald-500 mt-1" />
                           <div>
-                            <dt className="text-sm text-gray-500">
+                            <dt className="text-sm text-muted-foreground">
                               {t("forms.phone")}
                             </dt>
-                            <dd className="font-medium text-gray-900">
+                            <dd className="font-medium text-foreground">
                               {debt.sale_read?.store_read?.phone_number}
                             </dd>
                           </div>
@@ -350,25 +350,25 @@ export default function DebtDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="border-t p-6 bg-white">
+                  <div className="border-t border-border p-6 bg-card">
                     <h4 className="text-lg font-semibold flex items-center gap-2 mb-6 text-emerald-700">
                       <ShoppingCart className="w-5 h-5 text-emerald-500" />
                       {t("forms.sale_items")}
                     </h4>
                     <div className="overflow-x-auto rounded-lg border">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
+                      <table className="w-full bg-card">
+                        <thead className="bg-muted/50">
                           <tr className="border-b">
-                            <th className="text-left py-3 px-4 font-semibold text-gray-600">
+                            <th className="text-left py-3 px-4 font-semibold text-muted-foreground">
                               {t("forms.product")}
                             </th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-600">
+                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
                               {t("forms.quantity")}
                             </th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-600">
+                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
                               {t("forms.price_per_unit")}
                             </th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-600">
+                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
                               {t("forms.subtotal")}
                             </th>
                           </tr>
@@ -377,16 +377,16 @@ export default function DebtDetailsPage() {
                           {debt.sale_read?.sale_items?.map((item) => (
                             <tr
                               key={item.id}
-                              className="border-b hover:bg-gray-50/50 transition-colors duration-150"
+                              className="border-b border-border hover:bg-muted/50 transition-colors duration-150"
                             >
                               <td className="py-3 px-4">
                                 <div className="flex items-start gap-3">
                                   <Package className="w-4 h-4 text-emerald-500 mt-1" />
                                   <div>
-                                    <div className="font-medium text-gray-900">
+                                    <div className="font-medium text-foreground">
                                       {item.product_read.product_name}
                                     </div>
-                                    <div className="text-sm text-gray-500">
+                                    <div className="text-sm text-muted-foreground">
                                       {
                                         item.product_read?.category_read?.category_name
                                       }
@@ -394,18 +394,18 @@ export default function DebtDetailsPage() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="text-right py-3 px-4 text-gray-900">
+                              <td className="text-right py-3 px-4 text-foreground">
                                 {item.quantity}
                               </td>
-                              <td className="text-right py-3 px-4 text-gray-900">
+                              <td className="text-right py-3 px-4 text-foreground">
                                 {formatCurrency(item.price_per_unit)}
                               </td>
-                              <td className="text-right py-3 px-4 font-medium text-gray-900">
+                              <td className="text-right py-3 px-4 font-medium text-foreground">
                                 {formatCurrency(item.subtotal)}
                               </td>
                             </tr>
                           ))}
-                          <tr className="font-bold bg-gray-50">
+                          <tr className="font-bold bg-muted/50">
                             <td colSpan={3} className="text-right py-4 px-4">
                               {t("forms.total_amount")}
                             </td>
@@ -418,7 +418,7 @@ export default function DebtDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="border-t p-6 bg-gray-50/30">
+                  <div className="border-t border-border p-6 bg-muted/30">
                     <div className="flex justify-between items-center mb-6">
                       <h4 className="text-lg font-semibold flex items-center gap-2 text-emerald-700">
                         <DollarSign className="w-5 h-5 text-emerald-500" />
@@ -445,37 +445,37 @@ export default function DebtDetailsPage() {
                       </Button>
                     </div>
                     <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-start gap-3">
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
                           <div>
-                            <dt className="text-sm text-gray-500">
+                            <dt className="text-sm text-muted-foreground">
                               {t("forms.total_amount")}
                             </dt>
-                            <dd className="text-2xl font-semibold text-gray-900">
+                            <dd className="text-2xl font-semibold text-foreground">
                               {formatCurrency(debt.total_amount)}
                             </dd>
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-start gap-3">
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
                           <div>
-                            <dt className="text-sm text-gray-500">
+                            <dt className="text-sm text-muted-foreground">
                               {t("forms.deposit")}
                             </dt>
-                            <dd className="text-2xl font-semibold text-gray-900">
+                            <dd className="text-2xl font-semibold text-foreground">
                               {formatCurrency(debt.deposit)}
                             </dd>
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-start gap-3">
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
                           <div>
-                            <dt className="text-sm text-gray-500">
+                            <dt className="text-sm text-muted-foreground">
                               {t("forms.remainder")}
                             </dt>
                             <dd
@@ -487,14 +487,14 @@ export default function DebtDetailsPage() {
                         </div>
                       </div>
                       {debt.usd_rate_at_creation && (
-                        <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-start gap-3">
                             <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
                             <div>
-                              <dt className="text-sm text-gray-500">
+                              <dt className="text-sm text-muted-foreground">
                                 {t("forms.usd_rate_at_creation")}
                               </dt>
-                              <dd className="text-2xl font-semibold text-gray-900">
+                              <dd className="text-2xl font-semibold text-foreground">
                                 {formatCurrency(debt.usd_rate_at_creation)} UZS
                               </dd>
                             </div>
@@ -502,14 +502,14 @@ export default function DebtDetailsPage() {
                         </div>
                       )}
                       {debt.last_usd_rate && (
-                        <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-start gap-3">
                             <DollarSign className="w-5 h-5 text-purple-500 mt-1" />
                             <div>
-                              <dt className="text-sm text-gray-500">
+                              <dt className="text-sm text-muted-foreground">
                                 {t("forms.last_usd_rate")}
                               </dt>
-                              <dd className="text-2xl font-semibold text-gray-900">
+                              <dd className="text-2xl font-semibold text-foreground">
                                 {formatCurrency(debt.last_usd_rate)} UZS
                               </dd>
                             </div>

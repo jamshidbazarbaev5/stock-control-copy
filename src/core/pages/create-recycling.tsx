@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+  import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { Recycling } from "../api/recycling";
@@ -281,7 +281,9 @@ export default function CreateRecycling() {
           const quantity = stock.dynamic_fields?.quantity?.value || 
                           stock.dynamic_fields?.purchase_unit_quantity?.value || 
                           stock.quantity || 0;
-          return productMatches && Number(quantity) > 0;
+          const extraQuantity = parseFloat(stock.extra_quantity) || 0;
+          const totalQuantity = Number(quantity) + extraQuantity;
+          return productMatches && totalQuantity > 0;
         }
       );
 
@@ -341,9 +343,11 @@ export default function CreateRecycling() {
               const quantity = stock.dynamic_fields?.quantity?.value || 
                               stock.dynamic_fields?.purchase_unit_quantity?.value || 
                               stock.quantity || 0;
+              const extraQuantity = parseFloat(stock.extra_quantity) || 0;
+              const totalQuantity = Number(quantity) + extraQuantity;
               return {
                 value: stock.id,
-                label: `${productName} (${quantity}) [${storeName}]`,
+                label: `${productName} (${totalQuantity}) [${storeName}]`,
               };
             })
             .filter((opt: any) => opt.value),

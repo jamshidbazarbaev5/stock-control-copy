@@ -495,9 +495,9 @@ const DashboardPage = () => {
           {/* Salesman Dashboard - Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {/* Sales Summary Card */}
-            <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+            <Card className="bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium">
+                <CardTitle className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   {t("dashboard.sales_summary") || "Sales Summary"}
                 </CardTitle>
                 <ShoppingCart className="h-5 w-5 text-muted-foreground" />
@@ -505,7 +505,7 @@ const DashboardPage = () => {
               <CardContent>
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {salesmanSummary?.total_sales || 0}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -513,7 +513,7 @@ const DashboardPage = () => {
                     </p>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {salesmanSummary?.total_revenue?.toLocaleString() || 0}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -525,9 +525,9 @@ const DashboardPage = () => {
             </Card>
 
             {/* Debts Card */}
-            <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+            <Card className="bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium">
+                <CardTitle className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   {t("dashboard.debts") || "Debts"}
                 </CardTitle>
                 <CreditCard className="h-5 w-5 text-muted-foreground" />
@@ -535,7 +535,7 @@ const DashboardPage = () => {
               <CardContent>
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {salesmanDebts?.total_count || 0}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -543,7 +543,7 @@ const DashboardPage = () => {
                     </p>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {salesmanDebts?.total_debt?.toLocaleString() || 0}
                     </div>
                     <p className="text-xs text-muted-foreground">

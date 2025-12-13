@@ -151,6 +151,7 @@ export interface OverallTotals {
   debt_total?: number;
   expenses_total?: TotalWithPayments;
   debt_payments_total?: TotalWithPayments;
+  remaining?: TotalWithPayments;
 }
 
 export interface ActivityPaginatedResponse<T> {

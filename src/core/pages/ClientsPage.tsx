@@ -557,10 +557,10 @@ export default function ClientsPage() {
                       className="fixed inset-0 z-10" 
                       onClick={() => setOpenDropdown(null)}
                     />
-                    <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
+                    <div className="fixed w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
                       {client.type === "Юр.лицо" && (
                         <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdown(null);
@@ -572,7 +572,7 @@ export default function ClientsPage() {
                         </button>
                       )}
                       <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenDropdown(null);
@@ -583,7 +583,7 @@ export default function ClientsPage() {
                         Долги
                       </button>
                       <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenDropdown(null);
@@ -596,7 +596,7 @@ export default function ClientsPage() {
                       {currentUser?.is_superuser && client.type === "Юр.лицо" && (
                         <>
                           <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDropdown(null);
@@ -607,7 +607,7 @@ export default function ClientsPage() {
                             {t("common.increment_balance")}
                           </button>
                           <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDropdown(null);

@@ -150,7 +150,7 @@ export default function SupplierBalanceHistoryPage() {
           <div className="space-y-4">
             {data.results.map((item, index) => (
               <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                <CardHeader className="bg-muted/50 border-b border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-blue-600" />
@@ -166,7 +166,7 @@ export default function SupplierBalanceHistoryPage() {
                 <CardContent className="pt-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
                         <DollarSign className="h-5 w-5 text-green-600" />
                       </div>
                       <div>
@@ -179,7 +179,7 @@ export default function SupplierBalanceHistoryPage() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                         <CreditCard className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
@@ -191,7 +191,7 @@ export default function SupplierBalanceHistoryPage() {
                     </div>
                     {item.exchange_rate && Number(item.exchange_rate) > 0 && (
                       <div className="flex items-start gap-3">
-                        <div className="p-2 bg-orange-100 rounded-lg">
+                        <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                           <DollarSign className="h-5 w-5 text-orange-600" />
                         </div>
                         <div>
@@ -204,7 +204,7 @@ export default function SupplierBalanceHistoryPage() {
                     )}
                     {supplierData?.balance_type === 'USD' && item.exchange_rate && Number(item.exchange_rate) > 0 && (
                       <div className="flex items-start gap-3">
-                        <div className="p-2 bg-red-100 rounded-lg">
+                        <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
                           <DollarSign className="h-5 w-5 text-red-600" />
                         </div>
                         <div>
@@ -218,7 +218,7 @@ export default function SupplierBalanceHistoryPage() {
                       </div>
                     )}
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-purple-100 rounded-lg">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
                         <Store className="h-5 w-5 text-purple-600" />
                       </div>
                       <div>
@@ -265,7 +265,7 @@ export default function SupplierBalanceHistoryPage() {
           )}
 
           {/* Summary */}
-          <Card className="mt-6 bg-gradient-to-br from-slate-50 to-slate-100">
+          <Card className="mt-6 bg-muted/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
@@ -274,19 +274,19 @@ export default function SupplierBalanceHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-4 rounded-lg shadow-sm">
+                <div className="bg-card p-4 rounded-lg shadow-sm">
                   <span className="text-sm text-muted-foreground block mb-2">
                     {t('supplier.total_transactions')}
                   </span>
                   <p className="font-bold text-2xl text-primary">{data.count}</p>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
+                <div className="bg-card p-4 rounded-lg shadow-sm">
                   <span className="text-sm text-muted-foreground block mb-2">
                     {t('supplier.current_page')}
                   </span>
                   <p className="font-bold text-2xl text-primary">{data.current_page}</p>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
+                <div className="bg-card p-4 rounded-lg shadow-sm">
                   <span className="text-sm text-muted-foreground block mb-2">
                     {t('supplier.total_pages')}
                   </span>

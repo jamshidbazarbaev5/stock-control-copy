@@ -1289,26 +1289,26 @@ export default function CreateStock() {
   return (
     <div className="container mx-auto py-6 px-4">
       {isScanning && (
-        <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-md">
+        <div className="mb-4 p-3 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-md">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-blue-700 font-medium">
+            <div className="w-3 h-3 bg-blue-500 dark:bg-blue-400 rounded-full animate-pulse"></div>
+            <span className="text-blue-700 dark:text-blue-300 font-medium">
               Scanning barcode to find product... ({scanBuffer})
             </span>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-card rounded-lg shadow">
         {/* Header */}
-        <div className="p-6 border-b">
+        <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">
               {t("common.create_new_stock")}
             </h1>
             {hasDraft && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md">
+                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-md">
                   <Save className="h-4 w-4" />
                   <span>Draft auto-saved</span>
                 </div>
@@ -1327,7 +1327,7 @@ export default function CreateStock() {
         </div>
 
         {/* Common Fields Section */}
-        <div className="p-6 border-b bg-gray-50">
+        <div className="p-6 border-b border-border bg-muted/50">
           <h2 className="text-lg font-semibold mb-4">
             {t("common.common_information")}
           </h2>
@@ -1501,7 +1501,7 @@ export default function CreateStock() {
           {commonForm.watch("use_supplier_balance") && commonForm.watch("supplier") && (
             <div className="space-y-2">
               <Label htmlFor="supplier_balance_type">{t("forms.balance_type") || "Balance Type"} *</Label>
-              <div className="p-3 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium">
+              <div className="p-3 bg-muted border border-border rounded-md text-sm font-medium">
                 {commonForm.watch("supplier_balance_type") || "USD"}
               </div>
             </div>
@@ -1510,7 +1510,7 @@ export default function CreateStock() {
           {/* Show supplier balance info when use_supplier_balance is checked */}
           {commonForm.watch("use_supplier_balance") &&
             commonForm.watch("supplier") && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg mt-4">
                 <h3 className="font-semibold mb-2">
                   {t("common.supplier_info") || "Supplier Information"}
                 </h3>
@@ -1533,10 +1533,10 @@ export default function CreateStock() {
                     const canPay = balance >= totalAmount;
                     return (
                       <div className="space-y-3">
-                        <div className="p-3 bg-white border border-blue-200 rounded-lg">
+                        <div className="p-3 bg-card border border-blue-200 dark:border-blue-700 rounded-lg">
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-600">
+                              <span className="text-muted-foreground">
                                 {t("common.supplier_name") || "Supplier"}:
                               </span>
                               <span className="font-medium">
@@ -1544,7 +1544,7 @@ export default function CreateStock() {
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-600">
+                              <span className="text-muted-foreground">
                                 {t("common.supplier_balance") ||
                                   "Available Balance"}
                                 :
@@ -1555,8 +1555,8 @@ export default function CreateStock() {
                                 {formatPrice(balance)} {type}
                               </span>
                             </div>
-                            <div className="flex justify-between border-t pt-2">
-                              <span className="text-gray-600">
+                            <div className="flex justify-between border-t border-border pt-2">
+                              <span className="text-muted-foreground">
                                 {t("common.total_amount") || "Purchase Amount"}:
                               </span>
                               <span className="font-semibold">
@@ -1608,7 +1608,7 @@ export default function CreateStock() {
           {/* Payments Section - show when NOT using supplier balance AND NOT debt */}
           {commonForm.watch("use_supplier_balance") !== true &&
             commonForm.watch("is_debt") !== true && (
-              <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="space-y-4 mt-4 p-4 bg-muted/50 rounded-lg">
                 <div className="flex justify-between items-center">
                   <Label className="text-lg font-semibold">
                     {t("common.payments") || "Payments"}
@@ -1668,7 +1668,7 @@ export default function CreateStock() {
                   const remainingAmount = totalAmount - paidAmount;
 
                   return (
-                    <div className="space-y-2 p-3 bg-white rounded border">
+                    <div className="space-y-2 p-3 bg-card rounded border border-border">
                       <div className="flex justify-between text-sm">
                         <span>
                           {t("common.total_amount") || "Total Amount"}:
@@ -1705,7 +1705,7 @@ export default function CreateStock() {
                     return payments.map((payment, index) => (
                       <div
                         key={index}
-                        className="flex gap-2 items-start p-3 bg-white rounded border"
+                        className="flex gap-2 items-start p-3 bg-card rounded border border-border"
                       >
                         <div className="flex-1 space-y-2">
                           <div className="grid grid-cols-2 gap-2">
@@ -1783,7 +1783,7 @@ export default function CreateStock() {
 
                   {(!commonForm.watch("payments") ||
                     commonForm.watch("payments")?.length === 0) && (
-                    <div className="text-center text-sm text-gray-500 py-4">
+                    <div className="text-center text-sm text-muted-foreground py-4">
                       {t("common.no_payments_added") ||
                         "No payments added. A payment will be auto-added once items are calculated."}
                     </div>
@@ -1840,10 +1840,10 @@ export default function CreateStock() {
                 key={item.id}
                 className={`border rounded-lg transition-all ${
                   selectedItems.has(item.id) ? "ring-2 ring-blue-500" : ""
-                } ${item.isCalculated ? "border-green-300 bg-green-50/30" : "border-gray-200"}`}
+                } ${item.isCalculated ? "border-green-300 bg-green-50/30 dark:bg-green-900/10" : "border-border"}`}
               >
                 {/* Item Header */}
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-t-lg">
+                <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-t-lg">
                   <Checkbox
                     checked={selectedItems.has(item.id)}
                     onCheckedChange={(checked) => {
@@ -1874,7 +1874,7 @@ export default function CreateStock() {
                   </Button>
 
                   <div className="flex-1 flex items-center gap-4">
-                    <span className="font-medium text-gray-600">
+                    <span className="font-medium text-muted-foreground">
                       #{index + 1}
                     </span>
                     <span className="font-semibold text-lg">
@@ -1958,7 +1958,7 @@ export default function CreateStock() {
                             <SelectValue placeholder={t("common.product")} />
                           </SelectTrigger>
                         <SelectContent position="popper" sideOffset={5}>
-                            <div className="p-2 sticky top-0 bg-white z-10 border-b">
+                            <div className="p-2 sticky top-0 bg-card z-10 border-b border-border">
                               <Input
                                 placeholder={t(
                                   "common.search_product_placeholder",
@@ -2366,7 +2366,7 @@ export default function CreateStock() {
         <DialogContent>
           <DialogTitle>{t("common.restore_draft")}</DialogTitle>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {t("common.unsaved_work_message")}{" "}
               {draftTimestamp
                 ? new Date(draftTimestamp).toLocaleString()
@@ -2374,14 +2374,14 @@ export default function CreateStock() {
               . {t("common.would_you_like_to_restore")}
             </p>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-4">
               <div className="flex items-start gap-3">
-                <Save className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Save className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
                     {t("common.draft_saved_automatically")}
                   </p>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                     {t("common.draft_auto_save_description")}
                   </p>
                 </div>
@@ -2431,10 +2431,10 @@ export default function CreateStock() {
 
                 return (
                   <>
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-4">
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             {t("common.product_label")}
                           </span>
                           <span className="font-medium">
@@ -2442,7 +2442,7 @@ export default function CreateStock() {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             {t("common.purchase_unit_label")}
                           </span>
                           <span className="font-medium">
@@ -2450,7 +2450,7 @@ export default function CreateStock() {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             {t("common.conversion_number")}
                           </span>
                           <span className="font-bold text-blue-600">
@@ -2491,8 +2491,8 @@ export default function CreateStock() {
                       />
                     </div>
 
-                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                      <p className="text-sm text-amber-800">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
                         <strong>{t("common.formula")}</strong>{" "}
                         {item.form.calculation_input || t("common.input")} ÷{" "}
                         {conversionNumber

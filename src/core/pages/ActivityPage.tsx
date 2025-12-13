@@ -29,14 +29,15 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { shiftsApi } from '../api/shift';
 import {
-  Wallet,
-  CreditCard,
   SmartphoneNfc,
-  Landmark,
-  DollarSign,
   Printer,
   CheckCircle2,
   AlertCircle,
+  CreditCard,
+  Wallet,
+  DollarSign,
+  Landmark,
+  TrendingDown,
 } from 'lucide-react';
 import {
   saleReceiptService,
@@ -86,118 +87,159 @@ interface SummaryCardProps {
   variant?: 'sales' | 'expenses' | 'debt' | 'default';
 }
 
+
+
 const SummaryCard = ({
-  title,
-  totals,
-  debtTotal,
-  variant = 'default',
-}: SummaryCardProps) => {
+                       title,
+                       totals,
+                       debtTotal,
+                       variant = 'default',
+                     }: SummaryCardProps) => {
   if (!totals) return null;
 
-  const styles = {
+  // Modern styling configuration
+  const themes = {
     sales: {
-      border: 'border-emerald-200 ',
-      bg: 'bg-emerald-50 ',
-      text: 'text-emerald-700 ',
-      iconBg: 'bg-emerald-100 ',
-      icon: 'text-emerald-600 ',
+      wrapper: 'bg-white dark:bg-slate-800 border-emerald-100 dark:border-emerald-900/30 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.2)]',
+      gradient: 'from-emerald-50 to-white dark:from-emerald-900/20 dark:to-slate-800',
+      iconBox: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400',
+      mainText: 'text-slate-800 dark:text-emerald-50',
+      subText: 'text-emerald-600/80 dark:text-emerald-400/80',
+      badge: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/30',
+      divider: 'border-emerald-100/50 dark:border-emerald-800/30',
+      itemRow: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10',
+      MainIcon: Wallet,
     },
     expenses: {
-      border: 'border-red-200 ',
-      bg: 'bg-red-50 ',
-      text: 'text-red-700 ',
-      iconBg: 'bg-red-100 ',
-      icon: 'text-red-600 ',
+      wrapper: 'bg-white dark:bg-slate-800 border-rose-100 dark:border-rose-900/30 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(244,63,94,0.2)]',
+      gradient: 'from-rose-50 to-white dark:from-rose-900/20 dark:to-slate-800',
+      iconBox: 'bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400',
+      mainText: 'text-slate-800 dark:text-rose-50',
+      subText: 'text-rose-600/80 dark:text-rose-400/80',
+      badge: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/30',
+      divider: 'border-rose-100/50 dark:border-rose-800/30',
+      itemRow: 'hover:bg-rose-50/50 dark:hover:bg-rose-900/10',
+      MainIcon: TrendingDown,
     },
     debt: {
-      border: 'border-purple-200 ',
-      bg: 'bg-purple-50 ',
-      text: 'text-purple-700 ',
-      iconBg: 'bg-purple-100 ',
-      icon: 'text-purple-600 ',
+      wrapper: 'bg-white dark:bg-slate-800 border-violet-100 dark:border-violet-900/30 shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(139,92,246,0.2)]',
+      gradient: 'from-violet-50 to-white dark:from-violet-900/20 dark:to-slate-800',
+      iconBox: 'bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-400',
+      mainText: 'text-slate-800 dark:text-violet-50',
+      subText: 'text-violet-600/80 dark:text-violet-400/80',
+      badge: 'bg-violet-50 text-violet-700 border-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-800/30',
+      divider: 'border-violet-100/50 dark:border-violet-800/30',
+      itemRow: 'hover:bg-violet-50/50 dark:hover:bg-violet-900/10',
+      MainIcon: Landmark,
     },
     default: {
-      border: 'border-blue-200 ',
-      bg: 'bg-blue-50 ',
-      text: 'text-blue-700 ',
-      iconBg: 'bg-blue-100 ',
-      icon: 'text-blue-600 ',
+      wrapper: 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-[0_4px_20px_-4px_rgba(148,163,184,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(148,163,184,0.2)]',
+      gradient: 'from-slate-50 to-white dark:from-slate-800 dark:to-slate-900',
+      iconBox: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+      mainText: 'text-slate-800 dark:text-slate-100',
+      subText: 'text-slate-500 dark:text-slate-400',
+      badge: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
+      divider: 'border-slate-100 dark:border-slate-700',
+      itemRow: 'hover:bg-slate-50 dark:hover:bg-slate-800',
+      MainIcon: DollarSign,
     },
   };
 
-  const style = styles[variant];
-
-  // const HeaderIcon = () => {
-  //   if (variant === 'sales')
-  //     return <Wallet className={`w-6 h-6 ${style.icon}`} />;
-  //   if (variant === 'expenses')
-  //     return <CreditCard className={`w-6 h-6 ${style.icon}`} />;
-  //   if (variant === 'debt')
-  //     return <Landmark className={`w-6 h-6 ${style.icon}`} />;
-  //   return <DollarSign className={`w-6 h-6 ${style.icon}`} />;
-  // };
+  const theme = themes[variant] || themes.default;
+  const Icon = theme.MainIcon;
 
   return (
-    <div
-      className={`mt-4 rounded-xl border ${style.border} ${style.bg} overflow-hidden transition-all duration-200 flex flex-col h-full`}
-    >
-      <div className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {/* <div className={`p-3 rounded-full ${style.iconBg}`}>
-              <HeaderIcon />
-            </div> */}
-            <div className="min-h-[48px] flex flex-col justify-center">
-              <h3 className="font-semibold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">
-                {title}
-              </h3>
-              {debtTotal !== undefined && debtTotal > 0 && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-                    Долг: {formatCurrency(debtTotal)}
-                  </span>
-                </div>
-              )}
+      <div
+          className={`
+        group relative overflow-hidden rounded-2xl border transition-all duration-300 ease-out
+        flex flex-col h-full
+        ${theme.wrapper}
+        hover:-translate-y-1
+      `}
+      >
+        {/* Background Gradient Effect */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-50`} />
+
+        {/* Content Container */}
+        <div className="relative p-5 flex flex-col h-full z-10">
+
+          {/* Header Section */}
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${theme.iconBox} shadow-sm ring-1 ring-inset ring-black/5`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {title}
+                </h3>
+                {debtTotal !== undefined && debtTotal > 0 && (
+                    <div className={`
+                  mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border
+                  ${theme.badge}
+                `}>
+                      Долг: {formatCurrency(debtTotal)}
+                    </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="text-right">
-            <div className={`text-2xl font-bold ${style.text}`}>
+          {/* Main Total Section */}
+          <div className="mb-6">
+            <div className={`text-3xl font-bold tracking-tight ${theme.mainText} tabular-nums`}>
               {formatCurrency(totals.total)}
             </div>
             {totals.total_in_currency > 0 && (
-              <div className="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mt-0.5">
-                ${' '}
-                {totals.total_in_currency.toLocaleString('ru-RU', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
+                <div className={`text-sm font-medium mt-1 flex items-center gap-1.5 ${theme.subText}`}>
+                  <span className="opacity-70">USD:</span>
+                  <span className="tabular-nums">
+                ${totals.total_in_currency.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+              </span>
+                </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className={`border-t border-dashed w-full ${theme.divider} mb-4`} />
+
+          {/* Breakdown Section */}
+          <div className="flex-grow flex flex-col gap-2">
+            {Object.entries(totals.by_payment_type).map(([method, amount]) => (
+                <div
+                    key={method}
+                    className={`
+                flex items-center justify-between p-2 rounded-lg transition-colors duration-200
+                ${theme.itemRow}
+              `}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-md ${theme.wrapper} border-0 ring-1 ring-inset ring-slate-900/5 dark:ring-white/10`}>
+                      <PaymentIcon method={method} />
+                    </div>
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300 capitalize">
+                  {method}
+                </span>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                {formatCurrency(amount)}
+              </span>
+                </div>
+            ))}
+
+            {/* Empty State if no breakdown */}
+            {Object.keys(totals.by_payment_type).length === 0 && (
+                <div className="text-center py-4 text-xs text-slate-400 italic">
+                  Нет данных по методам оплаты
+                </div>
             )}
           </div>
         </div>
       </div>
-
-      <div className="p-4 pt-0 border-t border-gray-200/50 dark:border-gray-700/50 flex-grow">
-        <div className="flex flex-col gap-2 mt-4">
-          {Object.entries(totals.by_payment_type).map(([method, amount]) => (
-            <div
-              key={method}
-              className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
-                <PaymentIcon method={method} />
-                {method}
-              </div>
-              <span className="font-semibold text-gray-900 dark:text-gray-100 text-right">
-                {formatCurrency(amount)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 };
+
+
 
 export default function ActivityPage() {
   const { t } = useTranslation();
@@ -397,6 +439,11 @@ export default function ActivityPage() {
       header: 'Общая сумма',
       accessorKey: 'total_amount',
       cell: (row: ActivitySale) => formatCurrency(row.total_amount),
+    },
+    {
+      header: 'Скидка',
+      accessorKey: 'discount_amount',
+      cell: (row: ActivitySale) => formatCurrency(row.discount_amount) ,
     },
     {
       header: 'Чистая прибыль',
@@ -982,6 +1029,44 @@ export default function ActivityPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Remaining Totals Block */}
+      {activityData?.overall_totals?.remaining && (
+        <Card className="mt-6 p-4 border-2 border-blue-300 bg-white dark:bg-gray-900 dark:border-blue-700">
+          <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-4">
+            Остаток
+          </h3>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="text-left">
+              <div className="text-sm text-gray-500 dark:text-gray-400">Общий остаток</div>
+              <div className={`text-2xl font-bold ${activityData.overall_totals.remaining.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {formatCurrency(activityData.overall_totals.remaining.total)}
+              </div>
+              {activityData.overall_totals.remaining.total_in_currency !== 0 && (
+                <div className={`text-sm font-semibold ${activityData.overall_totals.remaining.total_in_currency >= 0 ? 'text-yellow-600' : 'text-red-500'}`}>
+                  $ {activityData.overall_totals.remaining.total_in_currency.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {Object.entries(activityData.overall_totals.remaining.by_payment_type).map(([method, amount]) => (
+                <div
+                  key={method}
+                  className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <PaymentIcon method={method} />
+                    {method}
+                  </div>
+                  <span className={`font-semibold text-sm ${amount >= 0 ? 'text-gray-900 dark:text-gray-100' : 'text-red-600'}`}>
+                    {formatCurrency(amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

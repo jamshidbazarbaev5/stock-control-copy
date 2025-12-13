@@ -247,7 +247,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ]
         : []),
       { icon: ShoppingBag, label: t("navigation.sale"), href: "/sales" },
-      { icon: Receipt, label: "Отчёт", href: "/activity" },
+      // Activity/Report - only for superadmin and admin
+      ...(currentUser?.is_superuser || currentUser?.role === "Администратор"
+        ? [{ icon: Receipt, label: "Отчёт", href: "/activity" }]
+        : []),
       { icon: UserCheck, label: t("navigation.clients"), href: "/clients" },
       { icon: ShoppingBag, label: t("navigation.debt"), href: "/debts" },
       {
@@ -290,7 +293,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           href: "/dashboard",
         },
         { icon: ShoppingBag, label: t("navigation.sale"), href: "/sales" },
-        { icon: Receipt, label: "Активность", href: "/activity" },
+        // Removed activity navigation for sellers - only superadmin and admin should see it
         ...(currentUser?.can_view_quantity !== false
           ? [
               {
@@ -420,7 +423,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 e.stopPropagation();
                 setDropdownOpen(!dropdownOpen);
               }}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors"
             >
               <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                 <User size={18} className="text-emerald-600" />
@@ -436,21 +439,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 />
                 {/* Dropdown Content */}
                 <div
-                  className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-3 z-[999]"
+                  className="absolute right-0 mt-2 w-72 bg-card rounded-lg shadow-xl border border-border py-3 z-[999]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {currentUser && (
                     <>
-                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                      <div className="px-4 py-3 border-b border-border">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                             <User size={24} className="text-emerald-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-800 dark:text-gray-200 text-lg">
+                            <div className="font-semibold text-foreground text-lg">
                               {currentUser.name}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="text-sm text-muted-foreground">
                               {currentUser.phone_number}
                             </div>
                             <div className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full mt-1">
@@ -459,14 +462,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </div>
                         </div>
                         {currentUser.store_read && (
-                          <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                            <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                          <div className="mt-3 p-2 bg-muted rounded-lg">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
                               Store Information
                             </div>
-                            <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                            <div className="text-sm font-medium text-foreground">
                               {currentUser.store_read.name}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-muted-foreground">
                               {currentUser.store_read.address}
                             </div>
                           </div>
@@ -484,10 +487,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             setDropdownOpen(false);
                             navigate("/profile");
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors cursor-pointer"
+                          className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-muted flex items-center gap-3 transition-colors cursor-pointer"
                           style={{ pointerEvents: "auto" }}
                         >
-                          <User size={16} className="text-gray-500" />
+                          <User size={16} className="text-muted-foreground" />
                           {t("common.profile")}
                         </button>
                         {userData?.has_active_shift &&
@@ -537,12 +540,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-2 rounded-lg hover:bg-muted"
           >
             {mobileMenuOpen ? (
-              <X size={24} className="text-gray-600 dark:text-gray-300" />
+              <X size={24} className="text-muted-foreground" />
             ) : (
-              <Menu size={24} className="text-gray-600 dark:text-gray-300" />
+              <Menu size={24} className="text-muted-foreground" />
             )}
           </button>
         </div>
@@ -561,7 +564,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           className={`
           ${mobileMenuOpen ? "block" : "hidden"}
           md:block
-          w-full bg-sidebar shadow-lg
+          w-full bg-card shadow-lg
           fixed md:sticky
           top-[3.5rem] md:top-0
           h-[calc(100vh-3.5rem)] md:h-screen
@@ -573,7 +576,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         `}
         >
           {/* Desktop Logo and Language Switcher */}
-          <div className="hidden md:block px-6 py-6 border-b border-sidebar-border ">
+          <div className="hidden md:block px-6 py-6 border-b border-border bg-muted/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
@@ -587,15 +590,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-2 rounded-lg hover:bg-sidebar-accent transition-colors"
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
               >
-                <Menu size={20} className="text-sidebar-accent-foreground" />
+                <Menu size={20} className="text-muted-foreground" />
               </button>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="px-3 py-4 flex flex-col  relative z-50 h-[calc(100vh-6rem)] overflow-y-auto">
+          <nav className="px-3 py-4 flex flex-col relative z-50 h-[calc(100vh-6rem)] overflow-y-auto bg-card">
             {navItems.map((item, index) => (
               <div key={index}>
                 {item.submenu ? (
@@ -611,8 +614,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left mb-1 transition-colors
                         ${
                           activeSubmenu === item.id
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-foreground hover:bg-muted"
                         }`}
                     >
                       <item.icon
@@ -646,7 +649,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       <div
                             className={`ml-2 ${
                           isCollapsed
-                            ? "absolute left-full top-0 ml-2 bg-sidebar border border-sidebar-border shadow-lg rounded-lg p-2 min-w-[200px] max-h-[80vh] overflow-y-auto dark:bg-gray-800 dark:border-gray-700"
+                            ? "absolute left-full top-0 ml-2 bg-card border border-border shadow-lg rounded-lg p-2 min-w-[200px] max-h-[80vh] overflow-y-auto"
                             : ""
                         }`}
                       >
@@ -662,8 +665,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left mb-1 transition-colors
                               ${
                                 location.pathname === subItem.href
-                                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                                  ? "bg-accent text-accent-foreground"
+                                  : "text-foreground hover:bg-muted"
                               }`}
                           >
                             <subItem.icon
@@ -691,8 +694,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left mb-1 transition-colors
                       ${
                         location.pathname === item.href
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-foreground hover:bg-muted"
                       }`}
                   >
                     <item.icon
@@ -749,7 +752,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               return (
                                 <div
                                   key={rate.id || rate.created_at}
-                                  className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                                  className="flex justify-between items-center p-2 bg-muted rounded"
                                 >
                                   <span className="font-medium">
                                     {rate.currency_detail?.name} (
@@ -766,7 +769,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 ? currencyRates
                                 : currencyRates?.results || []
                               ).length === 0) && (
-                              <p className="text-gray-500 text-center py-4">
+                              <p className="text-muted-foreground text-center py-4">
                                 No exchange rates set yet
                               </p>
                             )}
@@ -864,14 +867,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     e.stopPropagation();
                     setDropdownOpen(!dropdownOpen);
                   }}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group"
                 >
                   <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                     <User size={18} className="text-emerald-600" />
                   </div>
                   <ChevronDown
                     size={16}
-                    className={`text-gray-500 transition-transform duration-200 ${
+                    className={`text-muted-foreground transition-transform duration-200 ${
                       dropdownOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -879,21 +882,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
                 {dropdownOpen && (
                   <div
-                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-3 z-[9999]"
+                    className="absolute right-0 mt-2 w-80 bg-card rounded-lg shadow-xl border border-border py-3 z-[9999]"
                     style={{ zIndex: 9999 }}
                   >
                     {currentUser && (
                       <>
-                        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <div className="px-4 py-3 border-b border-border">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                               <User size={24} className="text-emerald-600" />
                             </div>
                             <div className="flex-1">
-                              <div className="font-semibold text-gray-800 dark:text-gray-200 text-lg">
+                              <div className="font-semibold text-foreground text-lg">
                                 {currentUser.name}
                               </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                              <div className="text-sm text-muted-foreground">
                                 {currentUser.phone_number}
                               </div>
                               <div className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full mt-1">
@@ -909,9 +912,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               setDropdownOpen(false);
                               navigate("/profile");
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                            className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted flex items-center gap-3 transition-colors"
                           >
-                            <User size={16} className="text-gray-500" />
+                            <User size={16} className="text-muted-foreground" />
                             <span className="font-medium">
                               {t("common.profile")}
                             </span>

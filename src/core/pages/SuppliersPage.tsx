@@ -363,9 +363,9 @@ export default function SuppliersPage() {
                         className="fixed inset-0 z-10" 
                         onClick={() => setOpenDropdown(null)}
                       />
-                      <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
+                      <div className="fixed w-48 bg-card rounded-md shadow-lg z-20 border border-border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
                         <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          className="w-full text-left px-4 py-2 hover:bg-muted flex items-center text-foreground"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdown(null);
@@ -376,7 +376,7 @@ export default function SuppliersPage() {
                           {t("common.add_balance")}
                         </button>
                         <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          className="w-full text-left px-4 py-2 hover:bg-muted flex items-center text-foreground"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdown(null);
@@ -387,7 +387,7 @@ export default function SuppliersPage() {
                           {t("common.mass_payment")}
                         </button>
                         <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
+                          className="w-full text-left px-4 py-2 hover:bg-muted flex items-center text-foreground"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdown(null);

@@ -136,14 +136,14 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-32 bg-gray-200 rounded mb-4"></div>
+                <div className="h-32 bg-muted rounded mb-4"></div>
                 <div className="flex justify-between items-center">
-                  <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  <div className="h-8 bg-gray-200 rounded w-20"></div>
+                  <div className="h-6 bg-muted rounded w-16"></div>
+                  <div className="h-8 bg-muted rounded w-20"></div>
                 </div>
               </CardContent>
             </Card>
@@ -157,10 +157,10 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-foreground">
             {t("receiptDesigner.templateManager")}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             {t("receiptDesigner.manageReceiptTemplates")}
           </p>
         </div>
@@ -186,7 +186,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                   <CardTitle className="text-lg font-medium truncate">
                     {template.name}
                   </CardTitle>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                     <Calendar size={12} />
                     {formatDate(template.created)}
                   </div>
@@ -208,7 +208,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
 
             <CardContent className="pt-0">
               {/* Template Preview */}
-              <div className="bg-gray-50 rounded p-3 mb-4 h-32 overflow-hidden">
+              <div className="bg-muted/50 rounded p-3 mb-4 h-32 overflow-hidden">
                 <div
                   className="transform scale-75 origin-top-left"
                   style={{
@@ -226,7 +226,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                   <div className="text-xs text-center mb-2">
                     {template.name}
                   </div>
-                  <div className="border-b border-gray-300 mb-2"></div>
+                  <div className="border-b border-border mb-2"></div>
                   {template.style?.components &&
                   Array.isArray(template.style.components) ? (
                     template.style.components
@@ -243,7 +243,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                         </div>
                       ))
                   ) : (
-                    <div className="text-xs text-gray-400">No components</div>
+                    <div className="text-xs text-muted-foreground">No components</div>
                   )}
                 </div>
               </div>
@@ -251,7 +251,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
               {/* Actions */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-muted-foreground">
                     {t("receiptDesigner.active")}:
                   </span>
                   <Switch
@@ -304,11 +304,11 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
 
         {templates.length === 0 && (
           <div className="col-span-full text-center py-12">
-            <Settings className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <Settings className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
               {t("receiptDesigner.noTemplatesFound")}
             </h3>
-            <p className="text-gray-500 mb-4">
+            <p className="text-muted-foreground mb-4">
               {t("receiptDesigner.createFirstTemplate")}
             </p>
             <Button onClick={onCreateNew}>

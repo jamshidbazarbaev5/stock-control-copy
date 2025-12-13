@@ -244,7 +244,7 @@ export default function StocksPage() {
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors border-r border-gray-300 pr-2">
+                    <button className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors border-r border-border pr-2">
                       <span>{label}</span>
                       <ChevronDown className="h-3 w-3" />
                     </button>
@@ -345,7 +345,7 @@ export default function StocksPage() {
                 </DropdownMenu>
               )}
               {row.is_recycled ? (
-                  <span className="text-[10px] leading-none px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+                  <span className="text-[10px] leading-none px-1.5 py-0.5 rounded border bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700">
                 {t("stock.recycled")}
               </span>
               ) : null}
@@ -783,7 +783,7 @@ export default function StocksPage() {
                     {Object.entries(COLUMN_CONFIG).map(([key, config]) => (
                         <label
                             key={key}
-                            className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                            className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
                         >
                           <input
                               type="checkbox"
@@ -877,15 +877,15 @@ export default function StocksPage() {
           </Select>
         </div>
 
-        <div className="overflow-x-auto border-r border-gray-300 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 border-r border-gray-300">
+        <div className="overflow-x-auto border border-border rounded-lg bg-card">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted/50">
             <tr>
               {columns.map((column) => (
                   <th
                       key={column.accessorKey}
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                          column.accessorKey === 'product' ? 'sticky left-0 bg-gray-50 z-10 border-r border-gray-200' : ''
+                      className={`px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider ${
+                          column.accessorKey === 'product' ? 'sticky left-0 bg-muted/50 z-10 border-r border-border' : ''
                       }`}
                   >
                     {column.header}
@@ -893,16 +893,16 @@ export default function StocksPage() {
               ))}
             </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
             {isLoading ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={columns.length} className="px-6 py-4 text-center text-muted-foreground">
                     Загрузка...
                   </td>
                 </tr>
             ) : stocks.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={columns.length} className="px-6 py-4 text-center text-muted-foreground">
                     Нет данных
                   </td>
                 </tr>
@@ -915,10 +915,10 @@ export default function StocksPage() {
                           key={stock.id}
                           className={`transition-colors duration-150 ${
                               isSelected
-                                  ? 'bg-blue-50 border-blue-200'
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
                                   : isHovered
-                                      ? 'bg-gray-50'
-                                      : 'hover:bg-gray-50'
+                                      ? 'bg-muted/50'
+                                      : 'hover:bg-muted/50'
                           }`}
                           onMouseEnter={() => setHoveredRow(stock.id!)}
                           onMouseLeave={() => setHoveredRow(null)}
@@ -926,15 +926,15 @@ export default function StocksPage() {
                         {columns.map((column) => (
                             <td
                                 key={column.accessorKey}
-                                className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                                className={`px-6 py-4 whitespace-nowrap text-sm text-foreground ${
                                     column.accessorKey === 'product'
-                                        ? 'sticky left-0 bg-white z-10 border-r border-gray-200 font-medium'
+                                        ? 'sticky left-0 bg-card z-10 border-r border-border font-medium'
                                         : ''
                                 } ${
                                     isSelected && column.accessorKey === 'product'
-                                        ? 'bg-blue-50'
+                                        ? 'bg-blue-50 dark:bg-blue-900/20'
                                         : isSelected
-                                            ? 'bg-blue-50'
+                                            ? 'bg-blue-50 dark:bg-blue-900/20'
                                             : ''
                                 }`}
                             >
@@ -983,14 +983,14 @@ export default function StocksPage() {
         {stocksData && (
             <Card className="p-4 sm:p-6 mb-4 mt-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Итоги</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Итоги</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Total Count */}
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
                     <div className="flex items-center gap-2 mb-2">
                       <Package className="h-5 w-5 text-purple-600" />
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm font-medium text-muted-foreground">
                     Всего записей
                   </span>
                     </div>
@@ -1003,7 +1003,7 @@ export default function StocksPage() {
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                     <div className="flex items-center gap-2 mb-2">
                       <Wallet className="h-5 w-5 text-blue-600" />
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm font-medium text-muted-foreground">
                     Текущая страница
                   </span>
                     </div>
@@ -1016,7 +1016,7 @@ export default function StocksPage() {
                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
                     <div className="flex items-center gap-2 mb-2">
                       <Package className="h-5 w-5 text-emerald-600" />
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm font-medium text-muted-foreground">
                     Размер страницы
                   </span>
                     </div>
@@ -1029,7 +1029,7 @@ export default function StocksPage() {
                   <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
                     <div className="flex items-center gap-2 mb-2">
                       <Landmark className="h-5 w-5 text-amber-600" />
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm font-medium text-muted-foreground">
                     Всего страниц
                   </span>
                     </div>
@@ -1042,14 +1042,14 @@ export default function StocksPage() {
 
                 {/* Current Page Totals */}
                 <div className="mt-6">
-                  <h4 className="text-md font-semibold text-gray-700 mb-3">
+                  <h4 className="text-md font-semibold text-foreground mb-3">
                     Сумма по текущей странице
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="h-5 w-5 text-blue-600" />
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-muted-foreground">
                       Общая стоимость (валюта)
                     </span>
                       </div>
@@ -1062,7 +1062,7 @@ export default function StocksPage() {
                     <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Landmark className="h-5 w-5 text-emerald-600" />
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-muted-foreground">
                       Общая стоимость (UZS)
                     </span>
                       </div>
@@ -1075,14 +1075,14 @@ export default function StocksPage() {
 
                 {/* All Records Totals */}
                 <div className="mt-4">
-                  <h4 className="text-md font-semibold text-gray-700 mb-3">
+                  <h4 className="text-md font-semibold text-foreground mb-3">
                     Общая сумма (все записи)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
                       <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="h-5 w-5 text-indigo-600" />
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-muted-foreground">
                       Общая стоимость (валюта)
                     </span>
                       </div>
@@ -1095,7 +1095,7 @@ export default function StocksPage() {
                     <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Landmark className="h-5 w-5 text-green-600" />
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-muted-foreground">
                       Общая стоимость (UZS)
                     </span>
                       </div>
@@ -1109,7 +1109,7 @@ export default function StocksPage() {
                 {/* Page Range
                 {stocksData.page_range && stocksData.page_range.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="text-md font-semibold text-gray-700 mb-3">
+                      <h4 className="text-md font-semibold text-foreground mb-3">
                         Диапазон страниц
                       </h4>
                       <div className="flex gap-2 flex-wrap">

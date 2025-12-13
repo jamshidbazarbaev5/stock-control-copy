@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResourceTable } from "../helpers/ResourseTable";
 import { toast } from "sonner";
@@ -28,6 +28,14 @@ import {
 } from "@/components/ui/dialog";
 import api from "../api/api";
 import { type Stock } from "../api/stock";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface PriceEdit {
   productId: number;
@@ -211,6 +219,19 @@ export default function ProductsPage() {
       }
   >(null);
 
+  // Barcode scanner state
+  const [scanBuffer, setScanBuffer] = useState("");
+  const [_isScanning, setIsScanning] = useState(false);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Barcode assignment dialog state
+  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [productSearchResults, setProductSearchResults] = useState<Product[]>([]);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const [isAssigningBarcode, setIsAssigningBarcode] = useState(false);
+
   // Save filters to localStorage
   useEffect(() => {
     localStorage.setItem("products_searchTerm", searchTerm);
@@ -236,6 +257,104 @@ export default function ProductsPage() {
   useEffect(() => {
     setPage(1);
   }, [searchTerm, selectedCategory, selectedMeasurement, productTab, hasPrice]);
+
+  // Barcode scanner functionality
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Ignore if user is typing in an input field or dialog is open
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      // Clear any existing timeout
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+
+      // Start scanning mode
+      setIsScanning(true);
+
+      // Handle Enter key (end of barcode scan)
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (scanBuffer.trim()) {
+          // Open the barcode assignment dialog with scanned barcode
+          setScannedBarcode(scanBuffer.trim());
+          setIsBarcodeDialogOpen(true);
+          setProductSearchQuery("");
+          setProductSearchResults([]);
+        }
+        setScanBuffer("");
+        setIsScanning(false);
+        return;
+      }
+
+      // Accumulate characters for barcode
+      if (event.key.length === 1) {
+        setScanBuffer((prev) => prev + event.key);
+
+        // Set timeout to reset buffer if scanning stops
+        scanTimeoutRef.current = setTimeout(() => {
+          setScanBuffer("");
+          setIsScanning(false);
+        }, 100);
+      }
+    };
+
+    // Add event listener
+    document.addEventListener("keydown", handleKeyPress);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener("keydown", handleKeyPress);
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+    };
+  }, [scanBuffer]);
+
+  // Search products by name for barcode assignment dialog
+  const handleProductSearch = async () => {
+    if (!productSearchQuery.trim()) {
+      return;
+    }
+    setIsSearchingProducts(true);
+    try {
+      const response = await api.get(`items/product/?product_name=${productSearchQuery}`);
+      const results = response.data.results || response.data || [];
+      setProductSearchResults(results);
+    } catch (error) {
+      console.error("Error searching products:", error);
+      toast.error("Ошибка при поиске товаров");
+    } finally {
+      setIsSearchingProducts(false);
+    }
+  };
+
+  // Assign barcode to product
+  const handleAssignBarcode = async (productId: number) => {
+    setIsAssigningBarcode(true);
+    try {
+      await api.patch(`items/product/${productId}/`, {
+        barcode: scannedBarcode,
+      });
+      toast.success("Штрих-код успешно присвоен товару");
+      setIsBarcodeDialogOpen(false);
+      setScannedBarcode("");
+      setProductSearchQuery("");
+      setProductSearchResults([]);
+    } catch (error) {
+      console.error("Error assigning barcode:", error);
+      toast.error("Ошибка при присвоении штрих-кода");
+    } finally {
+      setIsAssigningBarcode(false);
+    }
+  };
 
   const { data: productsData, isLoading } = useGetProducts({
     params: {
@@ -879,6 +998,111 @@ export default function ProductsPage() {
             : null
         }
       />
+
+      {/* Barcode Assignment Dialog */}
+      <Dialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {t("dialogs.assign_barcode", "Присвоить штрих-код товару")}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-sm text-blue-700">
+                {t("labels.scanned_barcode", "Отсканированный штрих-код")}:
+              </div>
+              <div className="text-lg font-mono font-bold text-blue-900">
+                {scannedBarcode}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder={t("placeholders.search_product_name", "Поиск по названию товара...")}
+                value={productSearchQuery}
+                onChange={(e) => setProductSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleProductSearch();
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleProductSearch}
+                disabled={isSearchingProducts || !productSearchQuery.trim()}
+              >
+                {isSearchingProducts ? t("common.searching", "Поиск...") : t("common.search", "Найти")}
+              </Button>
+            </div>
+
+            {productSearchResults.length > 0 && (
+              <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("table.name")}</TableHead>
+                      <TableHead>{t("table.category")}</TableHead>
+                      <TableHead>{t("table.barcode", "Штрих-код")}</TableHead>
+                      <TableHead className="text-right">{t("table.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {productSearchResults.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">
+                          {product.product_name}
+                        </TableCell>
+                        <TableCell>
+                          {product.category_read?.category_name || "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {product.barcode || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => product.id && handleAssignBarcode(product.id)}
+                            disabled={isAssigningBarcode}
+                          >
+                            {isAssigningBarcode
+                              ? t("common.saving", "Сохранение...")
+                              : t("buttons.assign_barcode", "Присвоить")}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {productSearchResults.length === 0 && productSearchQuery && !isSearchingProducts && (
+              <div className="text-center py-8 text-gray-500">
+                {t("messages.no_products_found", "Товары не найдены")}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsBarcodeDialogOpen(false);
+                setScannedBarcode("");
+                setProductSearchQuery("");
+                setProductSearchResults([]);
+              }}
+            >
+              {t("common.cancel", "Отмена")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
