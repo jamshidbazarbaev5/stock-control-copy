@@ -9,16 +9,17 @@ import { useErrorStore, parseErrorMessage } from "../store/errorStore";
 
 // Constants
 
- const BASE_URL = 'https://test.bondify.uz/api/v1/'
-
 const getBaseURL = (): string => {
   const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'https://test.smart-sawda.uz/api/v1/';
+  }
   return `https://${hostname}/api/v1/`;
 };
 
 // Create API instance
 const api: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: getBaseURL(),
   headers: {
     "Content-Type": "application/json",
   },

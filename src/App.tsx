@@ -94,6 +94,7 @@ import StockDebtPaymentHistoryPage from "@/core/pages/StockDebtPaymentHistoryPag
 import EditStockEntry from "@/core/pages/EditStockEntry.tsx";
 import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage";
 import ActivityPage from "./core/pages/ActivityPage";
+import ProductMovementsPage from "./core/pages/ProductMovementsPage";
 // import W9FormDemo from "./core/pages/W9FormDemo";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
@@ -437,6 +438,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор", "Продавец"]}>
                     <ActivityPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/product-movements"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <ProductMovementsPage />
                   </PrivateRoute>
                 }
               />

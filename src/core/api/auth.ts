@@ -14,10 +14,11 @@ interface TokenResponse {
 }
 
 // Constants
-const BASE_URL = 'https://test.bondify.uz/api/v1/'
-
 const getBaseURL = (): string => {
   const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'https://test.smart-sawda.uz/api/v1/';
+  }
   return `https://${hostname}/api/v1/`;
 };
 const TOKEN_ENDPOINT = 'token/';
@@ -30,7 +31,7 @@ const REFRESH_TOKEN_KEY = 'refresh_token';
 
 // API client
 const authApi = axios.create({
-  baseURL:BASE_URL,
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

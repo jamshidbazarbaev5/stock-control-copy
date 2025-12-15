@@ -180,5 +180,22 @@ export const useDeleteClientCustom = () => {
   });
 };
 
+export const useUpdateClientCustom = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Client & { id: number }) => {
+      const response = await api.put(`/clients/${data.id}/update`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (error: any) => {
+      console.error("Error updating client:", error);
+      toast.error(error?.response?.data?.detail || "Failed to update client");
+    },
+  });
+};
+
 export { api };
 
