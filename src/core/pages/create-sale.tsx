@@ -952,9 +952,8 @@ const handleQuantityChange = (
   const fetchCurrencyRates = async () => {
     try {
       setLoadingRates(true);
-      const response = await fetch('https://test.bondify.uz/api/v1/currency/rates/');
-      const data = await response.json();
-      setCurrencyRates(data);
+      const response = await api.get('currency/rates/');
+      setCurrencyRates(response.data);
     } catch (error) {
       console.error('Error fetching currency rates:', error);
       toast.error('Ошибка загрузки курсов валют');
