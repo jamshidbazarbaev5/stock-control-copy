@@ -383,8 +383,9 @@ export default function EditStockEntry() {
         const isEditable = quantity === quantityForHistory;
         const quantityMismatch = !isEditable;
 
-        // Extract exchange_rate ID properly
+        // Extract exchange_rate ID and rate value
         let exchangeRateValue: any = "";
+        let exchangeRateAmount: number = 0;
         if (stock.exchange_rate) {
           if (
               typeof stock.exchange_rate === "object" &&
@@ -393,9 +394,11 @@ export default function EditStockEntry() {
             // Check if it has an 'id' property
             if ("id" in stock.exchange_rate) {
               exchangeRateValue = (stock.exchange_rate as any).id;
+              exchangeRateAmount = Number((stock.exchange_rate as any).rate) || 0;
             }
           } else {
             exchangeRateValue = stock.exchange_rate;
+            exchangeRateAmount = Number(stock.exchange_rate) || 0;
           }
         }
 
@@ -418,6 +421,68 @@ export default function EditStockEntry() {
           exchange_rate: exchangeRateValue,
         });
 
+        // Calculate conversion factor from purchase_unit_quantity and quantity
+        const conversionFactor = Number(stock.quantity) && Number(stock.purchase_unit_quantity)
+          ? Number(stock.quantity) / Number(stock.purchase_unit_quantity)
+          : 1;
+
+        // Create dynamic fields to display based on currency type
+        const isBaseCurrency = stock.currency?.is_base || false;
+        const dynamicFields: { [key: string]: DynamicField } = {
+          purchase_unit_quantity: {
+            label: "Количество закупок",
+            value: stock.purchase_unit_quantity,
+            editable: true,
+            show: true,
+          },
+          quantity: {
+            label: "Количество",
+            value: stock.quantity,
+            editable: false,
+            show: true,
+          },
+          exchange_rate: {
+            label: "Курс обмена",
+            value: exchangeRateAmount,
+            editable: false,
+            show: !isBaseCurrency,
+          },
+        };
+
+        if (!isBaseCurrency) {
+          dynamicFields.price_per_unit_currency = {
+            label: `Цена за единицу (${stock.currency?.short_name || 'USD'})`,
+            value: stock.price_per_unit_currency,
+            editable: true,
+            show: true,
+          };
+          dynamicFields.total_price_in_currency = {
+            label: `Общая цена (${stock.currency?.short_name || 'USD'})`,
+            value: stock.total_price_in_currency,
+            editable: true,
+            show: true,
+          };
+        }
+
+        dynamicFields.price_per_unit_uz = {
+          label: `Цена за единицу (UZS)`,
+          value: stock.price_per_unit_uz,
+          editable: isBaseCurrency,
+          show: true,
+        };
+        dynamicFields.total_price_in_uz = {
+          label: `Общая цена (UZS)`,
+          value: stock.total_price_in_uz,
+          editable: isBaseCurrency,
+          show: true,
+        };
+
+        const fieldOrder = !isBaseCurrency
+          ? ['purchase_unit_quantity', 'quantity', 'exchange_rate', 'price_per_unit_currency',
+             'total_price_in_currency', 'price_per_unit_uz', 'total_price_in_uz']
+          : ['purchase_unit_quantity', 'quantity', 'price_per_unit_uz',
+             'total_price_in_uz'];
+
         return {
           id: `item-${index + 1}`,
           stockId: stock.id, // Store the database ID
@@ -437,11 +502,15 @@ export default function EditStockEntry() {
             stock_name: stock.stock_name || "",
             calculation_input: "",
           },
-          dynamicFields: {},
-          dynamicFieldsOrder: [],
-          calculationMetadata: null,
+          dynamicFields: dynamicFields,
+          dynamicFieldsOrder: fieldOrder,
+          calculationMetadata: {
+            conversion_factor: conversionFactor,
+            exchange_rate: exchangeRateAmount,
+            is_base_currency: isBaseCurrency,
+          },
           selectedProduct: stock.product || null,
-          isCalculated: false, // Will be recalculated to get field metadata
+          isCalculated: true, // Mark as calculated since we have all data from API
           isExpanded: true, // All items expanded by default
           isCalculating: false,
           isEditable,
@@ -1845,17 +1914,53 @@ export default function EditStockEntry() {
                 <div className="space-y-4 mt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="amount_of_debt">
-                        {t("common.amount_of_debt") || "Total Debt Amount"}
+                      <Label htmlFor="amount_of_debt_uzs">
+                        {t("common.amount_of_debt")} (UZS)
                       </Label>
                       <Input
-                          id="amount_of_debt"
+                          id="amount_of_debt_uzs"
                           type="number"
                           step="0.01"
-                          placeholder="0.00"
-                          {...commonForm.register("amount_of_debt")}
+                          value={(() => {
+                            return stockItems.reduce((sum, item) => {
+                              if (item.isCalculated && item.form.currency) {
+                                const currency = currencies.find(c => c.id === Number(item.form.currency));
+                                if (currency?.is_base) {
+                                  return sum + (Number(item.form.total_price_in_uz) || 0);
+                                }
+                              }
+                              return sum;
+                            }, 0).toFixed(2);
+                          })()}
+                          readOnly
+                          className="bg-gray-100 cursor-not-allowed"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount_of_debt_usd">
+                        {t("common.amount_of_debt")} (USD)
+                      </Label>
+                      <Input
+                          id="amount_of_debt_usd"
+                          type="number"
+                          step="0.01"
+                          value={(() => {
+                            return stockItems.reduce((sum, item) => {
+                              if (item.isCalculated && item.form.currency) {
+                                const currency = currencies.find(c => c.id === Number(item.form.currency));
+                                if (!currency?.is_base) {
+                                  return sum + (Number(item.form.total_price_in_currency) || 0);
+                                }
+                              }
+                              return sum;
+                            }, 0).toFixed(2);
+                          })()}
+                          readOnly
+                          className="bg-gray-100 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="advance_of_debt">
                         {t("common.advance_of_debt") || "Advance Payment"}
@@ -2564,9 +2669,12 @@ export default function EditStockEntry() {
                                     .map((fieldName: string) => {
                                       const fieldData = item.dynamicFields[fieldName];
                                       // For exchange_rate field, display the rate value from metadata
-                                      const displayValue = fieldName === 'exchange_rate' && item.calculationMetadata
-                                          ? item.calculationMetadata.exchange_rate.toString()
-                                          : (item.form[fieldName as keyof StockItemFormValues] || "");
+                                      let displayValue: string;
+                                      if (fieldName === 'exchange_rate' && item.calculationMetadata) {
+                                        displayValue = item.calculationMetadata.exchange_rate.toString();
+                                      } else {
+                                        displayValue = (item.form[fieldName as keyof StockItemFormValues] || "").toString();
+                                      }
 
                                       return (
                                           <div key={fieldName} className="space-y-2">

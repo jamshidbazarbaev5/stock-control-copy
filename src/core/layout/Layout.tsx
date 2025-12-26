@@ -251,6 +251,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ...(currentUser?.is_superuser || currentUser?.role === "Администратор"
         ? [{ icon: Receipt, label: "Отчёт", href: "/activity" }]
         : []),
+      // Product Movements - only for superadmin and admin
+      ...(currentUser?.is_superuser || currentUser?.role === "Администратор"
+        ? [{ icon: ArrowLeftRight, label: "Движение товаров", href: "/product-movements" }]
+        : []),
       { icon: UserCheck, label: t("navigation.clients"), href: "/clients" },
       { icon: ShoppingBag, label: t("navigation.debt"), href: "/debts" },
       {

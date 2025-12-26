@@ -130,15 +130,50 @@ export default function DebtsPage() {
           </div>
         ),
       },
+      // {
+      //   accessorKey: "total_amount",
+      //   header: t("forms.total_amount4"),
+      //   cell: (client: DebtByClient) => client.total_amount?.toLocaleString(),
+      // },
+      // {
+      //   accessorKey: "total_deposit",
+      //   header: t("forms.deposit"),
+      //   cell: (client: DebtByClient) => client.total_deposit?.toLocaleString(),
+      // },
+      // {
+      //   accessorKey: "total_remainder",
+      //   header: t("forms.total_remainder") || "Остаток",
+      //   cell: (client: DebtByClient) => (
+      //     <span className="text-red-600 font-medium">
+      //       {(client as any).total_remainder?.toLocaleString() || "0"}
+      //     </span>
+      //   ),
+      // },
       {
-        accessorKey: "total_amount",
-        header: t("forms.total_amount4"),
-        cell: (client: DebtByClient) => client.total_amount?.toLocaleString(),
+        accessorKey: "total_remainder_usd",
+        header: t("forms.total_remainder_usd") || "Остаток (USD)",
+        cell: (client: DebtByClient) => {
+          const usdRemainder = (client as any).total_remainder_usd;
+          if (!usdRemainder || Number(usdRemainder) === 0) return "—";
+          return (
+            <span className="text-blue-600 font-medium">
+              {Number(usdRemainder).toLocaleString()} $
+            </span>
+          );
+        },
       },
       {
-        accessorKey: "total_deposit",
-        header: t("forms.deposit"),
-        cell: (client: DebtByClient) => client.total_deposit?.toLocaleString(),
+        accessorKey: "total_remainder_uzs",
+        header: t("forms.total_remainder_uzs") || "Остаток (UZS)",
+        cell: (client: DebtByClient) => {
+          const uzsRemainder = (client as any).total_remainder_uzs;
+          if (!uzsRemainder || Number(uzsRemainder) === 0) return "—";
+          return (
+            <span className="text-emerald-600 font-medium">
+              {Number(uzsRemainder).toLocaleString()}
+            </span>
+          );
+        },
       },
     ];
 

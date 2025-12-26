@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResourceTable } from "../helpers/ResourseTable";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+
+import { WideDialog, WideDialogContent, WideDialogHeader, WideDialogTitle } from "@/components/ui/wide-dialog";
 import { toast } from "sonner";
 import {
   type Supplier,
@@ -55,23 +56,35 @@ const columns = (t: (key: string) => string) => [
     accessorKey: "phone_number",
   },
   {
-    header: t("table.balance"),
-    accessorKey: "balance",
+    header: t("table.balance") + " (UZS)",
+    accessorKey: "balance_uzs",
     cell: (row: Supplier) => {
       const s: any = row;
-      const type = s.balance_type === "USD" || s.balance_type === "UZS" ? s.balance_type : "USD";
-      const value = type === "USD" ? s.balance_in_usd : s.balance;
-      return `${formatPrice(value)} ${type}`;
+      return `${formatPrice(s.balance_uzs || 0)} UZS`;
     },
   },
   {
-    header: t("table.remaining_debt"),
-    accessorKey: "remaining_debt",
+    header: t("table.balance") + " (USD)",
+    accessorKey: "balance_usd",
     cell: (row: Supplier) => {
       const s: any = row;
-      const type = s.balance_type === "USD" || s.balance_type === "UZS" ? s.balance_type : "USD";
-      const currencySymbol = type === "USD" ? "$" : "UZS";
-      return `${formatPrice(row.remaining_debt)} ${currencySymbol}`;
+      return `${formatPrice(s.balance_usd || 0)} USD`;
+    },
+  },
+  {
+    header: t("table.remaining_debt") + " (UZS)",
+    accessorKey: "remaining_debt_uzs",
+    cell: (row: Supplier) => {
+      const s: any = row;
+      return `${formatPrice(s.remaining_debt_uzs || 0)} UZS`;
+    },
+  },
+  {
+    header: t("table.remaining_debt") + " (USD)",
+    accessorKey: "remaining_debt_usd",
+    cell: (row: Supplier) => {
+      const s: any = row;
+      return `${formatPrice(s.remaining_debt_usd || 0)} USD`;
     },
   },
 ];
@@ -89,6 +102,7 @@ export default function SuppliersPage() {
     amount: "",
     payment_method: "Наличные",
     exchange_rate: "",
+    debt_currency: "USD" as "USD" | "UZS",
   });
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [showScrollButtons, setShowScrollButtons] = useState(false);
@@ -100,6 +114,7 @@ export default function SuppliersPage() {
     payment_type: "Наличные" as "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта",
     comment: "",
     exchange_rate: "",
+    debt_currency: "USD" as "USD" | "UZS",
   });
   const [selectedMassPaymentStore, setSelectedMassPaymentStore] = useState<Store | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
@@ -173,6 +188,7 @@ export default function SuppliersPage() {
       amount: "",
       payment_method: "Наличные",
       exchange_rate: "",
+      debt_currency: "USD",
     });
     setSelectedStore(null);
     setIsBalanceDialogOpen(true);
@@ -203,15 +219,12 @@ export default function SuppliersPage() {
       return;
     }
 
-    const balanceType = (selectedSupplierForBalance?.balance_type === "USD" || selectedSupplierForBalance?.balance_type === "UZS")
-      ? (selectedSupplierForBalance as any).balance_type
-      : "USD";
     const data: any = {
       supplier: selectedSupplierForBalance.id,
       store: Number(balanceForm.store),
       amount: Number(balanceForm.amount),
       payment_method: balanceForm.payment_method,
-      balance_type: balanceType,
+      debt_currency: balanceForm.debt_currency,
       ...(balanceForm.exchange_rate && {
         exchange_rate: Number(balanceForm.exchange_rate),
       }),
@@ -225,7 +238,7 @@ export default function SuppliersPage() {
         setIsBalanceDialogOpen(false);
         setSelectedSupplierForBalance(null);
       },
-    
+
     });
   };
 
@@ -237,6 +250,7 @@ export default function SuppliersPage() {
       payment_type: "Наличные",
       comment: "",
       exchange_rate: "",
+      debt_currency: "USD",
     });
     setIsMassPaymentDialogOpen(true);
   };
@@ -270,18 +284,13 @@ export default function SuppliersPage() {
       }
     }
 
-    const supplierCurrency = (() => {
-      const s = suppliers.find((sup: Supplier) => sup.id === Number(massPaymentForm.supplier));
-      const bt = (s as any)?.balance_type;
-      return bt === "USD" || bt === "UZS" ? bt : "USD";
-    })();
     const data = {
       supplier: Number(massPaymentForm.supplier),
       store: Number(massPaymentForm.store),
       amount: Number(massPaymentForm.amount),
       payment_type: massPaymentForm.payment_type,
       comment: massPaymentForm.comment,
-      balance_type: supplierCurrency,
+      debt_currency: massPaymentForm.debt_currency,
       ...(massPaymentForm.exchange_rate && {
         exchange_rate: Number(massPaymentForm.exchange_rate),
       }),
@@ -405,13 +414,58 @@ export default function SuppliersPage() {
         />
 
         {/* Add Balance Dialog */}
-        <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
-          <DialogContent>
-            <DialogTitle>
-              {t("common.add_balance") || "Add Balance"} -{" "}
-              {selectedSupplierForBalance?.name}
-            </DialogTitle>
+        <WideDialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
+          <WideDialogContent width="wide">
+            <WideDialogHeader>
+              <WideDialogTitle>
+                {t("common.add_balance") || "Add Balance"} -{" "}
+                {selectedSupplierForBalance?.name}
+              </WideDialogTitle>
+            </WideDialogHeader>
             <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="debt_currency">
+                  {t("common.debt_currency") || "Debt Currency"} *
+                </Label>
+                <Select
+                    value={balanceForm.debt_currency}
+                    onValueChange={(value: "USD" | "UZS") =>
+                        setBalanceForm({ ...balanceForm, debt_currency: value })
+                    }
+                >
+                  <SelectTrigger id="debt_currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="UZS">UZS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedSupplierForBalance && (() => {
+                const s: any = selectedSupplierForBalance;
+                const debtAmount = balanceForm.debt_currency === "USD"
+                  ? Number(s.remaining_debt_usd || 0)
+                  : Number(s.remaining_debt_uzs || 0);
+
+                return (
+                  <div className="space-y-2 p-4 bg-muted rounded-lg">
+                    <div className="font-medium text-sm">
+                      {t("common.remaining_debt") || "Remaining Debt"}:
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">
+                        {balanceForm.debt_currency}:
+                      </span>
+                      <span className="font-bold text-lg text-orange-500">
+                        {formatPrice(debtAmount)} {balanceForm.debt_currency}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-2">
                 <Label htmlFor="payment_method">
                   {t("common.payment_method")} *
@@ -557,17 +611,63 @@ export default function SuppliersPage() {
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </WideDialogContent>
+        </WideDialog>
 
         {/* Mass Payment Dialog */}
-        <Dialog open={isMassPaymentDialogOpen} onOpenChange={setIsMassPaymentDialogOpen}>
-          <DialogContent>
-            <DialogTitle>
-              {t("common.mass_payment") || "Mass Payment"}
-            </DialogTitle>
+        <WideDialog open={isMassPaymentDialogOpen} onOpenChange={setIsMassPaymentDialogOpen}>
+          <WideDialogContent width="wide">
+            <WideDialogHeader>
+              <WideDialogTitle>
+                {t("common.mass_payment") || "Mass Payment"}
+              </WideDialogTitle>
+            </WideDialogHeader>
             <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="mass_debt_currency">
+                  {t("common.debt_currency") || "Debt Currency"} *
+                </Label>
+                <Select
+                    value={massPaymentForm.debt_currency}
+                    onValueChange={(value: "USD" | "UZS") =>
+                        setMassPaymentForm({ ...massPaymentForm, debt_currency: value })
+                    }
+                >
+                  <SelectTrigger id="mass_debt_currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="UZS">UZS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
+              {massPaymentForm.supplier && suppliers.length > 0 && (() => {
+                const supplier = suppliers.find((sup: Supplier) => sup.id === Number(massPaymentForm.supplier));
+                if (!supplier) return null;
+
+                const s: any = supplier;
+                const debtAmount = massPaymentForm.debt_currency === "USD"
+                  ? Number(s.remaining_debt_usd || 0)
+                  : Number(s.remaining_debt_uzs || 0);
+
+                return (
+                  <div className="space-y-2 p-4 bg-muted rounded-lg">
+                    <div className="font-medium text-sm">
+                      {t("common.remaining_debt") || "Remaining Debt"}:
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">
+                        {massPaymentForm.debt_currency}:
+                      </span>
+                      <span className="font-bold text-lg text-orange-500">
+                        {formatPrice(debtAmount)} {massPaymentForm.debt_currency}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <Label htmlFor="mass_store">{t("forms.store")} *</Label>
@@ -720,8 +820,8 @@ export default function SuppliersPage() {
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </WideDialogContent>
+        </WideDialog>
 
         {/* Scroll Buttons */}
         {showScrollButtons && (

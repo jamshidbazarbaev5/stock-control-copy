@@ -165,6 +165,8 @@ export interface Debt {
   deposit: string;
   is_paid: boolean;
   created_at: string;
+  total_amount_uzs:number;
+  remainder_uzs:number;
   remainder: number;
   last_usd_rate?: string;
   usd_rate_at_creation?: string;
@@ -176,6 +178,7 @@ export interface DebtPayment {
   amount: number;
   paid_at?: string;
   payment_method: string;
+  usd_rate_at_payment?: number;
   worker_read?: {
     id: number;
     name: string;
@@ -185,6 +188,7 @@ export interface DebtPayment {
 interface DebtPaymentResponse {
   id: number;
   debt: number;
+  usd_rate_at_payment:number;
   worker_read: {
     id: number;
     name: string;

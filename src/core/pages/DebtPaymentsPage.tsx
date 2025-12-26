@@ -57,15 +57,26 @@ export default function DebtPaymentsPage() {
             style={{ animationDelay: `${index * 100}ms` }}
           >
             <Card className="p-6 hover:shadow-lg transition-all duration-300">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Payment Amount and Method */}
                 <div className="flex items-start space-x-4">
                   {getPaymentMethodIcon(payment.payment_method)}
                   <div>
                     <p className="text-2xl font-bold text-emerald-600">
-                      {formatCurrency(payment.amount)}
+                      {formatCurrency(payment.amount)} {payment.payment_method === 'Валюта' ? '$' : 'UZS'}
                     </p>
                     <p className="text-sm text-gray-500">{payment.payment_method}</p>
+                  </div>
+                </div>
+
+                {/* USD Rate at Payment */}
+                <div className="flex items-start space-x-4">
+                  <DollarSign className="w-5 h-5 text-blue-500" />
+                  <div>
+                    <p className="font-medium text-blue-600">
+                      {payment.usd_rate_at_payment ? `${formatCurrency(payment.usd_rate_at_payment)} UZS` : '-'}
+                    </p>
+                    <p className="text-sm text-gray-500">{t('forms.usd_rate_at_payment') || 'Курс USD'}</p>
                   </div>
                 </div>
 

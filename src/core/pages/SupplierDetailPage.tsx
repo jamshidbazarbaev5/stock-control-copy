@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGetStockEntries, useGetStocks, usePayStockDebt } from '../api/stock';
 import { useGetStores } from '../api/store';
 import { useCurrentUser } from '../hooks/useCurrentUser';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, DollarSign, History, Edit, MoreHorizontal } from 'lucide-react';
+import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical } from 'lucide-react';
+import '../../expanded-row-dark.css';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ResourceTable } from '../helpers/ResourseTable';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,30 +31,24 @@ import { toast } from 'sonner';
 
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { t } = useTranslation();
-  const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentType, setPaymentType] = useState('Наличные');
+  const [debtCurrency, setDebtCurrency] = useState<'USD' | 'UZS'>('UZS');
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [paymentComment, setPaymentComment] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
-  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
-  // Fetch supplier details
-  const { data: supplierData } = useQuery<any>({
-    queryKey: ['supplier', id],
-    queryFn: async () => {
-      const response = await api.get(`/suppliers/${id}/`);
-      return response.data;
-    },
-  });
 
-  // Fetch stock entries for this supplierp
+  // Fetch stock entries for this supplier
   const { data: stockEntriesData, isLoading: isLoadingEntries } = useGetStockEntries({
-    params: { supplier: id },
+    params: { supplier: id, page: currentPage },
   });
   const { data: currentUser } = useCurrentUser();
   const { data: storesData } = useGetStores({});
@@ -74,11 +76,13 @@ export default function SupplierDetailPage() {
     : "0";
 
   const stockEntries = stockEntriesData?.results || [];
+  const totalCount = stockEntriesData?.count || 0;
 
   const handlePaymentClick = (entry: any) => {
     setSelectedEntry(entry);
     setPaymentAmount('');
     setPaymentType('Наличные');
+    setDebtCurrency('UZS');
     setSelectedStoreId(currentUser?.is_superuser ? null : (currentUser?.store_read?.id || null));
     setPaymentComment('');
     setExchangeRate('');
@@ -97,18 +101,14 @@ export default function SupplierDetailPage() {
       return;
     }
 
-    if (amount > Number(selectedEntry.remaining_debt)) {
-      toast.error(t('validation.amount_exceeds_remainder'));
-      return;
-    }
-
     payStockDebt.mutate(
       {
         stock_entry: selectedEntry.id,
         amount,
         payment_type: paymentType,
+        debt_currency: debtCurrency,
         comment: paymentComment,
-        ...(paymentType === "Валюта" && exchangeRate && {
+        ...(exchangeRate && {
           rate_at_payment: Number(exchangeRate),
         }),
       },
@@ -116,24 +116,23 @@ export default function SupplierDetailPage() {
         onSuccess: () => {
           toast.success(t('common.payment_successful'));
           setPaymentDialogOpen(false);
-          setSelectedEntry(null);
-          setPaymentAmount('');
-          setPaymentComment('');
-          setExchangeRate('');
+          window.location.reload();
         },
-       
+        onError: (error: any) => {
+          toast.error(error?.message || t('common.payment_failed'));
+          // Invalidate queries even on error to ensure data consistency
+          queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
+          queryClient.invalidateQueries({ queryKey: ['stores'] });
+        }
       }
     );
+
   };
 
   // Fetch stock details for an expanded entry
 
-  const toggleEntry = (entryId: number) => {
-    if (expandedEntry === entryId) {
-      setExpandedEntry(null);
-    } else {
-      setExpandedEntry(entryId);
-    }
+  const formatCurrency = (amount: string | number | undefined) => {
+    return new Intl.NumberFormat('ru-RU').format(Number(amount));
   };
 
   const formatDate = (dateString: string) => {
@@ -153,9 +152,161 @@ export default function SupplierDetailPage() {
     });
   };
 
-  const getCurrencySymbol = () => {
-    return supplierData?.balance_type === 'USD' ? '$' : t('common.uzs');
+  const handleRowClick = (row: any) => {
+    if (row.id === expandedRowId) {
+      setExpandedRowId(null);
+    } else {
+      setExpandedRowId(row.id || null);
+    }
   };
+
+  const renderExpandedRow = (entry: any) => {
+    return (
+      <div className="bg-gray-50 border-t border-gray-200">
+        <StockDetailsAccordion stockEntryId={entry.id} />
+      </div>
+    );
+  };
+
+  const columns = [
+    {
+      header: t('common.date'),
+      accessorKey: 'date_of_arrived',
+      cell: (row: any) => formatDate(row.date_of_arrived),
+    },
+    {
+      header: t('table.store'),
+      accessorKey: 'store',
+      cell: (row: any) => row.store?.name || '-',
+    },
+    {
+      header: t('common.total_amount') + ' (UZS)',
+      accessorKey: 'total_amount_uzs',
+      cell: (row: any) => (
+        <span className="font-medium text-emerald-600">
+          {formatCurrency(row.total_amount_uzs || 0)} UZS
+        </span>
+      ),
+    },
+    {
+      header: t('common.total_amount') + ' (USD)',
+      accessorKey: 'total_amount_usd',
+      cell: (row: any) => (
+        <span className="font-medium text-emerald-600">
+          {formatCurrency(row.total_amount_usd || 0)} USD
+        </span>
+      ),
+    },
+    {
+      header: t('common.stock_count'),
+      accessorKey: 'stock_count',
+      cell: (row: any) => (
+        <div className="inline-flex items-center gap-1">
+          <Package className="h-4 w-4 text-blue-600" />
+          <span>{row.stock_count}</span>
+        </div>
+      ),
+    },
+    {
+      header: t('common.debt_status'),
+      accessorKey: 'is_debt',
+      cell: (row: any) => (
+        <div>
+          {row.use_supplier_balance ? (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+              <CheckCircle2 className="h-3 w-3" />
+              с баланса
+            </span>
+          ) : (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                !row.is_debt
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : row.is_paid
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {!row.is_debt ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : row.is_paid ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : (
+                <AlertCircle className="h-3 w-3" />
+              )}
+              {!row.is_debt ? t('common.paid3') : row.is_paid ? t('common.paid') : t('common.unpaid')}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: t('dashboard.remaining_debt') + ' (UZS)',
+      accessorKey: 'remaining_debt_uzs',
+      cell: (row: any) => (
+        <span className="font-medium text-orange-600">
+          {formatCurrency(row.remaining_debt_uzs || 0)} UZS
+        </span>
+      ),
+    },
+    {
+      header: t('dashboard.remaining_debt') + ' (USD)',
+      accessorKey: 'remaining_debt_usd',
+      cell: (row: any) => (
+        <span className="font-medium text-orange-600">
+          {formatCurrency(row.remaining_debt_usd || 0)} USD
+        </span>
+      ),
+    },
+    {
+      header: t('common.actions'),
+      accessorKey: 'actions',
+      cell: (row: any) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/suppliers/${id}/stock-entries/${row.id}/edit`);
+              }}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              {t('common.edit')}
+            </DropdownMenuItem>
+            {row.is_debt && (
+              <>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/suppliers/${id}/stock-entries/${row.id}/payments`);
+                  }}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  {t('common.payment_history')}
+                </DropdownMenuItem>
+                {(Number(row.remaining_debt_uzs || 0) > 0 || Number(row.remaining_debt_usd || 0) > 0) && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePaymentClick(row);
+                    }}
+                  >
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    {t('common.pay_debt')}
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   if (isLoadingEntries) {
     return (
@@ -171,193 +322,64 @@ export default function SupplierDetailPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
+    <div className="container mx-auto py-4 sm:py-6 md:py-8 px-2 sm:px-4">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">
           {stockEntries[0]?.supplier.name || t('navigation.suppliers')} - {t('common.stock_entries')}
         </h1>
       </div>
 
-      {stockEntries.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            {t('common.no_data')}
-          </CardContent>
+      <div className="overflow-hidden rounded-lg mb-4 sm:mb-6">
+        <Card className="overflow-x-auto">
+          <div className="min-w-[320px] sm:min-w-[800px]">
+            <ResourceTable
+              data={stockEntries}
+              columns={columns}
+              isLoading={isLoadingEntries}
+              totalCount={totalCount}
+              pageSize={30}
+              currentPage={currentPage}
+              onPageChange={(newPage) => setCurrentPage(newPage)}
+              expandedRowRenderer={(row: any) => renderExpandedRow(row)}
+              onRowClick={(row: any) => handleRowClick(row)}
+            />
+          </div>
         </Card>
-      ) : (
-        <div className="space-y-4">
-          {stockEntries.map((entry) => (
-            <Card key={entry.id}>
-              <CardHeader className="cursor-pointer" onClick={() => toggleEntry(entry.id)}>
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">
-                      {t('common.date')}: {formatDate(entry.date_of_arrived)}
-                    </CardTitle>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">{t('table.store')}:</span>{' '}
-                        <span className="font-medium">{entry.store.name}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">{t('common.total_amount')}:</span>{' '}
-                        <span className="font-medium">{formatNumber(entry.total_amount)} {getCurrencySymbol()}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">{t('common.stock_count')}:</span>{' '}
-                        <span className="font-medium">{entry.stock_count}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">{t('common.debt_status')}:</span>{' '}
-                        <span
-                          className={`font-medium ${
-                            !entry.is_debt
-                              ? 'text-green-500'
-                              : entry.is_paid
-                              ? 'text-green-500'
-                              : 'text-red-500'
-                          }`}
-                        >
-                          {!entry.is_debt
-                            ? t('common.paid3') // Not for debt
-                            : entry.is_paid
-                            ? t('common.paid') // Debt paid
-                            : t('common.unpaid')}
-                        </span>
-                      </div>
-                      {entry.rate_at_purchase && (
-                        <div>
-                          <span className="text-muted-foreground">{t('common.exchange_rate')}:</span>{' '}
-                          <span className="font-medium text-blue-600">{formatNumber(entry.rate_at_purchase)}</span>
-                        </div>
-                      )}
-                    </div>
-                    {entry.is_debt && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
-                        {entry.amount_of_debt && Number(entry.amount_of_debt) > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">{t('common.amount_of_debt')}:</span>{' '}
-                            <span className="font-medium text-red-500">{Number(entry.amount_of_debt).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {getCurrencySymbol()}</span>
-                          </div>
-                        )}
-                        {entry.advance_of_debt && (
-                          <div>
-                            <span className="text-muted-foreground">{t('common.advance_payment')}:</span>{' '}
-                            <span className="font-medium text-green-500">{formatNumber(entry.advance_of_debt)} {getCurrencySymbol()}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-muted-foreground">{t('dashboard.total_paid')}:</span>{' '}
-                          <span className="font-medium text-blue-500">{formatNumber(entry.total_paid)} {getCurrencySymbol()}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">{t('dashboard.remaining_debt')}:</span>{' '}
-                          <span className="font-medium text-orange-500">{formatNumber(entry.remaining_debt)} {getCurrencySymbol()}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <div className="relative" style={{ position: 'static' }}>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-                          setOpenDropdown(openDropdown === entry.id ? null : entry.id);
-                        }}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                      {openDropdown === entry.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setOpenDropdown(null)}
-                          />
-                          <div className="fixed w-48 bg-white rounded-md shadow-lg z-20 border" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
-                            <Link
-                              to={`/suppliers/${id}/stock-entries/${entry.id}/edit`}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenDropdown(null);
-                              }}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              {t('common.edit')}
-                            </Link>
-                            {entry.is_debt && (
-                              <>
-                                <Link
-                                  to={`/suppliers/${id}/stock-entries/${entry.id}/payments`}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenDropdown(null);
-                                  }}
-                                >
-                                  <History className="h-4 w-4 mr-2" />
-                                  {t('common.payment_history')}
-                                </Link>
-                                {Number(entry.remaining_debt) > 0 && (
-                                  <button
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenDropdown(null);
-                                      handlePaymentClick(entry);
-                                    }}
-                                  >
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    {t('common.pay_debt')}
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-                      {expandedEntry === entry.id ? <ChevronUp /> : <ChevronDown />}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              {expandedEntry === entry.id && (
-                <CardContent>
-                  <StockDetailsAccordion stockEntryId={entry.id} />
-                </CardContent>
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
+      </div>
 
       {/* Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      <Dialog open={paymentDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          // Dialog is being closed (clicked outside or ESC pressed)
+          window.location.reload();
+        }
+        setPaymentDialogOpen(open);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('common.pay_debt')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="debt-currency">{t('common.currency')}</Label>
+              <select
+                id="debt-currency"
+                className="w-full px-3 py-2 border rounded-md"
+                value={debtCurrency}
+                onChange={(e) => setDebtCurrency(e.target.value as 'USD' | 'UZS')}
+              >
+                <option value="UZS">UZS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+
             {selectedEntry && (
               <div className="space-y-2 p-4 bg-muted rounded-lg">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">{t('common.total_amount')}:</span>
-                  <span className="font-medium">{formatNumber(selectedEntry.total_amount)} {getCurrencySymbol()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">{t('dashboard.total_paid')}:</span>
-                  <span className="font-medium text-blue-500">{formatNumber(selectedEntry.total_paid)} {getCurrencySymbol()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">{t('dashboard.remaining_debt')}:</span>
-                  <span className="font-medium text-orange-500">{formatNumber(selectedEntry.remaining_debt)} {getCurrencySymbol()}</span>
+                  <span className="text-sm text-muted-foreground">{t('dashboard.remaining_debt')} ({debtCurrency}):</span>
+                  <span className="font-medium text-orange-500">
+                    {formatNumber(debtCurrency === 'UZS' ? selectedEntry.remaining_debt_uzs || 0 : selectedEntry.remaining_debt_usd || 0)} {debtCurrency}
+                  </span>
                 </div>
               </div>
             )}
@@ -395,19 +417,17 @@ export default function SupplierDetailPage() {
               </select>
             </div>
 
-            {paymentType === "Валюта" && (
-              <div className="space-y-2">
-                <Label htmlFor="exchange-rate">{t('common.exchange_rate') || 'Exchange Rate'} *</Label>
-                <Input
-                  id="exchange-rate"
-                  type="number"
-                  step="0.01"
-                  value={exchangeRate}
-                  onChange={(e) => setExchangeRate(e.target.value)}
-                  placeholder={t('placeholders.enter_exchange_rate') || 'Enter exchange rate'}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="exchange-rate">{t('common.exchange_rate') || 'Exchange Rate'}</Label>
+              <Input
+                id="exchange-rate"
+                type="number"
+                step="0.01"
+                value={exchangeRate}
+                onChange={(e) => setExchangeRate(e.target.value)}
+                placeholder="12200"
+              />
+            </div>
 
             {selectedStoreId && (
               <div className="p-3 bg-muted rounded-md">
@@ -424,7 +444,6 @@ export default function SupplierDetailPage() {
                 placeholder={t('common.enter_payment_amount')}
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                max={selectedEntry?.remaining_debt}
               />
             </div>
 
@@ -442,7 +461,10 @@ export default function SupplierDetailPage() {
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
-                onClick={() => setPaymentDialogOpen(false)}
+                onClick={() => {
+                  setPaymentDialogOpen(false);
+                  window.location.reload();
+                }}
                 disabled={payStockDebt.isPending}
               >
                 {t('common.cancel')}
@@ -495,113 +517,44 @@ function StockDetailsAccordion({ stockEntryId }: { stockEntryId: number }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-lg">{t('common.stock_items')}</h3>
-        <span className="text-xs font-medium bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-          {stocks.length} {stocks.length === 1 ? t('common.item') : t('common.items')}
-        </span>
-      </div>
-      
-      <div className="grid gap-3">
-        {stocks.map((stock, index) => (
-          <Card key={stock.id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                {/* Product Name Header */}
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {t('common.product')} #{index + 1}
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-base text-gray-900 break-words">
-                      {stock.product?.product_name || 'N/A'}
-                    </h4>
-                  </div>
-                </div>
-
-                {/* Main Info Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {/* Quantity */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 font-medium mb-1">{t('common.quantity')}</p>
-                    <p className="font-bold text-sm text-gray-900">
-                      {formatNumber(stock.quantity || 0)}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {stock.purchase_unit?.short_name || ''}
-                    </p>
-                  </div>
-
-                  {/* Currency */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 font-medium mb-1">{t('common.currency')}</p>
-                    <p className="font-bold text-sm text-gray-900">
-                      {stock.currency?.short_name || 'UZS'}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {stock.currency?.name || ''}
-                    </p>
-                  </div>
-
-                  {/* Total Price */}
-                  <div className="bg-blue-50 p-3 rounded-lg md:col-span-1 col-span-2">
-                    <p className="text-xs text-blue-600 font-medium mb-1">{t('common.total_price')} (UZS)</p>
-                    <p className="font-bold text-lg text-blue-700">
-                      {formatNumber(stock.total_price_in_uz || 0)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Exchange Rate at Purchase */}
-                {stock.rate_at_purchase && (
-                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-green-600 font-medium">
-                        {t('common.exchange_rate') || 'Exchange Rate at Purchase'}
-                      </p>
-                      <p className="font-bold text-green-700">
-                        {formatNumber(stock.rate_at_purchase)}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Additional Details - More Prices */}
-                {/* <div className="border-t pt-3">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {stock.price_per_unit_currency && (
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.price_per_unit')}</p>
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {formatNumber(stock.price_per_unit_currency)}
-                        </p>
-                      </div>
-                    )}
-                    {stock.price_per_unit_uz && (
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.price_per_unit')} (UZS)</p>
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {formatNumber(stock.price_per_unit_uz)}
-                        </p>
-                      </div>
-                    )}
-                    {stock.base_unit_in_uzs && (
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium mb-1">{t('common.base_unit')} (UZS)</p>
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {formatNumber(stock.base_unit_in_uzs)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div> */}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="p-4">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">#</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">{t('common.product_name')}</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">{t('common.quantity')}</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">{t('common.currency')}</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">{t('common.total_price')}</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {stocks.map((stock, index) => (
+              <tr key={stock.id} className="hover:bg-gray-50">
+                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600">
+                  {index + 1}
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-900 font-medium">
+                  {stock.product?.product_name || 'N/A'}
+                </td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                  {formatNumber(stock.quantity_for_history || 0)} {stock.purchase_unit?.short_name || ''}
+                </td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                  {stock.currency?.short_name || 'UZS'}
+                </td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm font-semibold text-emerald-600">
+                  {formatNumber(
+                    stock.currency?.short_name === 'UZS'
+                      ? (stock.total_price_in_uz || 0)
+                      : (stock.total_price_in_currency || 0)
+                  )} {stock.currency?.short_name || 'UZS'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

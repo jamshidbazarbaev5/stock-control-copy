@@ -126,11 +126,16 @@ export default function IncomePage() {
     {
       header: t("forms.amount3"),
       accessorKey: "total_amount  ",
-      cell: (row: any) => (
-        <span className="font-medium text-emerald-600">
-          {formatCurrency(row.total_amount)} uzs
-        </span>
-      ),
+      cell: (row: any) => {
+        const paymentMethod = row.description?.["Payment Method"] ||
+          (row.description?.Payments?.length > 0 ? row.description.Payments[0]?.Method : null);
+        const isUsd = paymentMethod === "Валюта";
+        return (
+          <span className="font-medium text-emerald-600">
+            {formatCurrency(row.total_amount)} {isUsd ? "$" : "UZS"}
+          </span>
+        );
+      },
     },
     {
       header: t("forms.payment_method"),

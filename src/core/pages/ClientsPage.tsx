@@ -7,6 +7,7 @@ import {
     useDeleteClientCustom,
   useIncrementBalance,
   useClientCashOut,
+  useMassPayment,
 } from "../api/client";
 import { useGetStores } from "../api/store";
 import { toast } from "sonner";
@@ -18,8 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-  import { MoreHorizontal, Wallet, History, DollarSign, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+  import { MoreHorizontal, Wallet, History, DollarSign, Plus, CreditCard } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCurrentUser } from "../hooks/useCurrentUser";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 
 const formSchema = z.object({
@@ -192,6 +193,15 @@ const cashOutSchema = z.object({
 
 type CashOutForm = z.infer<typeof cashOutSchema>;
 
+// Mass payment dialog
+const massPaymentSchema = z.object({
+  amount: z.number().min(0.01, "Amount must be greater than 0"),
+  payment_method: z.enum(["Наличные", "Карта", "Click", "Перечисление", "Валюта"]),
+  usd_rate_at_payment: z.number().min(0.01, "USD rate must be greater than 0"),
+});
+
+type MassPaymentForm = z.infer<typeof massPaymentSchema>;
+
 interface CashOutDialogProps {
   clientId: number;
   isOpen: boolean;
@@ -203,6 +213,7 @@ const createDebtSchema = z.object({
   total_amount: z.number().min(0.01, "Amount must be greater than 0"),
   store: z.number().optional(),
   due_date: z.string().min(1, "Due date is required"),
+  debt_type: z.enum(["USD", "UZS"]),
 });
 
 type CreateDebtForm = z.infer<typeof createDebtSchema>;
@@ -221,7 +232,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
   
   const createDebt = useMutation({
-    mutationFn: async (data: { client_write: number; store_write: number; total_amount: number; due_date: string }) => {
+    mutationFn: async (data: { client_write: number; store_write: number; total_amount: number; due_date: string; debt_type: string }) => {
       const response = await api.post('/debts/create/', data);
       return response.data;
     },
@@ -234,7 +245,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
 
   const form = useForm<CreateDebtForm>({
     resolver: zodResolver(createDebtSchema),
-    defaultValues: { total_amount: 0, store: userStoreId || undefined, due_date: "" },
+    defaultValues: { total_amount: 0, store: userStoreId || undefined, due_date: "", debt_type: "UZS" },
   });
 
   const onSubmit = async (data: CreateDebtForm) => {
@@ -245,6 +256,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
         store_write: storeId!,
         total_amount: data.total_amount,
         due_date: data.due_date,
+        debt_type: data.debt_type,
       });
       toast.success(t("messages.success.debt_created", "Debt created successfully"));
       form.reset();
@@ -320,6 +332,26 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="debt_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("common.debt_type", "Тип долга")}</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("placeholders.select_debt_type", "Выберите тип")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="UZS">UZS</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={onClose}>
                 {t("common.cancel")}
@@ -348,8 +380,8 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
 
   const onSubmit = async (data: CashOutForm) => {
     try {
-      await cashOut.mutateAsync({ 
-        id: clientId, 
+      await cashOut.mutateAsync({
+        id: clientId,
         amount: data.amount,
         store: data.store,
         payment_method: data.payment_method,
@@ -379,8 +411,8 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
                     <FormItem>
                       <FormLabel>{t("forms.store")}</FormLabel>
                       <FormControl>
-                        <Select 
-                          value={field.value?.toString()} 
+                        <Select
+                          value={field.value?.toString()}
                           onValueChange={(val) => field.onChange(parseInt(val))}
                         >
                           <SelectTrigger>
@@ -453,6 +485,143 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
   );
 }
 
+// Mass Payment Dialog
+interface MassPaymentDialogProps {
+  clientId: number;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function MassPaymentDialog({ clientId, isOpen, onClose }: MassPaymentDialogProps) {
+  const { t } = useTranslation();
+  const massPayment = useMassPayment();
+
+  // Get the latest USD rate from currency rates
+  const { data: currencyRates } = useQuery<Array<{ id: number; rate: string; currency_detail: any }>>({
+    queryKey: ["currency-rates"],
+    queryFn: async () => {
+      const response = await api.get("/currency/rates/");
+      return response.data;
+    },
+  });
+
+  const usdRate = currencyRates?.[0] ? parseFloat(currencyRates[0].rate) : 0;
+
+  const form = useForm<MassPaymentForm>({
+    resolver: zodResolver(massPaymentSchema),
+    defaultValues: {
+      amount: 0,
+      payment_method: "Наличные",
+      usd_rate_at_payment: usdRate || 0,
+    },
+  });
+
+  // Update the USD rate when it changes
+  useEffect(() => {
+    if (usdRate > 0) {
+      form.setValue("usd_rate_at_payment", usdRate);
+    }
+  }, [usdRate, form]);
+
+  const onSubmit = async (data: MassPaymentForm) => {
+    try {
+      await massPayment.mutateAsync({
+        id: clientId,
+        amount: data.amount,
+        payment_method: data.payment_method,
+        usd_rate_at_payment: data.usd_rate_at_payment,
+      });
+      toast.success(t("common.mass_payment_successful", "Массовая оплата успешна"));
+      form.reset();
+      onClose();
+    } catch (error) {
+      console.error("Failed to process mass payment:", error);
+    }
+  };
+
+  return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("common.mass_payment", "Массовая оплата")}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.amount")}</FormLabel>
+                        <FormControl>
+                          <Input
+                              type="number"
+                              step="0.01"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="payment_method"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.payment_method")}</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t("placeholders.select_payment_method")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Наличные">{t("payment_types.cash")}</SelectItem>
+                              <SelectItem value="Карта">{t("payment_types.card")}</SelectItem>
+                              <SelectItem value="Click">{t("payment_types.click")}</SelectItem>
+                              <SelectItem value="Перечисление">Перечисление</SelectItem>
+                              <SelectItem value="Валюта">Валюта</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="usd_rate_at_payment"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.usd_rate", "Курс USD")}</FormLabel>
+                        <FormControl>
+                          <Input
+                              type="number"
+                              step="0.01"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          {t("common.current_usd_rate", "Текущий курс")}: {usdRate}
+                        </p>
+                      </FormItem>
+                  )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" disabled={massPayment.isPending}>
+                  {t("common.save")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+  );
+}
+
 export default function ClientsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -460,6 +629,7 @@ export default function ClientsPage() {
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [cashOutClientId, setCashOutClientId] = useState<number | null>(null);
   const [createDebtClientId, setCreateDebtClientId] = useState<number | null>(null);
+  const [massPaymentClientId, setMassPaymentClientId] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
   const { data: clientsData, isLoading } = useGetClients({
@@ -533,9 +703,9 @@ export default function ClientsPage() {
             data={clients}
             columns={columns}
             isLoading={isLoading}
-            onAdd={!currentUser?.is_superuser ? () => navigate('/create-client') : undefined}
-            onEdit={!currentUser?.is_superuser ? (client) => navigate(`/edit-client/${client.id}`) : undefined}
-            onDelete={!currentUser?.is_superuser ? handleDelete : undefined}
+            onAdd={() => navigate('/create-client')}
+            onEdit={(client) => navigate(`/edit-client/${client.id}`)}
+            onDelete={handleDelete}
             totalCount={totalCount}
             actions={(client: Client) => (
               <div className="relative" style={{ position: 'static' }}>
@@ -593,6 +763,17 @@ export default function ClientsPage() {
                         <Plus className="h-4 w-4 mr-2" />
                         {t("common.create_debt", "Create Debt")}
                       </button>
+                      <button
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdown(null);
+                          client.id && setMassPaymentClientId(client.id);
+                        }}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        {t("common.mass_payment", "Массовая оплата")}
+                      </button>
                       {currentUser?.is_superuser && client.type === "Юр.лицо" && (
                         <>
                           <button
@@ -644,6 +825,13 @@ export default function ClientsPage() {
                 clientId={createDebtClientId}
                 isOpen={!!createDebtClientId}
                 onClose={() => setCreateDebtClientId(null)}
+            />
+        )}
+        {massPaymentClientId && (
+            <MassPaymentDialog
+                clientId={massPaymentClientId}
+                isOpen={!!massPaymentClientId}
+                onClose={() => setMassPaymentClientId(null)}
             />
         )}
       </div>

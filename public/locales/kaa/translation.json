@@ -181,6 +181,7 @@
   },
   "common": {
     "paid3": "Қарызсыз",
+    "debt_currency": "Қарыз валютасы",
     "mass_payment": "Қарызды төлеў",
     "available_budget": "Бюджет",
     "search_product": "Өнимди излеў",
@@ -540,6 +541,14 @@
     "invalid_credentials": "Нәдурыс мағлыўматлар"
   },
   "forms": {
+    "total_remainder": "Қалдық",
+    "total_remainder_usd": "Қалдық (USD)",
+    "total_remainder_uzs": "Қалдық (UZS)",
+    "total_amount_usd": "Улыўма сумма (USD)",
+    "remainder_usd": "Қалдық (USD)",
+    "usd_rate_at_payment": "Валюта курсы",
+    "debt_currency_updated": "Қарыз валютасы жаңаланды",
+    "currency": "Валюта",
     "search_by_product_name": "Товар аты бойынша излеў",
     "budget_type": "Төлем түри",
     "transfer": "Аўдарыў",

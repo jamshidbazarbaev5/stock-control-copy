@@ -60,12 +60,36 @@ export interface ProductIntakeResponse {
   }[];
 }
 
-export interface ClientDebtResponse {
+export interface ClientDebtItem {
   client_name: string;
-  total_debt: string;
-  total_paid: string;
-  remaining_debt: string;
-  deposit: string;
+  client_id: number;
+  client_type: string;
+  total_amount_uzs: string;
+  total_amount_usd: string;
+  deposit_uzs: string;
+  deposit_usd: string;
+  remainder_uzs: string;
+  remainder_usd: string;
+  total_paid_uzs: number;
+  total_paid_usd: number;
+  total_debt?: string;
+  total_paid?: string;
+  remaining_debt?: string;
+  deposit?: string;
+}
+
+export interface ClientDebtResponse {
+  clients: ClientDebtItem[];
+  totals: {
+    total_amount_uzs: number;
+    total_amount_usd: number;
+    deposit_uzs: number;
+    deposit_usd: number;
+    remainder_uzs: number;
+    remainder_usd: number;
+    total_paid_uzs: number;
+    total_paid_usd: number;
+  };
 }
 
 export interface TopSellersResponse {
@@ -159,7 +183,7 @@ export const getProductIntake = async (period?: PeriodType, dateParams?: string)
   return response.data;
 };
 
-export const getClientDebts = async (period?: PeriodType, dateParams?: string): Promise<ClientDebtResponse[]> => {
+export const getClientDebts = async (period?: PeriodType, dateParams?: string): Promise<ClientDebtResponse> => {
   let url = 'reports/client-debts';
   if (dateParams && period) {
     url += `?${dateParams}&period=${period}`;
@@ -168,7 +192,7 @@ export const getClientDebts = async (period?: PeriodType, dateParams?: string): 
   } else if (period) {
     url += `?period=${period}`;
   }
-  const response = await api.get<ClientDebtResponse[]>(url);
+  const response = await api.get<ClientDebtResponse>(url);
   return response.data;
 };
 

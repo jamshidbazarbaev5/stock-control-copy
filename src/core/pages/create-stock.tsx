@@ -1422,16 +1422,53 @@ export default function CreateStock() {
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount_of_debt">
-                    {t("common.amount_of_debt")}
+                  <Label htmlFor="amount_of_debt_uzs">
+                    {t("common.amount_of_debt")} (UZS)
                   </Label>
                   <Input
-                    id="amount_of_debt"
+                    id="amount_of_debt_uzs"
                     type="number"
                     step="0.01"
-                    {...commonForm.register("amount_of_debt")}
+                    value={(() => {
+                      return stockItems.reduce((sum, item) => {
+                        if (item.isCalculated && item.form.currency) {
+                          const currency = currencies.find(c => c.id === Number(item.form.currency));
+                          if (currency?.is_base) {
+                            return sum + (Number(item.form.total_price_in_uz) || 0);
+                          }
+                        }
+                        return sum;
+                      }, 0).toFixed(2);
+                    })()}
+                    readOnly
+                    className="bg-gray-100 cursor-not-allowed"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="amount_of_debt_usd">
+                    {t("common.amount_of_debt")} (USD)
+                  </Label>
+                  <Input
+                    id="amount_of_debt_usd"
+                    type="number"
+                    step="0.01"
+                    value={(() => {
+                      return stockItems.reduce((sum, item) => {
+                        if (item.isCalculated && item.form.currency) {
+                          const currency = currencies.find(c => c.id === Number(item.form.currency));
+                          if (!currency?.is_base) {
+                            return sum + (Number(item.form.total_price_in_currency) || 0);
+                          }
+                        }
+                        return sum;
+                      }, 0).toFixed(2);
+                    })()}
+                    readOnly
+                    className="bg-gray-100 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="advance_of_debt">
                     {t("common.advance_of_debt")}

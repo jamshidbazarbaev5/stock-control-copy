@@ -26,6 +26,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  WideDialog,
+  WideDialogContent,
+  WideDialogHeader,
+  WideDialogTitle,
+  WideDialogFooter,
+} from "@/components/ui/wide-dialog";
 import api from "../api/api";
 import { type Stock } from "../api/stock";
 import {
@@ -44,6 +51,8 @@ interface PriceEdit {
   min_price?: string;
 }
 
+type DebtCurrency = "UZS" | "USD";
+
 const columns = (
   t: any,
   onPrint: (product: Product) => void,
@@ -60,6 +69,8 @@ const columns = (
     currencyPrice: string,
     sellInCurrencyUnit: any,
   ) => void,
+  debtCurrencySelections?: Record<number, DebtCurrency>,
+  onDebtCurrencyChange?: (productId: number, currency: DebtCurrency) => void,
 ) => [
   {
     header: t("table.select"),
@@ -168,6 +179,47 @@ const columns = (
   },
 
   {
+    header: t("table.debt_currency") || "Валюта долга",
+    accessorKey: "debt_currency",
+    cell: (product: any) => {
+      const currentValue = debtCurrencySelections?.[product?.id] || product?.debt_currency || "UZS";
+      return (
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input
+              type="radio"
+              name={`debt_currency_${product?.id}`}
+              value="UZS"
+              checked={currentValue === "UZS"}
+              onChange={() => {
+                if (product?.id && onDebtCurrencyChange) {
+                  onDebtCurrencyChange(product.id, "UZS");
+                }
+              }}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">UZS</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input
+              type="radio"
+              name={`debt_currency_${product?.id}`}
+              value="USD"
+              checked={currentValue === "USD"}
+              onChange={() => {
+                if (product?.id && onDebtCurrencyChange) {
+                  onDebtCurrencyChange(product.id, "USD");
+                }
+              }}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">USD</span>
+          </label>
+        </div>
+      );
+    },
+  },
+  {
     header: t("table.actions"),
     accessorKey: "id",
     cell: (product: any) => {
@@ -206,6 +258,7 @@ export default function ProductsPage() {
   >(() => (localStorage.getItem("products_productTab") as "with_quantity" | "without_quantity" | "imported") || "with_quantity");
   const [expandedRows, setExpandedRows] = useState<Record<number, Stock[]>>({});
   const [loadingRows, setLoadingRows] = useState<Set<number>>(new Set());
+  const [debtCurrencySelections, setDebtCurrencySelections] = useState<Record<number, DebtCurrency>>({});
 
   // Import dialog state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -230,7 +283,7 @@ export default function ProductsPage() {
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [productSearchResults, setProductSearchResults] = useState<Product[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
-  const [isAssigningBarcode, setIsAssigningBarcode] = useState(false);
+  const [assigningProductId, setAssigningProductId] = useState<number | null>(null);
 
   // Save filters to localStorage
   useEffect(() => {
@@ -318,14 +371,17 @@ export default function ProductsPage() {
     };
   }, [scanBuffer]);
 
-  // Search products by name for barcode assignment dialog
-  const handleProductSearch = async () => {
-    if (!productSearchQuery.trim()) {
+  // Live search products by name for barcode assignment dialog
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handleProductSearch = async (query: string) => {
+    if (!query.trim()) {
+      setProductSearchResults([]);
       return;
     }
     setIsSearchingProducts(true);
     try {
-      const response = await api.get(`items/product/?product_name=${productSearchQuery}`);
+      const response = await api.get(`items/product/?product_name=${query}`);
       const results = response.data.results || response.data || [];
       setProductSearchResults(results);
     } catch (error) {
@@ -336,11 +392,31 @@ export default function ProductsPage() {
     }
   };
 
+  // Debounced live search
+  useEffect(() => {
+    if (!isBarcodeDialogOpen) return;
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      handleProductSearch(productSearchQuery);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [productSearchQuery, isBarcodeDialogOpen]);
+
   // Assign barcode to product
-  const handleAssignBarcode = async (productId: number) => {
-    setIsAssigningBarcode(true);
+  const handleAssignBarcode = async (product: Product) => {
+    if (!product.id) return;
+    setAssigningProductId(product.id);
     try {
-      await api.patch(`items/product/${productId}/`, {
+      await api.patch(`items/product/${product.id}/`, {
         barcode: scannedBarcode,
       });
       toast.success("Штрих-код успешно присвоен товару");
@@ -349,10 +425,10 @@ export default function ProductsPage() {
       setProductSearchQuery("");
       setProductSearchResults([]);
     } catch (error) {
-      console.error("Error assigning barcode:", error);
-      toast.error("Ошибка при присвоении штрих-кода");
+      // console.error("Error assigning barcode:", error);
+      // toast.error("Ошибка при присвоении штрих-кода");
     } finally {
-      setIsAssigningBarcode(false);
+      setAssigningProductId(null);
     }
   };
 
@@ -502,6 +578,31 @@ export default function ProductsPage() {
           selling_price_in_currency: currencyPrice,
         },
       }));
+    }
+  };
+
+  const handleDebtCurrencyChange = async (productId: number, currency: DebtCurrency) => {
+    // Update local state immediately for responsive UI
+    setDebtCurrencySelections((prev) => ({
+      ...prev,
+      [productId]: currency,
+    }));
+
+    try {
+      await api.post("items/update-debt-currency/", {
+        product_ids: [productId],
+        debt_currency: currency,
+      });
+      toast.success(t("forms.debt_currency_updated") || "Валюта долга обновлена");
+    } catch (error) {
+      console.error("Error updating debt currency:", error);
+      toast.error(t("messages.error.debt_currency_update") || "Ошибка при обновлении валюты долга");
+      // Revert local state on error
+      setDebtCurrencySelections((prev) => {
+        const newSelections = { ...prev };
+        delete newSelections[productId];
+        return newSelections;
+      });
     }
   };
 
@@ -968,6 +1069,8 @@ export default function ProductsPage() {
           priceEdits,
           handlePriceChange,
           handleCurrencyPriceChange,
+          debtCurrencySelections,
+          handleDebtCurrencyChange,
         )}
         isLoading={isLoading}
         onEdit={handleEdit}
@@ -1000,13 +1103,13 @@ export default function ProductsPage() {
       />
 
       {/* Barcode Assignment Dialog */}
-      <Dialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
+      <WideDialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
+        <WideDialogContent width="wide" className="max-h-[90vh] overflow-auto">
+          <WideDialogHeader>
+            <WideDialogTitle>
               {t("dialogs.assign_barcode", "Присвоить штрих-код товару")}
-            </DialogTitle>
-          </DialogHeader>
+            </WideDialogTitle>
+          </WideDialogHeader>
 
           <div className="space-y-4">
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -1018,30 +1121,24 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="relative">
               <Input
                 type="text"
                 placeholder={t("placeholders.search_product_name", "Поиск по названию товара...")}
                 value={productSearchQuery}
                 onChange={(e) => setProductSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleProductSearch();
-                  }
-                }}
-                className="flex-1"
+                className="w-full"
+                autoFocus
               />
-              <Button
-                onClick={handleProductSearch}
-                disabled={isSearchingProducts || !productSearchQuery.trim()}
-              >
-                {isSearchingProducts ? t("common.searching", "Поиск...") : t("common.search", "Найти")}
-              </Button>
+              {isSearchingProducts && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                  {t("common.searching", "Поиск...")}
+                </div>
+              )}
             </div>
 
             {productSearchResults.length > 0 && (
-              <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+              <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1066,10 +1163,10 @@ export default function ProductsPage() {
                         <TableCell className="text-right">
                           <Button
                             size="sm"
-                            onClick={() => product.id && handleAssignBarcode(product.id)}
-                            disabled={isAssigningBarcode}
+                            onClick={() => handleAssignBarcode(product)}
+                            disabled={assigningProductId !== null}
                           >
-                            {isAssigningBarcode
+                            {assigningProductId === product.id
                               ? t("common.saving", "Сохранение...")
                               : t("buttons.assign_barcode", "Присвоить")}
                           </Button>
@@ -1088,7 +1185,7 @@ export default function ProductsPage() {
             )}
           </div>
 
-          <DialogFooter>
+          <WideDialogFooter>
             <Button
               variant="ghost"
               onClick={() => {
@@ -1100,9 +1197,9 @@ export default function ProductsPage() {
             >
               {t("common.cancel", "Отмена")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </WideDialogFooter>
+        </WideDialogContent>
+      </WideDialog>
     </div>
   );
 }

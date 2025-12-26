@@ -6,8 +6,8 @@ import {
   searchProductByBarcode,
 } from "../api/product";
 import {
-  useGetCategories,
   fetchCategoriesWithAttributes,
+  fetchAllCategories,
 } from "../api/category";
 import { useGetMeasurements } from "../api/measurement";
 import type { Attribute } from "@/types/attribute";
@@ -49,14 +49,27 @@ export default function CreateProduct() {
   const [_isScanning, setIsScanning] = useState(false);
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch categories and measurements for the select dropdowns
-  const { data: categoriesData } = useGetCategories({});
+  // Fetch measurements for the select dropdowns
   const { data: measurementsData } = useGetMeasurements({});
 
-  // Get the arrays from response data
-  const categories = Array.isArray(categoriesData)
-    ? categoriesData
-    : categoriesData?.results || [];
+  // State to hold all categories from all pages
+  const [categories, setCategories] = useState<any[]>([]);
+
+  // Fetch all categories on component mount
+  useEffect(() => {
+    const loadAllCategories = async () => {
+      try {
+        const allCategories = await fetchAllCategories();
+        setCategories(allCategories);
+      } catch (error) {
+        console.error('Failed to fetch all categories:', error);
+        toast.error('Failed to load categories');
+      }
+    };
+
+    loadAllCategories();
+  }, []);
+
   const availableMeasurements = Array.isArray(measurementsData)
     ? measurementsData
     : measurementsData?.results || [];

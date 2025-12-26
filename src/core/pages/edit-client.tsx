@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { type Client, useGetClient, useUpdateClient } from '../api/client';
+import { type Client, useGetClient, useUpdateClientCustom } from '../api/client';
 import { ResourceForm } from '../helpers/ResourceForm';
 
 export default function EditClient() {
@@ -13,7 +13,7 @@ export default function EditClient() {
   const [formKey, setFormKey] = useState(0); // Add key to force form re-render
 
   const { data: client, isLoading } = useGetClient(Number(id));
-  const updateClient = useUpdateClient();
+  const updateClient = useUpdateClientCustom();
 
   useEffect(() => {
     if (client) {

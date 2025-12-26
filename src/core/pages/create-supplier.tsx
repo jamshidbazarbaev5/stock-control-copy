@@ -20,18 +20,7 @@ const supplierFields = (t: any) => [
     placeholder: t('placeholders.enter_phone'),
     required: true,
   },
-  {
-    name: 'balance_type',
-    label: t('forms.balance_type') || 'Balance Type',
-    type: 'select',
-    placeholder: t('placeholders.select_currency') || 'Select currency',
-    options: [
-      { value: 'USD', label: 'USD' },
-      { value: 'UZS', label: 'UZS' },
-    ],
-    required: true,
-    defaultValue: 'USD',
-  },
+
 ];
 
 export default function CreateSupplier() {

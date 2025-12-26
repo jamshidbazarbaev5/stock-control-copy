@@ -30,6 +30,8 @@
   },
 
   "dashboard": {
+    "remaining":"Ещё есть",
+    "total_amount":"Общая сумма",
     "other": "Другие",
     "total_sales_debt":"Общая сумма долгов",
     "total_sales_amount":"Общая сумма продаж",
@@ -148,7 +150,8 @@
     "cash": "Наличные",
     "card": "Карта",
     "click": "Click",
-    "complex": "Сложная оплата"
+    "complex": "Сложная оплата",
+    "currency": "Валюта"
   },
   "payment": {
     "cash": "Наличные",
@@ -185,14 +188,20 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "mass_payment":"Массовая оплата",
+    "mass_payment_successful":"Массовая оплата успешна",
+    "mass_payment_failed":"Ошибка массовой оплаты",
+    "usd_rate":"Курс USD",
+    "current_usd_rate":"Текущий курс",
+    "remaining_debt":"Остаток",
     "item":"Кол",
     "supplier_balance_type":"Тип баланса",
+    "debt_currency":"Валюта долга",
     "create_debt": "Создать долг",
     "due_date": "Срок оплаты",
     "balance_history": "История баланса",
     "exchange_rate":"Курс обмена",
     "paid3":"Не в долг",
-      "mass_payment":"Оплатить долг",
     "available_budget": "Бюджет",
     "search_product": "Поиск продукта",
     "edit_stock_entry": "Изменить приход",
@@ -553,6 +562,16 @@
   },
 
   "forms": {
+    "remainder_uzs":"Остаток в UZS",
+    "total_amount_uzs":"Общая сумма в (UZS)",
+    "total_remainder": "Остаток",
+    "total_remainder_usd": "Остаток (USD)",
+    "total_remainder_uzs": "Остаток (UZS)",
+    "total_amount_usd":"Общая сумма в USD",
+    "remainder_usd":"Остаток в USD",
+    "usd_rate_at_payment":"Курс валюты",
+    "debt_currency_updated":"Валюта долга обновлена",
+    "currency": "Валюта",
     "balance_type": "Тип баланса",
     "budget":"Бюджет",
     "search_by_product_name": "Поиск по названию товара",
@@ -813,6 +832,7 @@
     "unpaid": "Не погашен"
   },
   "placeholders": {
+    "enter_usd_rate":"Введите курс USD",
     "select_permission": "Выберите разрешение",
     "select_budget_type": "Тип",
     "enter_lender_name": "Введите имя",
@@ -907,6 +927,8 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "total_cost_usd":"Общая сумма в USD",
+    "debt_currency":"Тип долга ",
     "total_cost":"Общая цена",
     "balance_in_usd": "Баланс в USD",
     "discount":"Скидка",
@@ -1032,6 +1054,7 @@
       "attribute_created": "Атрибут успешно создан",
       "debt_created": "Долг успешно создан"
     },
+
     "error": {
       "payment_exceeds_budget": "Вы не можете оплатить этот долг бюджет магазина не хватет",
       "add_money": "Пополните все поля",

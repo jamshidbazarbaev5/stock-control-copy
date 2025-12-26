@@ -1770,6 +1770,45 @@ const handleQuantityChange = (
                       </div>
                     </SelectContent>
                   </Select>
+
+                  {/* Client Balance Display */}
+                  {field.value && (() => {
+                    const selectedClient = clients.find((c) => c.id === field.value);
+                    if (!selectedClient) return null;
+
+                    const clientBalance = (selectedClient as any)?.balance ? parseFloat(String((selectedClient as any).balance)) : 0;
+                    const totalAmount = parseFloat(form.watch("total_amount") || "0");
+                    const discountAmount = parseFloat(form.watch("discount_amount") || "0");
+                    const finalTotal = totalAmount - discountAmount;
+                    const newBalance = clientBalance - finalTotal;
+
+                    return (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-sm text-blue-700 space-y-1">
+                          <p>
+                            <strong>Клиент:</strong> {selectedClient.name}
+                            {form.watch("on_credit") && (
+                              <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                                В кредит
+                              </span>
+                            )}
+                          </p>
+                          <p>
+                            <strong>Баланс:</strong> {clientBalance.toLocaleString()} сум
+                          </p>
+                          <p>
+                            <strong>Сумма покупки:</strong> {finalTotal.toLocaleString()} сум
+                          </p>
+                          <p>
+                            <strong>Новый баланс:</strong>{" "}
+                            <span className={newBalance < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                              {newBalance.toLocaleString()} сум
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </FormItem>
               )}
             />

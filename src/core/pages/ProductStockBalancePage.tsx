@@ -20,6 +20,7 @@ interface ProductStockBalance {
   product__product_name: string;
   store__name: string;
   total_quantity: number;
+  total_cost_usd: number;
 }
 
 interface StockBalanceResponse {
@@ -40,6 +41,7 @@ interface StockBalanceResponse {
     total_product: number;
     total: number;
     total_cost: number;
+    total_cost_usd: number;
     info_products: ProductStockBalance[];
     total_volume: number;
   };
@@ -113,6 +115,11 @@ export default function ProductStockBalancePage() {
       accessorKey: "total_cost",
       cell: (row: any) => row.total_cost?.toLocaleString(),
     },
+    ...(currentUser?.is_superuser ? [{
+      header: t("table.total_cost_usd") || "Стоимость (USD)",
+      accessorKey: "total_cost_usd",
+      cell: (row: any) => row.total_cost_usd ? `${row.total_cost_usd.toLocaleString()} $` : "",
+    }] : []),
     {
       header: t("table.total_kub_volume"),
       accessorKey: "total_kub_volume",
@@ -131,6 +138,7 @@ export default function ProductStockBalancePage() {
         return "0,00";
       },
     },
+
   ];
 
   // Change handler to ensure correct type
@@ -220,33 +228,57 @@ export default function ProductStockBalancePage() {
             />
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-bold">
-            {t("table.total_volume")}
-            {/* Show as 135,37 if value exists */}
-            {typeof data?.results.total === "number" && (
-              <span> {data.results.total.toFixed(2).replace(".", ",")}</span>
+
+        <div className="flex justify-between items-center mt-6 mb-4">
+          <div className="flex gap-4 flex-wrap flex-1">
+            <Card className="px-6 py-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800 shadow-md">
+              <div className="flex flex-col">
+                <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  {t("table.total_volume")}
+                </span>
+                {typeof data?.results.total === "number" && (
+                  <span className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
+                    {data.results.total.toFixed(2).replace(".", ",")} м³
+                  </span>
+                )}
+              </div>
+            </Card>
+
+            {currentUser?.is_superuser && (
+              <>
+                <Card className="px-6 py-4 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800 shadow-md">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                      {t("table.total_cost")}
+                    </span>
+                    {typeof data?.results.total_cost === "number" && (
+                      <span className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 mt-1">
+                        {formatNumber(data.results.total_cost)} UZS
+                      </span>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="px-6 py-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800 shadow-md">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                      {t("table.total_cost_usd") || "Общая сумма в USD"}
+                    </span>
+                    {typeof data?.results.total_cost_usd === "number" && (
+                      <span className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+                        {formatNumber(data.results.total_cost_usd)} $
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              </>
             )}
-          </h1>
+          </div>
 
-       
-
-          <Button onClick={handleExportExcel} variant="outline">
+          <Button onClick={handleExportExcel} variant="outline" className="ml-4">
             {t("buttons.export_excel", "Экспорт в Excel")}
           </Button>
         </div>
-        {currentUser?.is_superuser && (
-          <h1 className="text-lg font-bold">
-            {t("table.total_cost")}
-            {/* Show as 135,37 if value exists */}
-            {typeof data?.results.total_cost === "number" && (
-              <span>
-                {" "}
-                {formatNumber(data.results.total_cost)}
-              </span>
-            )}
-          </h1>
-        )}
       </div>
       <Card className="mt-4">
         <ResourceTable

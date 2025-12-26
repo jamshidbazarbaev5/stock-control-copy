@@ -357,7 +357,9 @@ export interface StockDebtPaymentRequest {
   stock_entry: number;
   amount: number;
   payment_type: string;
+  debt_currency: string;
   comment?: string;
+  rate_at_payment?: number;
 }
 
 // API endpoints

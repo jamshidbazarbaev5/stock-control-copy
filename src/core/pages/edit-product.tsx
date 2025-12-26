@@ -3,8 +3,8 @@ import { ResourceForm } from "../helpers/ResourceForm";
 import type { Product } from "../api/product";
 import { useUpdateProduct, useGetProduct } from "../api/product";
 import {
-  useGetCategories,
   fetchCategoriesWithAttributes,
+  fetchAllCategories,
 } from "../api/category";
 import { useGetMeasurements } from "../api/measurement";
 import type { Attribute } from "@/types/attribute";
@@ -54,14 +54,27 @@ export default function EditProduct() {
   const [baseUnit, setBaseUnit] = useState("");
   const [isImported, setIsImported] = useState(false);
 
-  // Fetch categories and measurements for the select dropdowns
-  const { data: categoriesData } = useGetCategories({});
+  // Fetch measurements for the select dropdowns
   const { data: measurementsData } = useGetMeasurements({});
 
-  // Get the arrays from response data
-  const categories = Array.isArray(categoriesData)
-    ? categoriesData
-    : categoriesData?.results || [];
+  // State to hold all categories from all pages
+  const [categories, setCategories] = useState<any[]>([]);
+
+  // Fetch all categories on component mount
+  useEffect(() => {
+    const loadAllCategories = async () => {
+      try {
+        const allCategories = await fetchAllCategories();
+        setCategories(allCategories);
+      } catch (error) {
+        console.error('Failed to fetch all categories:', error);
+        toast.error('Failed to load categories');
+      }
+    };
+
+    loadAllCategories();
+  }, []);
+
   const availableMeasurements = Array.isArray(measurementsData)
     ? measurementsData
     : measurementsData?.results || [];
@@ -170,7 +183,7 @@ export default function EditProduct() {
           typeof data.category_write === "string"
             ? parseInt(data.category_write, 10)
             : data.category_write,
-        barcode: barcode,
+        barcode: data.barcode,
         base_unit: baseUnit ? parseInt(baseUnit, 10) : undefined,
         min_price:
           typeof data.min_price === "string"

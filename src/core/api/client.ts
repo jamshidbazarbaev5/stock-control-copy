@@ -51,6 +51,12 @@ export interface CashOutPayload {
   payment_method: "Наличные" | "Карта" | "Click" | "Перечисление";
 }
 
+export interface MassPaymentPayload {
+  amount: number;
+  payment_method: "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта";
+  usd_rate_at_payment: number;
+}
+
 // API endpoints
 const CLIENT_URL = "clients/";
 
@@ -193,6 +199,31 @@ export const useUpdateClientCustom = () => {
     onError: (error: any) => {
       console.error("Error updating client:", error);
       toast.error(error?.response?.data?.detail || "Failed to update client");
+    },
+  });
+};
+
+// Mass payment mutation hook
+export const useMassPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: number } & MassPaymentPayload) => {
+      const response = await api.post<Client>(
+        `${CLIENT_URL}${id}/mass-payment/`,
+        payload,
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      if (data.id) {
+        queryClient.invalidateQueries({ queryKey: ["clients", data.id] });
+        queryClient.invalidateQueries({ queryKey: ["clientHistory", data.id] });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Error during mass payment:", error);
+      toast.error(error?.response?.data?.detail || "Failed to process mass payment");
     },
   });
 };

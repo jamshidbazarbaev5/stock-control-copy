@@ -33,6 +33,7 @@ interface DebtListItem {
 interface PaymentFormData {
   amount: number;
   payment_method: string;
+  usd_rate_at_payment?: number;
 }
 
 export default function DebtDetailsPage() {
@@ -44,8 +45,11 @@ export default function DebtDetailsPage() {
   const [selectedDebt, setSelectedDebt] = useState<{
     id: number;
     remainder: number;
+    remainder_usd?: number;
+    hasUsdDebt?: boolean;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
 
   const { data: debtsData, isLoading } = useGetDebtsHistory(
     Number(clientId),
@@ -86,10 +90,23 @@ export default function DebtDetailsPage() {
   };
 
   // Payment handling
+  // Determine max remainder based on selected payment method
+  const getMaxRemainder = () => {
+    if (!selectedDebt) return 0;
+    // If payment method is "Валюта" (USD), use remainder_usd
+    if (selectedPaymentMethod === "Валюта" && selectedDebt.remainder_usd) {
+      return Number(selectedDebt.remainder_usd);
+    }
+    // For all other payment methods, use remainder (UZS)
+    return Number(selectedDebt.remainder);
+  };
+
   const paymentFields = [
     {
       name: "amount",
-      label: t("forms.amount"),
+      label: selectedPaymentMethod === "Валюта"
+        ? (t("forms.amount") + " (USD)")
+        : t("forms.amount"),
       type: "number",
       placeholder: t("placeholders.enter_amount"),
       required: true,
@@ -99,15 +116,15 @@ export default function DebtDetailsPage() {
           message: t("validation.amount_must_be_positive"),
         },
         max: {
-          value: selectedDebt ? Number(selectedDebt.remainder) : 0,
+          value: getMaxRemainder(),
           message: t("validation.amount_exceeds_total"),
         },
         validate: {
           notGreaterThanRemainder: (value: number) => {
             if (!selectedDebt) return true;
-            const remainder = Number(selectedDebt.remainder);
+            const maxRemainder = getMaxRemainder();
             return (
-              value <= remainder ||
+              value <= maxRemainder ||
               t("validation.amount_exceeds_remainder")
             );
           },
@@ -124,17 +141,35 @@ export default function DebtDetailsPage() {
         { value: "Наличные", label: t("payment.cash") },
         { value: "Click", label: t("payment.click") },
         { value: "Карта", label: t("payment.card") },
-
         { value: "Перечисление", label: t("payment.per") },
+        { value: "Валюта", label: t("forms.currency") || "Валюта" },
       ],
+      onChange: (value: string) => setSelectedPaymentMethod(value),
+    },
+    {
+      name: "usd_rate_at_payment",
+      label: t("forms.usd_rate_at_payment") || "Курс USD при оплате",
+      type: "number",
+      placeholder: t("placeholders.enter_usd_rate") || "Введите курс USD",
+      required: true,
+      validation: {
+        min: {
+          value: 0.01,
+          message: t("validation.rate_must_be_positive") || "Курс должен быть положительным",
+        },
+      },
     },
   ];
 
-  const handlePaymentClick = (debt: { id: number; remainder: string | number }) => {
+  const handlePaymentClick = (debt: { id: number; remainder: string | number; remainder_usd?: string | number; total_amount_usd?: string | number }) => {
+    const hasUsdDebt = debt.total_amount_usd && Number(debt.total_amount_usd) > 0;
     setSelectedDebt({
       id: debt.id,
-      remainder: Number(debt.remainder)
+      remainder: Number(debt.remainder),
+      remainder_usd: debt.remainder_usd ? Number(debt.remainder_usd) : undefined,
+      hasUsdDebt: !!hasUsdDebt,
     });
+    setSelectedPaymentMethod("");
     setIsPaymentModalOpen(true);
   };
 
@@ -142,7 +177,8 @@ export default function DebtDetailsPage() {
     if (!selectedDebt) return;
 
     // Additional validation to prevent overpayment
-    if (data.amount > selectedDebt.remainder) {
+    const maxRemainder = getMaxRemainder();
+    if (data.amount > maxRemainder) {
       toast.error(t("validation.amount_exceeds_remainder"));
       return;
     }
@@ -153,27 +189,10 @@ export default function DebtDetailsPage() {
         ...data,
       });
 
-      // Update the debts data locally
-      const updatedDebts = debts.map((debt) => {
-        if (debt.id === selectedDebt.id) {
-          return {
-            ...debt,
-            remainder: debt.remainder - data.amount,
-            deposit: Number(debt.deposit),
-            is_paid: debt.remainder - data.amount <= 0,
-          };
-        }
-        return debt;
+      // Invalidate and refetch to get fresh data from server
+      await queryClient.invalidateQueries({
+        queryKey: ["debtsHistory", Number(clientId), currentPage]
       });
-
-      // Update the query cache with new data
-      queryClient.setQueryData(
-        ["debtsHistory", Number(clientId), currentPage],
-        {
-          ...debtsData,
-          results: updatedDebts,
-        },
-      );
 
       toast.success(t("messages.success.payment_created"));
       setIsPaymentModalOpen(false);
@@ -277,9 +296,21 @@ export default function DebtDetailsPage() {
               >
                 <div className="space-y-2 flex-1 min-w-0">
                   <h3 className="text-base sm:text-xl font-semibold flex flex-wrap items-center gap-2">
-                    <span className="text-emerald-600">
-                      {formatCurrency(debt.total_amount)}
-                    </span>
+                    {Number(debt.total_amount_uzs) > 0 && (
+                      <span className="text-emerald-600">
+                        {formatCurrency(debt.total_amount_uzs)} UZS
+                      </span>
+                    )}
+                    {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
+                      <>
+                        {Number(debt.total_amount_uzs) > 0 && (
+                          <span className="text-muted-foreground">+</span>
+                        )}
+                        <span className="text-blue-600">
+                          {formatCurrency((debt as any).total_amount_usd)} $
+                        </span>
+                      </>
+                    )}
                     <span className="text-muted-foreground">•</span>
                     <span className="text-foreground text-sm sm:text-base">
                       {formatDate(debt.created_at)}
@@ -430,6 +461,8 @@ export default function DebtDetailsPage() {
                             handlePaymentClick({
                               id: debt.id!,
                               remainder: Number(debt.remainder),
+                              remainder_usd: (debt as any).remainder_usd,
+                              total_amount_usd: (debt as any).total_amount_usd,
                             })
                           }
                           className="bg-emerald-500 hover:bg-emerald-600"
@@ -450,14 +483,29 @@ export default function DebtDetailsPage() {
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
                           <div>
                             <dt className="text-sm text-muted-foreground">
-                              {t("forms.total_amount")}
+                              {t("forms.total_amount_uzs")}
                             </dt>
                             <dd className="text-2xl font-semibold text-foreground">
-                              {formatCurrency(debt.total_amount)}
+                              {formatCurrency(debt.total_amount_uzs)}
                             </dd>
                           </div>
                         </div>
                       </div>
+                      {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
+                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start gap-3">
+                            <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
+                            <div>
+                              <dt className="text-sm text-muted-foreground">
+                                {t("forms.total_amount_usd") || "Сумма (USD)"}
+                              </dt>
+                              <dd className="text-2xl font-semibold text-foreground">
+                                {formatCurrency((debt as any).total_amount_usd)} $
+                              </dd>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-start gap-3">
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
@@ -476,16 +524,33 @@ export default function DebtDetailsPage() {
                           <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
                           <div>
                             <dt className="text-sm text-muted-foreground">
-                              {t("forms.remainder")}
+                              {t("forms.remainder_uzs")}
                             </dt>
                             <dd
-                              className={`text-2xl font-semibold ${debt.remainder < 0 ? "text-green-600" : "text-red-600"}`}
+                              className={`text-2xl font-semibold ${debt.remainder_uzs < 0 ? "text-green-600" : "text-red-600"}`}
                             >
-                              {formatCurrency(debt.remainder)}
+                              {formatCurrency(debt.remainder_uzs)}
                             </dd>
                           </div>
                         </div>
                       </div>
+                      {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0 && (
+                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start gap-3">
+                            <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
+                            <div>
+                              <dt className="text-sm text-muted-foreground">
+                                {t("forms.remainder_usd") || "Остаток (USD)"}
+                              </dt>
+                              <dd
+                                className={`text-2xl font-semibold ${Number((debt as any).remainder_usd) < 0 ? "text-green-600" : "text-red-600"}`}
+                              >
+                                {formatCurrency((debt as any).remainder_usd)} $
+                              </dd>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {debt.usd_rate_at_creation && (
                         <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-start gap-3">
@@ -501,21 +566,7 @@ export default function DebtDetailsPage() {
                           </div>
                         </div>
                       )}
-                      {debt.last_usd_rate && (
-                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start gap-3">
-                            <DollarSign className="w-5 h-5 text-purple-500 mt-1" />
-                            <div>
-                              <dt className="text-sm text-muted-foreground">
-                                {t("forms.last_usd_rate")}
-                              </dt>
-                              <dd className="text-2xl font-semibold text-foreground">
-                                {formatCurrency(debt.last_usd_rate)} UZS
-                              </dd>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                   
                     </dl>
                   </div>
                 </div>
