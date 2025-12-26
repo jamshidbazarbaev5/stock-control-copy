@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ResourceTable } from '../helpers/ResourseTable';
@@ -52,15 +52,22 @@ const columns = (t: any) => [
 export default function CategoriesPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [currentPage, setCurrentPage] = useState(1);
+
   const { t } = useTranslation();
   const { data: categoriesData, isLoading } = useGetCategories({
     params: {
-      category_name: searchTerm
+      category_name: searchTerm,
+      page: currentPage
     }
   });
 
-    // Debug the raw API response
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Debug the raw API response
   console.log('Raw categoriesData:', categoriesData);
 
   // Get the categories array from the paginated response
@@ -87,6 +94,10 @@ export default function CategoriesPage() {
 
   const handleEdit = (category: Category) => {
     navigate(`/edit-category/${category.id}`);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   // const handleDelete = (id: number) => {
@@ -121,10 +132,10 @@ export default function CategoriesPage() {
         onEdit={handleEdit}
         // onDelete={handleDelete}
         onAdd={() => navigate('/create-category')}
-        totalCount={enhancedCategories.length}
-        pageSize={30}
-        currentPage={1}
-        onPageChange={() => {}}
+        totalCount={(categoriesData as any)?.count || enhancedCategories.length}
+        pageSize={(categoriesData as any)?.page_size || 30}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
       />
 
 

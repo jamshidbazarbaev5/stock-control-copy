@@ -55,3 +55,29 @@ export const fetchCategoriesWithAttributes = async (categoryName?: string): Prom
   const response = await api.get<CategoryWithAttributesResponse>(CATEGORY_URL, { params });
   return response.data;
 };
+
+// Function to fetch all categories across all pages
+export const fetchAllCategories = async (): Promise<Category[]> => {
+  let allCategories: Category[] = [];
+  let currentPage = 1;
+  let hasMorePages = true;
+
+  while (hasMorePages) {
+    try {
+      const response = await api.get<CategoryWithAttributesResponse>(CATEGORY_URL, {
+        params: { page: currentPage }
+      });
+
+      allCategories = [...allCategories, ...response.data.results];
+
+      // Check if there's a next page
+      hasMorePages = response.data.links.next !== null;
+      currentPage++;
+    } catch (error) {
+      console.error('Error fetching categories page:', currentPage, error);
+      hasMorePages = false;
+    }
+  }
+
+  return allCategories;
+};
