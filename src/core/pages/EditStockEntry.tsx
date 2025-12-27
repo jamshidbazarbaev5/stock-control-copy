@@ -13,7 +13,7 @@ import {
 } from "../api/product";
 import { useGetStores } from "../api/store";
 import {
-  useGetSuppliers,
+  useGetAllSuppliers,
   useCreateSupplier,
   type Supplier,
 } from "../api/supplier";
@@ -261,9 +261,7 @@ export default function EditStockEntry() {
     params: { stock_entry: stockEntryId },
   });
   const { data: storesData, isLoading: storesLoading } = useGetStores({});
-  const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliers(
-      {},
-  );
+  const { data: suppliersData, isLoading: suppliersLoading } = useGetAllSuppliers();
   const { data: categoriesData, isLoading: categoriesLoading } =
       useGetCategories({});
   const { data: currenciesData, isLoading: currenciesLoading } =
@@ -318,9 +316,7 @@ export default function EditStockEntry() {
   const stores = Array.isArray(storesData)
       ? storesData
       : storesData?.results || [];
-  const suppliers = Array.isArray(suppliersData)
-      ? suppliersData
-      : suppliersData?.results || [];
+  const suppliers: Supplier[] = suppliersData || [];
 
   useEffect(() => {
     if (useSupplierBalance && supplierValue) {

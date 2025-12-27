@@ -42,6 +42,7 @@ import {
 import { toast } from "sonner";
 import type { Stock } from "@/core/api/stock";
 import { StockSelectionModal } from "./StockSelectionModal";
+import { fetchCurrencyRates } from "@/core/api/api";
 
 interface ProductInCart {
   id: number;
@@ -456,8 +457,7 @@ const POSInterfaceCore = () => {
   useEffect(() => {
     if (isPaymentModalOpen) {
       setLoadingExchangeRate(true);
-      fetch("https://test.bondify.uz/api/v1/currency/rates")
-          .then((response) => response.json())
+      fetchCurrencyRates()
           .then((data) => {
             if (data && data.length > 0 && data[0].rate) {
               const rate = parseFloat(data[0].rate);
@@ -634,14 +634,16 @@ const POSInterfaceCore = () => {
     }
 
     if (
-        e.key === "Enter" ||
-        e.key === "\n" ||
-        e.key === "\r" ||
-        e.keyCode === 13
+      e.key === "Enter" ||
+      e.key === "\n" ||
+      e.key === "\r" ||
+      e.keyCode === 13 ||
+      e.key === " " ||
+      e.keyCode === 32
     ) {
       e.preventDefault();
       console.log(
-          "✅ ENTER KEY DETECTED! Processing barcode:",
+          "✅ ENTER/SPACE KEY DETECTED! Processing barcode:",
           barcodeScanInput,
           "Length:",
           barcodeScanInput.length,
@@ -1181,10 +1183,10 @@ const POSInterfaceCore = () => {
     }
   };
 
-  const clearCart = () => {
-    setCartProducts([]);
-    setFocusedProductIndex(-1);
-  };
+  // const clearCart = () => {
+  //   setCartProducts([]);
+  //   setFocusedProductIndex(-1);
+  // };
 
   // Utility function to clear localStorage state
   const clearPersistedState = () => {
@@ -1200,12 +1202,18 @@ const POSInterfaceCore = () => {
   const handleKeyDown = useCallback(
       (e: KeyboardEvent) => {
         // Handle global shortcuts that work regardless of cart state
+        // Single Ctrl/Control key press opens search (works on both Mac and Windows)
+        if (
+          (e.key === "Control" || e.key === "Meta") &&
+          !e.altKey &&
+          !e.shiftKey
+        ) {
+          e.preventDefault();
+          handleSearchClick();
+          return;
+        }
+
         switch (e.key) {
-          case "b":
-          case "B":
-            e.preventDefault();
-            handleSearchClick();
-            return;
           case "l":
           case "L":
             e.preventDefault();
@@ -1804,7 +1812,7 @@ const POSInterfaceCore = () => {
                                       onClick={() => {
                                         setSelectedProductForPrice(product);
                                         setSelectedProductIndexForPrice(index);
-                                        setPriceInput(product.price.toString());
+                                        setPriceInput("");
                                         setIsPriceModalOpen(true);
                                       }}
                                       className="w-20 text-right px-2 py-1 text-xs font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
@@ -1946,16 +1954,7 @@ const POSInterfaceCore = () => {
                 </div>
 
                 {/* Page indicator */}
-                <div className="flex items-center justify-between text-sm text-gray-500 mt-4 flex-shrink-0">
-                  <span>Товаров в корзине: {cartProducts.length}</span>
-                  <button
-                      onClick={clearCart}
-                      className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition-colors"
-                      disabled={cartProducts.length === 0}
-                  >
-                    Очистить корзину
-                  </button>
-                </div>
+               
               </div>
             </div>
 
@@ -1968,8 +1967,8 @@ const POSInterfaceCore = () => {
                     title="Поиск товаров"
                 >
                   <Search className="w-6 h-6" />
-                  <span className="text-sm bg-blue-400 text-white px-2 py-1 rounded absolute -top-1 -right-1">
-                  B
+                  <span className="text-xs bg-blue-400 text-white px-1.5 py-0.5 rounded absolute -top-1 -right-1">
+                  Ctrl
                 </span>
                 </button>
                 <button

@@ -8,7 +8,7 @@ import {
 } from "../api/product";
 import { useGetStores } from "../api/store";
 import {
-  useGetSuppliers,
+  useGetAllSuppliers,
   useCreateSupplier,
   type Supplier,
 } from "../api/supplier";
@@ -264,9 +264,7 @@ export default function CreateStock() {
   const createProduct = useCreateProduct();
   const createSupplier = useCreateSupplier();
   const { data: storesData, isLoading: storesLoading } = useGetStores({});
-  const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliers(
-    {},
-  );
+  const { data: suppliersData, isLoading: suppliersLoading } = useGetAllSuppliers();
   const { data: categoriesData, isLoading: categoriesLoading } =
     useGetCategories({});
   const { data: currenciesData, isLoading: currenciesLoading } =
@@ -323,9 +321,7 @@ export default function CreateStock() {
   const stores = Array.isArray(storesData)
     ? storesData
     : storesData?.results || [];
-  const suppliers = Array.isArray(suppliersData)
-    ? suppliersData
-    : suppliersData?.results || [];
+  const suppliers: Supplier[] = suppliersData || [];
 
   useEffect(() => {
     if (commonForm.watch("use_supplier_balance") && commonForm.watch("supplier")) {

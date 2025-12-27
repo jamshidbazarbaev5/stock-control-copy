@@ -1,6 +1,6 @@
 import { createResourceApiHooks } from "../helpers/createResourceApi";
 import api from "./api";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 
 // Types
 export interface Supplier {
@@ -34,6 +34,39 @@ export const {
   useUpdateResource: useUpdateSupplier,
   useDeleteResource: useDeleteSupplier,
 } = createResourceApiHooks<Supplier>(SUPPLIER_URL, "suppliers");
+
+// Hook to fetch ALL suppliers across all pages
+export const useGetAllSuppliers = (options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: ["all-suppliers"],
+    queryFn: async (): Promise<Supplier[]> => {
+      let allSuppliers: Supplier[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await api.get<{ results: Supplier[], count: number, total_pages: number }>(SUPPLIER_URL, {
+          params: { page, page_size: 100 },
+        });
+
+        const data = response.data;
+        if (data.results) {
+          allSuppliers = [...allSuppliers, ...data.results];
+        }
+
+        // Check if there are more pages
+        hasMore = page < (data.total_pages || 1);
+        page++;
+
+        // Safety limit to prevent infinite loops
+        if (page > 100) break;
+      }
+
+      return allSuppliers;
+    },
+    enabled: options?.enabled !== undefined ? options.enabled : true,
+  });
+};
 
 // Add supplier balance mutation
 export const useAddSupplierBalance = () => {

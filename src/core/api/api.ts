@@ -85,3 +85,9 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Currency rates
+export const fetchCurrencyRates = async () => {
+  const response = await api.get("/currency/rates");
+  return response.data;
+};
