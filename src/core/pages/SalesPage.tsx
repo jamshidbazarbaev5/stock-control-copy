@@ -824,6 +824,29 @@ export default function SalesPage() {
       accessorKey: "sale_payments",
       cell: (row: any) => (
         <div className="flex flex-col items-center gap-1">
+          {/* Balance usage display */}
+          {((row.paid_from_balance_uzs && parseFloat(row.paid_from_balance_uzs) > 0) ||
+            (row.paid_from_balance_usd && parseFloat(row.paid_from_balance_usd) > 0)) && (
+            <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 px-2 py-1 rounded-md">
+              <div className="flex flex-col items-start">
+                <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
+                  Исп. баланс
+                </span>
+                <div className="flex items-center gap-2">
+                  {row.paid_from_balance_uzs && parseFloat(row.paid_from_balance_uzs) > 0 && (
+                    <span className="text-xs font-bold text-purple-600">
+                      {formatCurrency(row.paid_from_balance_uzs)} сум
+                    </span>
+                  )}
+                  {row.paid_from_balance_usd && parseFloat(row.paid_from_balance_usd) > 0 && (
+                    <span className="text-xs font-bold text-purple-600">
+                      {formatCurrency(row.paid_from_balance_usd)} $
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {row.sale_debt ? (
             <div className="flex items-center gap-1 text-xs justify-center">
               {row.sale_debt.deposit_payment_method === "Наличные" && (

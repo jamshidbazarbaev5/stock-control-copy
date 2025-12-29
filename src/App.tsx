@@ -95,6 +95,7 @@ import EditStockEntry from "@/core/pages/EditStockEntry.tsx";
 import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage";
 import ActivityPage from "./core/pages/ActivityPage";
 import ProductMovementsPage from "./core/pages/ProductMovementsPage";
+import StockReturnsHistoryPage from "./core/pages/StockReturnsHistoryPage";
 // import W9FormDemo from "./core/pages/W9FormDemo";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
@@ -309,6 +310,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <EditStockEntry />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/suppliers/:supplierId/stock-entries/:stockEntryId/returns"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <StockReturnsHistoryPage />
                   </PrivateRoute>
                 }
               />

@@ -631,7 +631,7 @@ export default function ClientsPage() {
   const [createDebtClientId, setCreateDebtClientId] = useState<number | null>(null);
   const [massPaymentClientId, setMassPaymentClientId] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number; flip?: boolean } | null>(null);
   const { data: clientsData, isLoading } = useGetClients({
     params: selectedType === "all" ? {} : { type: selectedType },
   });
@@ -644,7 +644,7 @@ export default function ClientsPage() {
       ? clients.length
       : clientsData?.count || 0;
 
-  const columns = [
+  const columns :any = [
     {
       header: t("forms.client_type"),
       accessorKey: "type",
@@ -709,25 +709,45 @@ export default function ClientsPage() {
             totalCount={totalCount}
             actions={(client: Client) => (
               <div className="relative" style={{ position: 'static' }}>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-                    setOpenDropdown(openDropdown === client.id ? null : client.id!);
+                    const dropdownHeight = 280; // Approximate dropdown height
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+
+                    // Check if there's not enough space below but enough above
+                    const flip = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
+
+                    if (flip) {
+                      setDropdownPosition({ top: rect.top, right: window.innerWidth - rect.right, flip: true });
+                    } else {
+                      setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right, flip: false });
+                    }
+                    if (client.id !== undefined) {
+                      setOpenDropdown(openDropdown === client.id ? null : client.id);
+                    }
                   }}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
                 {openDropdown === client.id && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setOpenDropdown(null)}
                     />
-                    <div className="fixed w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700" style={{ top: dropdownPosition?.top, right: dropdownPosition?.right }}>
+                    <div
+                      className="fixed w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700"
+                      style={{
+                        top: dropdownPosition?.flip ? undefined : dropdownPosition?.top,
+                        bottom: dropdownPosition?.flip ? window.innerHeight - dropdownPosition!.top : undefined,
+                        right: dropdownPosition?.right,
+                      }}
+                    >
                       {client.type === "Юр.лицо" && (
                         <button
                           className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
@@ -757,7 +777,7 @@ export default function ClientsPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenDropdown(null);
-                          client.id && setCreateDebtClientId(client.id);
+                          if (client.id) setCreateDebtClientId(client.id);
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -768,7 +788,7 @@ export default function ClientsPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenDropdown(null);
-                          client.id && setMassPaymentClientId(client.id);
+                          if (client.id) setMassPaymentClientId(client.id);
                         }}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
@@ -781,7 +801,7 @@ export default function ClientsPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDropdown(null);
-                              client.id && setSelectedClientId(client.id);
+                              if (client.id) setSelectedClientId(client.id);
                             }}
                           >
                             <Wallet className="h-4 w-4 mr-2" />
@@ -792,7 +812,7 @@ export default function ClientsPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDropdown(null);
-                              client.id && setCashOutClientId(client.id);
+                              if (client.id) setCashOutClientId(client.id);
                             }}
                           >
                             <Wallet className="h-4 w-4 mr-2" />

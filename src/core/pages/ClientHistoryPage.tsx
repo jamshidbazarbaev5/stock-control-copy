@@ -128,7 +128,7 @@ export default function ClientHistoryPage() {
         <p className="text-gray-600">
           {t("forms.current_balance")}:{" "}
           {new Intl.NumberFormat("ru-RU").format(
-            parseFloat(String(client.balance)),
+            parseFloat(String(client.balance_uzs)),
           )}
         </p>
       </div>

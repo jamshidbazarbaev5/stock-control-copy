@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { addDays } from "date-fns";
 import {
   ChevronDown,
   ChevronUp,
@@ -42,11 +43,12 @@ import {
 import { toast } from "sonner";
 import type { Stock } from "@/core/api/stock";
 import { StockSelectionModal } from "./StockSelectionModal";
-import { fetchCurrencyRates } from "@/core/api/api";
+import { useGetStores } from "@/core/api/store";
+import api from "@/core/api/api";
 
 interface ProductInCart {
   id: number;
-  productId: number;
+  productId: number; 
   name: string;
   price: number;
   quantity: number;
@@ -89,7 +91,7 @@ interface SessionState {
   selectedSeller: number | null;
   selectedClient: number | null;
   clientSearchTerm: string;
-  onCredit: boolean;
+  paymentMode: "none" | "balance" | "debt";
   debtDeposit: string;
   debtDueDate: string;
   depositPaymentMethod: string;
@@ -106,6 +108,7 @@ interface SalePayload {
   store: number;
   sold_by: number;
   on_credit: boolean;
+  client?: number;
   sale_items: {
     product_write: number;
     quantity: number;
@@ -169,7 +172,7 @@ const POSInterfaceCore = () => {
           selectedSeller: null,
           selectedClient: null,
           clientSearchTerm: "",
-          onCredit: false,
+          paymentMode: "balance",
           debtDeposit: "",
           debtDueDate: "",
           depositPaymentMethod: "Наличные",
@@ -215,12 +218,19 @@ const POSInterfaceCore = () => {
   const [clientSearchTerm, setClientSearchTerm] = useState(
       currentSession.clientSearchTerm,
   );
-  const [onCredit, setOnCredit] = useState(currentSession.onCredit);
-  const [debtDeposit, setDebtDeposit] = useState(currentSession.debtDeposit);
-  const [debtDueDate, setDebtDueDate] = useState(currentSession.debtDueDate);
-  const [depositPaymentMethod, setDepositPaymentMethod] = useState(
-      currentSession.depositPaymentMethod,
+  // Payment mode: "none" = no client action, "balance" = use client balance, "debt" = on credit/debt
+  const [paymentMode, setPaymentMode] = useState<"none" | "balance" | "debt">(
+      currentSession.paymentMode || "none",
   );
+  // For debt mode - deposit and due date
+  const [debtDeposit, setDebtDeposit] = useState(currentSession.debtDeposit || "");
+  const [debtDueDate, setDebtDueDate] = useState(currentSession.debtDueDate || "");
+  const [depositPaymentMethod, setDepositPaymentMethod] = useState(
+      currentSession.depositPaymentMethod || "Наличные",
+  );
+  // Insufficient balance modal state
+  const [isInsufficientBalanceModalOpen, setIsInsufficientBalanceModalOpen] = useState(false);
+  const [insufficientBalanceChoice, setInsufficientBalanceChoice] = useState<"pay" | "debt" | null>(null);
 
   // Global modal states (shared across sessions)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -257,16 +267,33 @@ const POSInterfaceCore = () => {
     if (!isPaymentModalOpen || paymentMethods.length === 0) return;
 
     const finalTotal = total - discountAmount;
+
+    // Calculate client balance
+    const balanceUzs = selectedClient
+        ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+            : 0
+        : 0;
+    const balanceUsd = selectedClient
+        ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+            : 0
+        : 0;
+    const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+    const targetAmount = selectedClient && paymentMode !== "balance"
+        ? Math.max(0, finalTotal - totalBalanceUzs)
+        : finalTotal;
+
     const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
 
     // Only adjust if there's a mismatch
-    if (Math.abs(totalPaid - finalTotal) > 0.01) {
+    if (Math.abs(totalPaid - targetAmount) > 0.01) {
       if (paymentMethods.length === 1) {
-        setPaymentMethods([{ ...paymentMethods[0], amount: finalTotal }]);
+        setPaymentMethods([{ ...paymentMethods[0], amount: targetAmount }]);
       } else {
         // Adjust last payment
         const otherPaymentsTotal = paymentMethods.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
-        const lastPaymentAmount = Math.max(0, finalTotal - otherPaymentsTotal);
+        const lastPaymentAmount = Math.max(0, targetAmount - otherPaymentsTotal);
         const updated = [...paymentMethods];
         updated[updated.length - 1] = { ...updated[updated.length - 1], amount: lastPaymentAmount };
         setPaymentMethods(updated);
@@ -302,12 +329,12 @@ const POSInterfaceCore = () => {
   // Client creation modal state
   const [isCreateClientModalOpen, setIsCreateClientModalOpen] = useState(false);
   const [newClientData, setNewClientData] = useState({
-    type: 'Физ.лицо' as 'Физ.лицо' | 'Юр.лицо',
+    type: 'Физ.лицо' as 'Физ.лицо' | 'Юр.лицо' | 'Магазин',
     name: '',
     phone_number: '+998',
     address: '',
     ceo_name: '',
-    balance: 0,
+    linked_store: '',
   });
 
   // Price modal state
@@ -338,11 +365,15 @@ const POSInterfaceCore = () => {
   const { data: clientsData } = useGetClients({
     params: { name: clientSearchTerm },
   });
+  const { data: storesData } = useGetStores({});
 
   const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
   const clients = Array.isArray(clientsData)
       ? clientsData
       : clientsData?.results || [];
+  const stores = Array.isArray(storesData)
+      ? storesData
+      : storesData?.results || [];
 
   // Save current session state whenever it changes
   useEffect(() => {
@@ -360,7 +391,7 @@ const POSInterfaceCore = () => {
                   selectedSeller,
                   selectedClient,
                   clientSearchTerm,
-                  onCredit,
+                  paymentMode,
                   debtDeposit,
                   debtDueDate,
                   depositPaymentMethod,
@@ -379,7 +410,7 @@ const POSInterfaceCore = () => {
     selectedSeller,
     selectedClient,
     clientSearchTerm,
-    onCredit,
+    paymentMode,
     debtDeposit,
     debtDueDate,
     depositPaymentMethod,
@@ -457,8 +488,9 @@ const POSInterfaceCore = () => {
   useEffect(() => {
     if (isPaymentModalOpen) {
       setLoadingExchangeRate(true);
-      fetchCurrencyRates()
-          .then((data) => {
+      api.get("/currency/rates/")
+          .then((response) => {
+            const data = response.data;
             if (data && data.length > 0 && data[0].rate) {
               const rate = parseFloat(data[0].rate);
               setExchangeRate(rate);
@@ -634,16 +666,14 @@ const POSInterfaceCore = () => {
     }
 
     if (
-      e.key === "Enter" ||
-      e.key === "\n" ||
-      e.key === "\r" ||
-      e.keyCode === 13 ||
-      e.key === " " ||
-      e.keyCode === 32
+        e.key === "Enter" ||
+        e.key === "\n" ||
+        e.key === "\r" ||
+        e.keyCode === 13
     ) {
       e.preventDefault();
       console.log(
-          "✅ ENTER/SPACE KEY DETECTED! Processing barcode:",
+          "✅ ENTER KEY DETECTED! Processing barcode:",
           barcodeScanInput,
           "Length:",
           barcodeScanInput.length,
@@ -898,7 +928,7 @@ const POSInterfaceCore = () => {
           !isAdmin && !isSuperUser && currentUser?.id ? currentUser.id : null,
       selectedClient: null,
       clientSearchTerm: "",
-      onCredit: false,
+      paymentMode: "none",
       debtDeposit: "",
       debtDueDate: "",
       depositPaymentMethod: "Наличные",
@@ -920,7 +950,7 @@ const POSInterfaceCore = () => {
     );
     setSelectedClient(null);
     setClientSearchTerm("");
-    setOnCredit(false);
+    setPaymentMode("none");
     setDebtDeposit("");
     setDebtDueDate("");
     setDepositPaymentMethod("Наличные");
@@ -978,7 +1008,7 @@ const POSInterfaceCore = () => {
         selectedSeller,
         selectedClient,
         clientSearchTerm,
-        onCredit,
+        paymentMode,
         debtDeposit,
         debtDueDate,
         depositPaymentMethod,
@@ -999,10 +1029,10 @@ const POSInterfaceCore = () => {
       setSelectedSeller(targetSession.selectedSeller);
       setSelectedClient(targetSession.selectedClient);
       setClientSearchTerm(targetSession.clientSearchTerm);
-      setOnCredit(targetSession.onCredit);
-      setDebtDeposit(targetSession.debtDeposit);
-      setDebtDueDate(targetSession.debtDueDate);
-      setDepositPaymentMethod(targetSession.depositPaymentMethod);
+      setPaymentMode(targetSession.paymentMode || "none");
+      setDebtDeposit(targetSession.debtDeposit || "");
+      setDebtDueDate(targetSession.debtDueDate || "");
+      setDepositPaymentMethod(targetSession.depositPaymentMethod || "Наличные");
     }
   };
 
@@ -1029,10 +1059,10 @@ const POSInterfaceCore = () => {
         setSelectedSeller(newActiveSession.selectedSeller);
         setSelectedClient(newActiveSession.selectedClient);
         setClientSearchTerm(newActiveSession.clientSearchTerm);
-        setOnCredit(newActiveSession.onCredit);
-        setDebtDeposit(newActiveSession.debtDeposit);
-        setDebtDueDate(newActiveSession.debtDueDate);
-        setDepositPaymentMethod(newActiveSession.depositPaymentMethod);
+        setPaymentMode(newActiveSession.paymentMode || "none");
+        setDebtDeposit(newActiveSession.debtDeposit || "");
+        setDebtDueDate(newActiveSession.debtDueDate || "");
+        setDepositPaymentMethod(newActiveSession.depositPaymentMethod || "Наличные");
       }
     }
   };
@@ -1202,18 +1232,11 @@ const POSInterfaceCore = () => {
   const handleKeyDown = useCallback(
       (e: KeyboardEvent) => {
         // Handle global shortcuts that work regardless of cart state
-        // Single Ctrl/Control key press opens search (works on both Mac and Windows)
-        if (
-          (e.key === "Control" || e.key === "Meta") &&
-          !e.altKey &&
-          !e.shiftKey
-        ) {
-          e.preventDefault();
-          handleSearchClick();
-          return;
-        }
-
         switch (e.key) {
+          case "Control":
+            e.preventDefault();
+            handleSearchClick();
+            return;
           case "l":
           case "L":
             e.preventDefault();
@@ -1512,45 +1535,80 @@ const POSInterfaceCore = () => {
               {(selectedSeller || selectedClient) && (
                   <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-4 flex-1">
                         <UserIcon className="w-5 h-5 text-blue-600" />
-                        <div className="text-sm">
+                        <div className="text-sm flex-1">
                           {selectedSeller && (
-                              <span className="text-blue-700 font-medium">
-                          Продавец:{" "}
+                              <div className="text-blue-700 font-medium">
+                                Продавец:{" "}
                                 {users.find((u) => u.id === selectedSeller)?.name ||
                                     (selectedSeller === currentUser?.id
                                         ? currentUser?.name
                                         : `ID: ${selectedSeller} (не найден)`)}
-                        </span>
+                              </div>
                           )}
-                          {selectedSeller && selectedClient && (
-                              <span className="text-gray-400 mx-2">•</span>
-                          )}
-                          {selectedClient && (
-                              <span className="text-blue-700 font-medium">
-                          Клиент:{" "}
-                                {clients.find((c) => c.id === selectedClient)?.name}
-                                {onCredit && (
-                                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
-                              В кредит
-                            </span>
-                                )}
-                        </span>
-                          )}
+                          {selectedClient && (() => {
+                            const client = clients.find((c) => c.id === selectedClient);
+                            if (paymentMode === "debt") {
+                              return (
+                                <div className="text-blue-700 font-medium">
+                                  Клиент: {client?.name}
+                                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                                    В долг
+                                  </span>
+                                </div>
+                              );
+                            }
+                            const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                            const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                            const newTotalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate) - total;
+                            const remainingToPay = newTotalBalanceUzs < 0 ? Math.abs(newTotalBalanceUzs) : 0;
+                            return (
+                                <div className="space-y-1">
+                                  <div className="text-blue-700 font-medium">
+                                    Клиент: {client?.name}
+                                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                      Оплата
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-blue-600">
+                                    Баланс UZS: {balanceUzs.toLocaleString()} сум
+                                  </div>
+                                  <div className="text-xs text-blue-600">
+                                    Баланс USD: {balanceUsd.toLocaleString()} $ (x{exchangeRate.toLocaleString()} = {(balanceUsd * exchangeRate).toLocaleString()} сум)
+                                  </div>
+                                  <div className="text-xs font-semibold text-blue-700">
+                                    Общий баланс: {(balanceUzs + balanceUsd * exchangeRate).toLocaleString()} сум
+                                  </div>
+                                  <div className="text-xs font-semibold text-blue-700">
+                                    Сумма покупки: {total.toLocaleString()} сум
+                                  </div>
+                                  <div className="text-xs text-blue-600">
+                                  <span className={newTotalBalanceUzs < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                                    Новый баланс: {newTotalBalanceUzs.toLocaleString()} сум
+                                  </span>
+                                    {remainingToPay > 0 && (
+                                        <span className="text-red-600 font-medium ml-2">
+                                      Осталось оплатить: {remainingToPay.toLocaleString()} сум
+                                    </span>
+                                    )}
+                                  </div>
+                                </div>
+                            );
+                          })()}
                         </div>
                       </div>
                       <button
                           onClick={() => {
                             setSelectedSeller(null);
                             setSelectedClient(null);
-                            setOnCredit(false);
+                            setPaymentMode("none");
                             setClientSearchTerm("");
                             setDebtDeposit("");
                             setDebtDueDate("");
                             setDepositPaymentMethod("Наличные");
                           }}
-                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                          className="text-gray-400 hover:text-gray-600 transition-colors ml-2"
                           title="Очистить выбор"
                       >
                         <X className="w-4 h-4" />
@@ -1812,7 +1870,7 @@ const POSInterfaceCore = () => {
                                       onClick={() => {
                                         setSelectedProductForPrice(product);
                                         setSelectedProductIndexForPrice(index);
-                                        setPriceInput("");
+                                        setPriceInput('');
                                         setIsPriceModalOpen(true);
                                       }}
                                       className="w-20 text-right px-2 py-1 text-xs font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
@@ -1954,7 +2012,16 @@ const POSInterfaceCore = () => {
                 </div>
 
                 {/* Page indicator */}
-               
+                {/*<div className="flex items-center justify-between text-sm text-gray-500 mt-4 flex-shrink-0">*/}
+                {/*  <span>Товаров в корзине: {cartProducts.length}</span>*/}
+                {/*  <button*/}
+                {/*      onClick={clearCart}*/}
+                {/*      className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition-colors"*/}
+                {/*      disabled={cartProducts.length === 0}*/}
+                {/*  >*/}
+                {/*    Очистить корзину*/}
+                {/*  </button>*/}
+                {/*</div>*/}
               </div>
             </div>
 
@@ -1967,8 +2034,8 @@ const POSInterfaceCore = () => {
                     title="Поиск товаров"
                 >
                   <Search className="w-6 h-6" />
-                  <span className="text-xs bg-blue-400 text-white px-1.5 py-0.5 rounded absolute -top-1 -right-1">
-                  Ctrl
+                  <span className="text-sm bg-blue-400 text-white px-2 py-1 rounded absolute -top-1 -right-1">
+                  CTRL
                 </span>
                 </button>
                 <button
@@ -2009,23 +2076,64 @@ const POSInterfaceCore = () => {
                 {!isCalculatorVisible && (
                     <button
                         onClick={() => {
+                          // Check if we need to show insufficient balance modal
+                          if (paymentMode === "balance" && selectedClient) {
+                            const balanceUzs = (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                : 0;
+                            const balanceUsd = (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                : 0;
+                            const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+
+                            if (totalBalanceUzs < total) {
+                              // Show insufficient balance modal
+                              setIsInsufficientBalanceModalOpen(true);
+                              return;
+                            }
+                          }
+
                           setDiscountAmount(0);
+                          // Calculate remaining amount to pay if client balance is used
+                          const balanceUzs = selectedClient
+                              ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                  ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                  : 0
+                              : 0;
+                          const balanceUsd = selectedClient
+                              ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                  ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                  : 0
+                              : 0;
+                          const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                          const finalTotal = total - discountAmount;
+                          const remainingToPay = Math.max(0, finalTotal - totalBalanceUzs);
+
                           setPaymentMethods([
-                            { amount: total, payment_method: "Наличные" },
+                            {
+                              amount: remainingToPay,
+                              payment_method: "Наличные",
+                            },
                           ]);
                           setIsPaymentModalOpen(true);
                         }}
                         disabled={cartProducts.length === 0}
                         className={`py-4 px-6 rounded-xl text-lg font-bold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[60px] active:scale-95 touch-manipulation ${
-                            onCredit
+                            paymentMode === "debt"
                                 ? "bg-amber-600 text-white hover:bg-amber-700"
-                                : "bg-blue-600 text-white hover:bg-blue-700"
+                                : paymentMode === "balance"
+                                    ? "bg-green-600 text-white hover:bg-green-700"
+                                    : "bg-blue-600 text-white hover:bg-blue-700"
                         }`}
-                        title={cartProducts.length === 0 ? "Добавьте товары" : onCredit ? `В долг ${total.toLocaleString()} сум` : `Оплатить ${total.toLocaleString()} сум`}
+                        title={cartProducts.length === 0 ? "Добавьте товары" : paymentMode === "debt" ? `В долг ${total.toLocaleString()} сум` : `Оплатить ${total.toLocaleString()} сум`}
                     >
                       {cartProducts.length === 0
                           ? "Товары"
-                          : `${onCredit ? "Долг" : "Оплата"}: ${total.toLocaleString()}`}
+                          : paymentMode === "debt"
+                              ? `Долг: ${total.toLocaleString()}`
+                              : paymentMode === "balance"
+                                  ? `С баланса: ${total.toLocaleString()}`
+                                  : `Оплата: ${total.toLocaleString()}`}
                     </button>
                 )}
 
@@ -2244,24 +2352,63 @@ const POSInterfaceCore = () => {
               <div className="p-3 border-t border-gray-200 flex-shrink-0 bg-white">
                 <button
                     onClick={() => {
+                      // Check if we need to show insufficient balance modal
+                      if (paymentMode === "balance" && selectedClient) {
+                        const balanceUzs = (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                            : 0;
+                        const balanceUsd = (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                            : 0;
+                        const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+
+                        if (totalBalanceUzs < total) {
+                          // Show insufficient balance modal
+                          setIsInsufficientBalanceModalOpen(true);
+                          return;
+                        }
+                      }
+
                       setDiscountAmount(0);
+                      // Calculate remaining amount to pay if client balance is used
+                      const balanceUzs = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                              : 0
+                          : 0;
+                      const balanceUsd = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                              : 0
+                          : 0;
+                      const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                      const finalTotal = total - discountAmount;
+                      const remainingToPay = Math.max(0, finalTotal - totalBalanceUzs);
+
                       setPaymentMethods([
-                        { amount: total, payment_method: "Наличные" },
+                        {
+                          amount: remainingToPay,
+                          payment_method: "Наличные",
+                        },
                       ]);
                       setIsPaymentModalOpen(true);
                     }}
                     disabled={cartProducts.length === 0}
                     className={`w-full py-4 rounded-lg text-lg font-bold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[64px] active:scale-95 touch-manipulation ${
-                        onCredit
+                        paymentMode === "debt"
                             ? "bg-amber-600 text-white hover:bg-amber-700"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
+                            : paymentMode === "balance"
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                 >
                   {cartProducts.length === 0
                       ? "Добавьте товары"
-                      : onCredit
+                      : paymentMode === "debt"
                           ? `В долг ${total.toLocaleString()} сум`
-                          : `Оплатить ${total.toLocaleString()} сум`}
+                          : paymentMode === "balance"
+                              ? `С баланса ${total.toLocaleString()} сум`
+                              : `Оплатить ${total.toLocaleString()} сум`}
                 </button>
               </div>
             </div>
@@ -2585,30 +2732,26 @@ const POSInterfaceCore = () => {
                   </div>
               )}
 
-              {/* Credit Toggle */}
+              {/* Payment Mode Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  В кредит
+                  Тип операции
                 </label>
                 <Select
-                    value={onCredit ? "true" : "false"}
-                    onValueChange={(value) => {
-                      const isCredit = value === "true";
-                      setOnCredit(isCredit);
-                      if (!isCredit) {
-                        setSelectedClient(null);
-                        setDebtDeposit("");
-                        setDebtDueDate("");
-                        setDepositPaymentMethod("Наличные");
-                      }
+                    value={paymentMode}
+                    onValueChange={(value: "balance" | "debt") => {
+                      setPaymentMode(value);
+                      setDebtDeposit("");
+                      setDebtDueDate("");
+                      setDepositPaymentMethod("Наличные");
                     }}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Выберите тип" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="true">Да</SelectItem>
-                    <SelectItem value="false">Нет</SelectItem>
+                    <SelectItem value="balance">С баланса клиента</SelectItem>
+                    <SelectItem value="debt">В долг</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2657,12 +2800,10 @@ const POSInterfaceCore = () => {
                     <div className="max-h-[200px] overflow-y-auto">
                       {clients && clients.length > 0 ? (
                           clients
-                              .filter(
-                                  (client) =>
-                                      (onCredit ? true : client.type === "Юр.лицо") &&
-                                      client.name
-                                          .toLowerCase()
-                                          .includes(clientSearchTerm.toLowerCase()),
+                              .filter((client) =>
+                                  client.name
+                                      .toLowerCase()
+                                      .includes(clientSearchTerm.toLowerCase()),
                               )
                               .map((client) => (
                                   <SelectItem
@@ -2683,64 +2824,67 @@ const POSInterfaceCore = () => {
                 </Select>
               </div>
 
-              {/* Debt specific fields - shown only when onCredit is true */}
-              {onCredit && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Сумма залога (сум)
-                      </label>
-                      <Input
-                          type="number"
-                          placeholder="Введите сумму залога..."
-                          value={debtDeposit}
-                          onChange={(e) => setDebtDeposit(e.target.value)}
-                          onFocus={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onBlur={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="mb-2"
-                          autoComplete="off"
-                      />
-                    </div>
+              {/* Debt specific fields - shown only when paymentMode === "debt" */}
+              {paymentMode === "debt" && (
+                <>
+                  {/* Due date */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Срок погашения
+                    </label>
+                    <Input
+                        type="date"
+                        value={debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0]}
+                        onChange={(e) => setDebtDueDate(e.target.value)}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                        }}
+                        onBlur={(e) => {
+                          e.stopPropagation();
+                        }}
+                        className="mb-2"
+                        autoComplete="off"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Способ оплаты залога
-                      </label>
-                      <select
-                          value={depositPaymentMethod}
-                          onChange={(e) => setDepositPaymentMethod(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="Наличные">Наличные</option>
-                        <option value="Карта">Карта</option>
-                        <option value="Click">Click</option>
-                        <option value="Перечисление">Перечисление</option>
-                      </select>
-                    </div>
+                  {/* Deposit amount */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Сумма залога (сум)
+                    </label>
+                    <Input
+                        type="number"
+                        placeholder="Введите сумму залога..."
+                        value={debtDeposit}
+                        onChange={(e) => setDebtDeposit(e.target.value)}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                        }}
+                        onBlur={(e) => {
+                          e.stopPropagation();
+                        }}
+                        className="mb-2"
+                        autoComplete="off"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Срок погашения
-                      </label>
-                      <Input
-                          type="date"
-                          value={debtDueDate}
-                          onChange={(e) => setDebtDueDate(e.target.value)}
-                          onFocus={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onBlur={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="mb-2"
-                          autoComplete="off"
-                      />
-                    </div>
-                  </>
+                  {/* Deposit payment method */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Способ оплаты залога
+                    </label>
+                    <select
+                        value={depositPaymentMethod}
+                        onChange={(e) => setDepositPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="Наличные">Наличные</option>
+                      <option value="Карта">Карта</option>
+                      <option value="Click">Click</option>
+                      <option value="Перечисление">Перечисление</option>
+                    </select>
+                  </div>
+                </>
               )}
 
               {/* Current Selection Display */}
@@ -2763,13 +2907,54 @@ const POSInterfaceCore = () => {
                           <p className="text-sm text-blue-700">
                             <strong>Клиент:</strong>{" "}
                             {clients.find((c) => c.id === selectedClient)?.name}
-                            {onCredit && (
+                            {paymentMode === "debt" ? (
                                 <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
-                          В кредит
+                          В долг
                         </span>
-                            )}
+                            ) : paymentMode === "balance" ? (
+                                <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          С баланса
+                        </span>
+                            ) : null}
                           </p>
-                          {onCredit && (debtDeposit || debtDueDate) && (
+                          {paymentMode === "balance" && (() => {
+                            const client = clients.find((c) => c.id === selectedClient);
+                            const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                            const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                            const newTotalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate) - total;
+                            const remainingToPay = newTotalBalanceUzs < 0 ? Math.abs(newTotalBalanceUzs) : 0;
+                            return (
+                                <div className="text-sm text-blue-700 mt-2 space-y-1">
+                                  <p>
+                                    <strong>Баланс UZS:</strong>{" "}
+                                    {balanceUzs.toLocaleString()} сум
+                                  </p>
+                                  <p>
+                                    <strong>Баланс USD:</strong>{" "}
+                                    {balanceUsd.toLocaleString()} $ (x{exchangeRate.toLocaleString()} = {(balanceUsd * exchangeRate).toLocaleString()} сум)
+                                  </p>
+                                  <p className="font-semibold text-blue-800">
+                                    <strong>Общий баланс:</strong>{" "}
+                                    {(balanceUzs + balanceUsd * exchangeRate).toLocaleString()} сум
+                                  </p>
+                                  <p>
+                                    <strong>Сумма покупки:</strong>{" "}
+                                    {total.toLocaleString()} сум
+                                  </p>
+                                  <p className={newTotalBalanceUzs < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                                    <strong>Новый баланс:</strong>{" "}
+                                    {newTotalBalanceUzs.toLocaleString()} сум
+                                  </p>
+                                  {remainingToPay > 0 && (
+                                      <p className="text-red-600 font-medium">
+                                        <strong>Осталось оплатить:</strong>{" "}
+                                        {remainingToPay.toLocaleString()} сум
+                                      </p>
+                                  )}
+                                </div>
+                            );
+                          })()}
+                          {paymentMode === "debt" && (debtDeposit || debtDueDate) && (
                               <div className="text-sm text-blue-700 mt-1">
                                 {debtDeposit && (
                                     <p>
@@ -2797,7 +2982,7 @@ const POSInterfaceCore = () => {
                       // Reset selections
                       setSelectedSeller(null);
                       setSelectedClient(null);
-                      setOnCredit(false);
+                      setPaymentMode("none");
                       setClientSearchTerm("");
                       setDebtDeposit("");
                       setDebtDueDate("");
@@ -2814,6 +2999,98 @@ const POSInterfaceCore = () => {
                 >
                   Готово
                 </Button>
+              </div>
+            </div>
+          </WideDialogContent>
+        </WideDialog>
+
+        {/* Insufficient Balance Modal - Shows when balance < total */}
+        <WideDialog
+            open={isInsufficientBalanceModalOpen}
+            onOpenChange={setIsInsufficientBalanceModalOpen}
+        >
+          <WideDialogContent className="max-w-md p-0">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Недостаточно баланса
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Баланс клиента меньше суммы покупки. Выберите действие:
+              </p>
+
+              {/* Balance Info */}
+              {selectedClient && (() => {
+                const client = clients.find((c) => c.id === selectedClient);
+                const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                const remaining = total - totalBalanceUzs;
+
+                return (
+                    <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                      <div className="text-sm text-blue-700 space-y-1">
+                        <p><strong>Баланс клиента:</strong> {totalBalanceUzs.toLocaleString()} сум</p>
+                        <p><strong>Сумма покупки:</strong> {total.toLocaleString()} сум</p>
+                        <p className="text-red-600 font-semibold"><strong>Не хватает:</strong> {remaining.toLocaleString()} сум</p>
+                      </div>
+                    </div>
+                );
+              })()}
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                    onClick={() => {
+                      setInsufficientBalanceChoice("pay");
+                      setIsInsufficientBalanceModalOpen(false);
+                      // Open payment modal to pay remaining amount
+                      setDiscountAmount(0);
+                      const balanceUzs = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                              : 0
+                          : 0;
+                      const balanceUsd = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                              : 0
+                          : 0;
+                      const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                      const remainingToPay = Math.max(0, total - totalBalanceUzs);
+
+                      setPaymentMethods([{ amount: remainingToPay, payment_method: "Наличные" }]);
+                      setIsPaymentModalOpen(true);
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
+                >
+                  Оплатить разницу ({Math.max(0, (() => {
+                    const balanceUzs = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs || 0 : 0;
+                    const balanceUsd = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd || 0 : 0;
+                    return total - (balanceUzs + balanceUsd * exchangeRate);
+                  })()).toLocaleString()} сум)
+                </button>
+                <button
+                    onClick={() => {
+                      setIsInsufficientBalanceModalOpen(false);
+                      // Switch to debt mode and open user selection modal
+                      setPaymentMode("debt");
+                      // Set default due date to 30 days from now
+                      setDebtDueDate(addDays(new Date(), 30).toISOString().split("T")[0]);
+                      setDepositPaymentMethod("Наличные");
+                      setIsUserModalOpen(true);
+                    }}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
+                >
+                  Оформить в долг
+                </button>
+                <button
+                    onClick={() => {
+                      setIsInsufficientBalanceModalOpen(false);
+                    }}
+                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl text-base font-medium transition-colors"
+                >
+                  Отмена
+                </button>
               </div>
             </div>
           </WideDialogContent>
@@ -3004,7 +3281,7 @@ const POSInterfaceCore = () => {
                     Цена за единицу
                   </div>
                   <div className="text-4xl font-bold text-gray-900 min-h-[3rem] flex items-center justify-center">
-                    {priceInput || "0"}
+                    {priceInput || ""}
                   </div>
                   {selectedProductForPrice && priceInput && (
                       <div className="text-sm text-gray-600 mt-3 pt-3 border-t border-gray-200">
@@ -3092,7 +3369,7 @@ const POSInterfaceCore = () => {
                   <span className="text-xl">←</span>
                   <span className="text-base">Назад</span>
                   <span className="text-sm bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                  B
+                  Esc
                 </span>
                 </button>
 
@@ -3100,15 +3377,16 @@ const POSInterfaceCore = () => {
                     onClick={async () => {
                       // Validate payment total
 
-
-                      // Validate debt fields when onCredit is true
-                      if (onCredit && !selectedClient) {
-                        toast.error("Выберите клиента для продажи в кредит!");
+                      // Validate debt fields when paymentMode === "debt"
+                      if (paymentMode === "debt" && !selectedClient) {
+                        toast.error("Выберите клиента для продажи в долг!");
                         return;
                       }
 
-
-                      if (onCredit && !debtDueDate) {
+                      // Only require due_date for Физ.лицо
+                      const selectedClientData = clients.find((c) => c.id === selectedClient);
+                      const clientType = (selectedClientData as any)?.type || "Физ.лицо";
+                      if (paymentMode === "debt" && clientType === "Физ.лицо" && !debtDueDate) {
                         toast.error("Выберите срок погашения!");
                         return;
                       }
@@ -3116,11 +3394,27 @@ const POSInterfaceCore = () => {
                       try {
                         setIsProcessingSale(true);
 
+                        // Determine payload based on client type and payment mode
+                        const isInsufficientBalancePay = insufficientBalanceChoice === "pay";
+
+                        // For different client types and payment modes:
+                        // "С баланса" (sufficient): use_client_balance=true, on_credit=false
+                        // "С баланса" + "Оплатить разницу": use_client_balance=true, on_credit=false, with sale_payments
+                        // "С баланса" + "В долг": use_client_balance=true, on_credit=true, with sale_debt
+                        // "В долг" (pure debt, no balance): use_client_balance=true, on_credit=true, with sale_debt
+
+                        // use_client_balance is ALWAYS true when client is selected
+                        const isUseClientBalance = Boolean(selectedClient);
+                        // on_credit is true when "В долг" selected
+                        const isOnCredit = paymentMode === "debt";
+                        const isPayDifference = isInsufficientBalancePay;
+
                         // Create your custom payload structure as specified
                         const customSalePayload: SalePayload = {
                           store: currentUser?.store_read?.id || 1,
                           sold_by: selectedSeller || currentUser?.id || 5,
-                          on_credit: onCredit,
+                          on_credit: isOnCredit,
+                          ...(selectedClient && { client: selectedClient }),
                           sale_items: cartProducts.map((item) => ({
                             product_write: item.productId,
                             quantity: item.quantity,
@@ -3128,17 +3422,18 @@ const POSInterfaceCore = () => {
                                 item.selectedUnit?.id || item.product.base_unit || 1,
                             price_per_unit: item.price,
                           })),
-                          sale_payments: paymentMethods.filter((p) => p.amount > 0),
-                          ...(onCredit &&
-                              selectedClient && {
-                                sale_debt: {
-                                  client: selectedClient,
-                                  deposit: parseInt(debtDeposit || "0"),
-                                  due_date: debtDueDate,
-                                  deposit_payment_method:
-                                      depositPaymentMethod || "Наличные",
-                                },
-                              }),
+                          // For balance + debt (isInsufficientBalancePay), no sale_payments
+                          // For debt only, no sale_payments either
+                          sale_payments: (isUseClientBalance || isOnCredit) ? [] : paymentMethods.filter((p) => p.amount > 0),
+                          // sale_debt ALWAYS sent when on_credit is true (В долг)
+                          ...(isOnCredit && selectedClient && {
+                            sale_debt: {
+                              client: selectedClient,
+                              deposit: Number(debtDeposit) || 0,
+                              due_date: debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0],
+                              deposit_payment_method: depositPaymentMethod || "Наличные",
+                            },
+                          }),
                         };
 
                         // Also create API-compatible payload for backend
@@ -3147,6 +3442,7 @@ const POSInterfaceCore = () => {
                         const saleApiPayload: Sale = {
                           store: currentUser?.store_read?.id || 1,
                           ...(selectedSeller && { sold_by: selectedSeller }),
+                          ...(selectedClient && { client: selectedClient }),
                           payment_method:
                               paymentMethods[0]?.payment_method || "Наличные",
                           sale_items: cartProducts.map((item) => ({
@@ -3156,43 +3452,45 @@ const POSInterfaceCore = () => {
                             price_per_unit: item.price.toString(),
                             ...(item.stockId && { stock: item.stockId }),
                           })),
-                          on_credit: onCredit,
+                          on_credit: isOnCredit,
+                          use_client_balance: isUseClientBalance,
                           total_amount: total.toFixed(2),
                           discount_amount: discountAmount.toFixed(2),
-                          sale_payments: paymentMethods
-                              .map((payment) => {
-                                if (payment.payment_method === "Валюта") {
-                                  // For currency payment, amount should be in USD, not UZS
-                                  const usdAmount = payment.usd_amount || 0;
-                                  const rate = payment.exchange_rate || exchangeRate;
-                                  const uzsEquivalent = usdAmount * rate;
-                                  const changeAmount = Math.max(0, uzsEquivalent - (total - discountAmount));
+                          sale_payments: (isOnCredit || (isUseClientBalance && !isPayDifference))
+                              ? []
+                              : paymentMethods
+                                  .map((payment) => {
+                                    if (payment.payment_method === "Валюта") {
+                                      // For currency payment, amount should be in USD, not UZS
+                                      const usdAmount = payment.usd_amount || 0;
+                                      const rate = payment.exchange_rate || exchangeRate;
+                                      const uzsEquivalent = usdAmount * rate;
+                                      const changeAmount = Math.max(0, uzsEquivalent - (total - discountAmount));
 
-                                  return {
-                                    payment_method: payment.payment_method,
-                                    amount: usdAmount.toFixed(2), // USD amount, not UZS
-                                    exchange_rate: rate,
-                                    change_amount: changeAmount.toFixed(2),
-                                  };
-                                }
+                                      return {
+                                        payment_method: payment.payment_method,
+                                        amount: usdAmount.toFixed(2), // USD amount, not UZS
+                                        exchange_rate: rate,
+                                        change_amount: changeAmount.toFixed(2),
+                                      };
+                                    }
 
-                                // For other payment methods, amount is in UZS
-                                return {
-                                  payment_method: payment.payment_method,
-                                  amount: (payment.amount || (total - discountAmount)).toFixed(2),
-                                };
-                              })
-                              .filter((p) => Number(p.amount) > 0),
-                          ...(onCredit &&
-                              selectedClient && {
-                                sale_debt: {
-                                  client: selectedClient,
-                                  deposit: debtDeposit,
-                                  due_date: debtDueDate,
-                                  deposit_payment_method:
-                                      depositPaymentMethod || "Наличные",
-                                },
-                              }),
+                                    // For other payment methods, amount is in UZS
+                                    return {
+                                      payment_method: payment.payment_method,
+                                      amount: (payment.amount || (total - discountAmount)).toFixed(2),
+                                    };
+                                  })
+                                  .filter((p) => Number(p.amount) > 0),
+                          // sale_debt ALWAYS sent when on_credit is true (В долг)
+                          ...(isOnCredit && selectedClient && {
+                            sale_debt: {
+                              client: selectedClient,
+                              deposit: Number(debtDeposit) || 0,
+                              due_date: debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0],
+                              deposit_payment_method: depositPaymentMethod || "Наличные",
+                            },
+                          }),
                         };
 
                         console.log(
@@ -3247,7 +3545,7 @@ const POSInterfaceCore = () => {
                         // Reset other states including debt-related fields
                         setSelectedClient(null);
                         setSelectedSeller(null);
-                        setOnCredit(false);
+                        setPaymentMode("none");
                         setDebtDeposit("");
                         setDebtDueDate("");
                         setDepositPaymentMethod("Наличные");
@@ -3260,18 +3558,42 @@ const POSInterfaceCore = () => {
                         toast.success("Продажа успешно оформлена!");
                       } catch (error) {
                         console.error("Error creating sale:", error);
-                        toast.error(
-                            "Ошибка при оформлении продажи. Попробуйте еще раз.",
-                        );
+                        // toast.error(
+                        //     "Ошибка при оформлении продажи. Попробуйте еще раз.",
+                        // );
                       } finally {
                         setIsProcessingSale(false);
                       }
                     }}
                     disabled={
                         isProcessingSale ||
-                        (paymentMethods.reduce((sum, p) => sum + (p.amount || (total - discountAmount)), 0) <
-                            (total - discountAmount) &&
-                            !onCredit)
+                        (() => {
+                          // Calculate target amount based on client balance
+                          const balanceUzs = selectedClient
+                              ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                  ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                  : 0
+                              : 0;
+                          const balanceUsd = selectedClient
+                              ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                  ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                  : 0
+                              : 0;
+                          const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                          const finalTotal = total - discountAmount;
+                          const isUseClientBalance = paymentMode === "balance";
+                          const targetAmount = selectedClient && isUseClientBalance
+                              ? Math.max(0, finalTotal - totalBalanceUzs)
+                              : finalTotal;
+
+                          const totalPaid = paymentMethods.reduce(
+                              (sum, p) => sum + (p.amount || 0),
+                              0,
+                          );
+                          // Disable if not using balance/debt and payments don't cover the target amount
+                          const isPaymentAction = paymentMode !== "debt" && paymentMode !== "balance";
+                          return isPaymentAction && totalPaid < targetAmount - 0.01;
+                        })()
                     }
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-xl text-base font-semibold flex items-center gap-2 transition-colors"
                 >
@@ -3299,22 +3621,74 @@ const POSInterfaceCore = () => {
               {/* Payment Summary */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div>
-                  <div className="text-gray-500 text-sm mb-1">Итого:</div>
-                  <div className="text-3xl font-bold text-gray-900">
-                    {total.toLocaleString()} UZS
-                  </div>
+                  {/* Calculate target amount based on client balance */}
+                  {(() => {
+                    const balanceUzs = selectedClient
+                        ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                            : 0
+                        : 0;
+                    const balanceUsd = selectedClient
+                        ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                            ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                            : 0
+                        : 0;
+                    const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                    const finalTotal = total - discountAmount;
+                    const targetAmount = selectedClient && paymentMode !== "balance"
+                        ? Math.max(0, finalTotal - totalBalanceUzs)
+                        : finalTotal;
+
+                    return (
+                        <>
+                          <div className="text-gray-500 text-sm mb-1">
+                            {selectedClient && paymentMode !== "balance" && totalBalanceUzs < finalTotal
+                                ? "Осталось внести:"
+                                : "Итого:"}
+                          </div>
+                          <div className="text-3xl font-bold text-gray-900">
+                            {targetAmount.toLocaleString()} UZS
+                          </div>
+                          {selectedClient && paymentMode !== "balance" && totalBalanceUzs > 0 && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                С баланса: {Math.min(totalBalanceUzs, finalTotal).toLocaleString()}
+                              </div>
+                          )}
+                        </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <div className="text-green-500 text-sm mb-1">К оплате:</div>
                   <div className="text-3xl font-bold text-green-500">
-                    {Math.max(
-                        0,
-                        (total - discountAmount) -
-                        paymentMethods.reduce(
-                            (sum, p) => sum + (p.amount || 0),
-                            0,
-                        ),
-                    ).toLocaleString()}{" "}
+                    {(() => {
+                      // Calculate target amount based on client balance
+                      const balanceUzs = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                              : 0
+                          : 0;
+                      const balanceUsd = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                              : 0
+                          : 0;
+                      const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                      const finalTotal = total - discountAmount;
+                      const targetAmount = selectedClient && paymentMode !== "balance"
+                          ? Math.max(0, finalTotal - totalBalanceUzs)
+                          : finalTotal;
+
+                      return Math.max(
+                          0,
+                          targetAmount -
+                          paymentMethods.reduce(
+                              (sum, p) => sum + (p.amount || 0),
+                              0,
+                          ),
+                      ).toLocaleString();
+                    })()}
+                    {" "}
                     UZS
                   </div>
                 </div>
@@ -3332,386 +3706,476 @@ const POSInterfaceCore = () => {
               </div>
 
               {/* Payment Method Buttons */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const hasNalichnye = paymentMethods.some(
-                          (p) => p.payment_method === "Наличные",
-                      );
-                      if (!hasNalichnye) {
-                        const totalPaid = paymentMethods.reduce(
-                            (sum, p) => sum + (p.amount || 0),
-                            0,
-                        );
-                        const remaining = (total - discountAmount) - totalPaid;
-                        setPaymentMethods((prev) => [
-                          ...prev,
-                          {
-                            amount: remaining > 0 ? remaining : 0,
-                            payment_method: "Наличные",
-                          },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <svg
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                  >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Наличные</span>
-                  <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+              {/* Helper variable to determine if payment inputs should be disabled */}
+              {(() => {
+                // Enable payment methods unless on credit
+                // When client balance is used but insufficient, still allow payment for remaining amount
+                const isPaymentDisabled = paymentMode === "debt";
+                return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Only disable in credit mode
+                              const hasNalichnye = paymentMethods.some(
+                                  (p) => p.payment_method === "Наличные",
+                              );
+                              if (!hasNalichnye) {
+                                const totalPaid = paymentMethods.reduce(
+                                    (sum, p) => sum + (p.amount || 0),
+                                    0,
+                                );
+                                // Calculate remaining based on client balance
+                                const balanceUzs = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                        : 0
+                                    : 0;
+                                const balanceUsd = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                        : 0
+                                    : 0;
+                                const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                                const finalTotal = total - discountAmount;
+                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                    ? Math.max(0, finalTotal - totalBalanceUzs)
+                                    : finalTotal;
+                                const remaining = targetAmount - totalPaid;
+                                setPaymentMethods((prev) => [
+                                  ...prev,
+                                  {
+                                    amount: remaining > 0 ? remaining : 0,
+                                    payment_method: "Наличные",
+                                  },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <svg
+                              className="w-6 h-6 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-medium">Наличные</span>
+                          <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
                   F1
                 </span>
-                </button>
+                        </button>
 
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const hasClick = paymentMethods.some(
-                          (p) => p.payment_method === "Click",
-                      );
-                      if (!hasClick) {
-                        const totalPaid = paymentMethods.reduce(
-                            (sum, p) => sum + (p.amount || 0),
-                            0,
-                        );
-                        const remaining = (total - discountAmount) - totalPaid;
-                        setPaymentMethods((prev) => [
-                          ...prev,
-                          {
-                            amount: remaining > 0 ? remaining : 0,
-                            payment_method: "Click",
-                          },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <svg
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                  >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Click</span>
-                  <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Only disable in credit mode
+                              const hasClick = paymentMethods.some(
+                                  (p) => p.payment_method === "Click",
+                              );
+                              if (!hasClick) {
+                                const totalPaid = paymentMethods.reduce(
+                                    (sum, p) => sum + (p.amount || 0),
+                                    0,
+                                );
+                                // Calculate remaining based on client balance
+                                const balanceUzs = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                        : 0
+                                    : 0;
+                                const balanceUsd = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                        : 0
+                                    : 0;
+                                const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                                const finalTotal = total - discountAmount;
+                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                    ? Math.max(0, finalTotal - totalBalanceUzs)
+                                    : finalTotal;
+                                const remaining = targetAmount - totalPaid;
+                                setPaymentMethods((prev) => [
+                                  ...prev,
+                                  {
+                                    amount: remaining > 0 ? remaining : 0,
+                                    payment_method: "Click",
+                                  },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <svg
+                              className="w-6 h-6 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-medium">Click</span>
+                          <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
                   F2
                 </span>
-                </button>
+                        </button>
 
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const hasKarta = paymentMethods.some(
-                          (p) => p.payment_method === "Карта",
-                      );
-                      if (!hasKarta) {
-                        const totalPaid = paymentMethods.reduce(
-                            (sum, p) => sum + (p.amount || 0),
-                            0,
-                        );
-                        const remaining = (total - discountAmount) - totalPaid;
-                        setPaymentMethods((prev) => [
-                          ...prev,
-                          {
-                            amount: remaining > 0 ? remaining : 0,
-                            payment_method: "Карта",
-                          },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <svg
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                  >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                    />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Карта</span>
-                  <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Only disable in credit mode
+                              const hasKarta = paymentMethods.some(
+                                  (p) => p.payment_method === "Карта",
+                              );
+                              if (!hasKarta) {
+                                const totalPaid = paymentMethods.reduce(
+                                    (sum, p) => sum + (p.amount || 0),
+                                    0,
+                                );
+                                // Calculate remaining based on client balance
+                                const balanceUzs = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                        : 0
+                                    : 0;
+                                const balanceUsd = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                        : 0
+                                    : 0;
+                                const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                                const finalTotal = total - discountAmount;
+                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                    ? Math.max(0, finalTotal - totalBalanceUzs)
+                                    : finalTotal;
+                                const remaining = targetAmount - totalPaid;
+                                setPaymentMethods((prev) => [
+                                  ...prev,
+                                  {
+                                    amount: remaining > 0 ? remaining : 0,
+                                    payment_method: "Карта",
+                                  },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <svg
+                              className="w-6 h-6 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-medium">Карта</span>
+                          <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
                   F3
                 </span>
-                </button>
+                        </button>
 
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const hasPerechislenie = paymentMethods.some(
-                          (p) => p.payment_method === "Перечисление",
-                      );
-                      if (!hasPerechislenie) {
-                        const totalPaid = paymentMethods.reduce(
-                            (sum, p) => sum + (p.amount || 0),
-                            0,
-                        );
-                        const remaining = (total - discountAmount) - totalPaid;
-                        setPaymentMethods((prev) => [
-                          ...prev,
-                          {
-                            amount: remaining > 0 ? remaining : 0,
-                            payment_method: "Перечисление",
-                          },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <svg
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                  >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                    />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Перечисление</span>
-                  <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Only disable in credit mode
+                              const hasPerechislenie = paymentMethods.some(
+                                  (p) => p.payment_method === "Перечисление",
+                              );
+                              if (!hasPerechislenie) {
+                                const totalPaid = paymentMethods.reduce(
+                                    (sum, p) => sum + (p.amount || 0),
+                                    0,
+                                );
+                                // Calculate remaining based on client balance
+                                const balanceUzs = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                        : 0
+                                    : 0;
+                                const balanceUsd = selectedClient
+                                    ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                        ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                        : 0
+                                    : 0;
+                                const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                                const finalTotal = total - discountAmount;
+                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                    ? Math.max(0, finalTotal - totalBalanceUzs)
+                                    : finalTotal;
+                                const remaining = targetAmount - totalPaid;
+                                setPaymentMethods((prev) => [
+                                  ...prev,
+                                  {
+                                    amount: remaining > 0 ? remaining : 0,
+                                    payment_method: "Перечисление",
+                                  },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <svg
+                              className="w-6 h-6 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-medium">Перечисление</span>
+                          <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
                   F4
                 </span>
-                </button>
+                        </button>
 
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const hasValyuta = paymentMethods.some(
-                          (p) => p.payment_method === "Валюта",
-                      );
-                      if (!hasValyuta) {
-                        // Replace all payment methods with Валюта only
-                        setPaymentMethods([
-                          {
-                            amount: 0,
-                            payment_method: "Валюта",
-                            exchange_rate: exchangeRate,
-                            usd_amount: 0,
-                          },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <svg
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                  >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Валюта</span>
-                  <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Disable when in credit mode or client is selected
+                              const hasValyuta = paymentMethods.some(
+                                  (p) => p.payment_method === "Валюта",
+                              );
+                              if (!hasValyuta) {
+                                // Replace all payment methods with Валюта only
+                                setPaymentMethods([
+                                  {
+                                    amount: 0,
+                                    payment_method: "Валюта",
+                                    exchange_rate: exchangeRate,
+                                    usd_amount: 0,
+                                  },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center gap-2 transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <svg
+                              className="w-6 h-6 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-medium">Валюта</span>
+                          <span className="text-sm bg-gray-300 text-gray-600 px-2 py-1 rounded ml-auto">
                   F5
                 </span>
-                </button>
+                        </button>
 
-                <button
-                    onClick={() => {
-                      if (onCredit) return; // Disable when in credit mode
-                      const totalPaid = paymentMethods.reduce(
-                          (sum, p) => sum + (p.amount || 0),
-                          0,
-                      );
-                      const remaining = (total - discountAmount) - totalPaid;
-                      if (remaining > 0) {
-                        setPaymentMethods((prev) => [
-                          ...prev,
-                          { amount: remaining, payment_method: "Наличные" },
-                        ]);
-                      }
-                    }}
-                    disabled={onCredit}
-                    className={`border-2 rounded-xl p-3 flex items-center justify-center transition-colors ${
-                        onCredit
-                            ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
-                            : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                >
-                  <Plus className="w-6 h-6 text-gray-600 mr-2" />
-                  <span className="text-gray-700 font-medium">Добавить</span>
-                </button>
-              </div>
-
-              {/* Payment Method Cards */}
-              <div className="grid grid-cols-3 gap-6">
-                {paymentMethods.map((payment, index) => (
-                    <div
-                        key={index}
-                        className="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 relative"
-                    >
-                      <button
-                          onClick={() => {
-                            if (onCredit) return;
-                            if (paymentMethods.length > 1) {
-                              setPaymentMethods((prev) =>
-                                  prev.filter((_, i) => i !== index),
+                        <button
+                            onClick={() => {
+                              if (isPaymentDisabled) return; // Only disable in credit mode
+                              const totalPaid = paymentMethods.reduce(
+                                  (sum, p) => sum + (p.amount || 0),
+                                  0,
                               );
-                            }
-                          }}
-                          disabled={onCredit}
-                          className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                              onCredit
-                                  ? "bg-gray-300 text-gray-400 cursor-not-allowed"
-                                  : "bg-white hover:bg-red-50 text-red-500"
-                          }`}
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      <div className="text-gray-700 font-semibold text-lg mb-4">
-                        {payment.payment_method}
+                              // Calculate target amount based on client balance
+                              const balanceUzs = selectedClient
+                                  ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                      ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                      : 0
+                                  : 0;
+                              const balanceUsd = selectedClient
+                                  ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                      ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                      : 0
+                                  : 0;
+                              const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                              const finalTotal = total - discountAmount;
+                              const targetAmount = selectedClient && paymentMode !== "balance"
+                                  ? Math.max(0, finalTotal - totalBalanceUzs)
+                                  : finalTotal;
+                              const remaining = targetAmount - totalPaid;
+                              if (remaining > 0) {
+                                setPaymentMethods((prev) => [
+                                  ...prev,
+                                  { amount: remaining, payment_method: "Наличные" },
+                                ]);
+                              }
+                            }}
+                            disabled={isPaymentDisabled}
+                            className={`border-2 rounded-xl p-3 flex items-center justify-center transition-colors ${
+                                isPaymentDisabled
+                                    ? "bg-gray-300 border-gray-400 cursor-not-allowed opacity-50"
+                                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                            }`}
+                        >
+                          <Plus className="w-6 h-6 text-gray-600 mr-2" />
+                          <span className="text-gray-700 font-medium">Добавить</span>
+                        </button>
                       </div>
 
-                      {payment.payment_method === "Валюта" ? (
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-xs text-gray-500 mb-1 block">Курс (UZS/USD):</label>
-                              <input
-                                  type="number"
-                                  value={payment.exchange_rate || exchangeRate}
-                                  onChange={(e) => {
-                                    if (onCredit) return;
-                                    const newRate = Number(e.target.value);
-                                    const updated = [...paymentMethods];
-                                    updated[index].exchange_rate = newRate;
-                                    // Recalculate UZS amount if USD amount exists
-                                    if (updated[index].usd_amount) {
-                                      updated[index].amount = updated[index].usd_amount! * newRate;
+                      {/* Payment Method Cards */}
+                      <div className="grid grid-cols-3 gap-6">
+                        {paymentMethods.map((payment, index) => (
+                            <div
+                                key={index}
+                                className="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 relative"
+                            >
+                              <button
+                                  onClick={() => {
+                                    if (isPaymentDisabled) return;
+                                    if (paymentMethods.length > 1) {
+                                      setPaymentMethods((prev) =>
+                                          prev.filter((_, i) => i !== index),
+                                      );
                                     }
-                                    setPaymentMethods(updated);
                                   }}
-                                  onFocus={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  onBlur={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  placeholder="12200"
-                                  disabled={onCredit}
-                                  className={`w-full text-lg font-semibold bg-white border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 ${
-                                      onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                                  disabled={isPaymentDisabled}
+                                  className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                                      isPaymentDisabled
+                                          ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                                          : "bg-white hover:bg-red-50 text-red-500"
                                   }`}
-                              />
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+
+                              <div className="text-gray-700 font-semibold text-lg mb-4">
+                                {payment.payment_method}
+                              </div>
+
+                              {payment.payment_method === "Валюта" ? (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-xs text-gray-500 mb-1 block">Курс (UZS/USD):</label>
+                                      <input
+                                          type="number"
+                                          value={payment.exchange_rate || exchangeRate}
+                                          onChange={(e) => {
+                                            if (isPaymentDisabled) return;
+                                            const newRate = Number(e.target.value);
+                                            const updated = [...paymentMethods];
+                                            updated[index].exchange_rate = newRate;
+                                            // Recalculate UZS amount if USD amount exists
+                                            if (updated[index].usd_amount) {
+                                              updated[index].amount = updated[index].usd_amount! * newRate;
+                                            }
+                                            setPaymentMethods(updated);
+                                          }}
+                                          onFocus={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                          onBlur={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                          placeholder="12200"
+                                          disabled={isPaymentDisabled}
+                                          className={`w-full text-lg font-semibold bg-white border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 ${
+                                              isPaymentDisabled ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                                          }`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-500 mb-1 block">USD:</label>
+                                      <input
+                                          type="number"
+                                          value={payment.usd_amount || ""}
+                                          onChange={(e) => {
+                                            if (isPaymentDisabled) return;
+                                            const usdAmount = Number(e.target.value);
+                                            const rate = payment.exchange_rate || exchangeRate;
+                                            const updated = [...paymentMethods];
+                                            updated[index].usd_amount = usdAmount;
+                                            updated[index].amount = usdAmount * rate;
+                                            updated[index].exchange_rate = rate;
+                                            setPaymentMethods(updated);
+                                          }}
+                                          onFocus={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                          onBlur={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                          placeholder=""
+                                          disabled={isPaymentDisabled}
+                                          className={`w-full text-3xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                                              isPaymentDisabled ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                                          }`}
+                                      />
+                                    </div>
+                                    <div className="text-sm text-gray-600 pt-2 border-t border-gray-300">
+                                      = {payment.amount?.toLocaleString() || 0} UZS
+                                    </div>
+                                  </div>
+                              ) : (
+                                  <input
+                                      type="number"
+                                      value={payment.amount || ""}
+                                      onChange={(e) => {
+                                        if (isPaymentDisabled) return;
+                                        const updated = [...paymentMethods];
+                                        const value = e.target.value;
+                                        updated[index].amount = value === "" ? 0 : Number(value);
+                                        setPaymentMethods(updated);
+                                      }}
+                                      onFocus={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                      onBlur={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                      placeholder="0"
+                                      disabled={isPaymentDisabled}
+                                      className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
+                                          isPaymentDisabled ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+                                      }`}
+                                  />
+                              )}
                             </div>
-                            <div>
-                              <label className="text-xs text-gray-500 mb-1 block">USD:</label>
-                              <input
-                                  type="number"
-                                  value={payment.usd_amount || ""}
-                                  onChange={(e) => {
-                                    if (onCredit) return;
-                                    const usdAmount = Number(e.target.value);
-                                    const rate = payment.exchange_rate || exchangeRate;
-                                    const updated = [...paymentMethods];
-                                    updated[index].usd_amount = usdAmount;
-                                    updated[index].amount = usdAmount * rate;
-                                    updated[index].exchange_rate = rate;
-                                    setPaymentMethods(updated);
-                                  }}
-                                  onFocus={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  onBlur={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  placeholder=""
-                                  disabled={onCredit}
-                                  className={`w-full text-3xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
-                                      onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                                  }`}
-                              />
-                            </div>
-                            <div className="text-sm text-gray-600 pt-2 border-t border-gray-300">
-                              = {payment.amount?.toLocaleString() || 0} UZS
-                            </div>
-                          </div>
-                      ) : (
-                          <input
-                              type="number"
-                              value={payment.amount || ""}
-                              onChange={(e) => {
-                                if (onCredit) return;
-                                const updated = [...paymentMethods];
-                                const value = e.target.value;
-                                updated[index].amount = value === "" ? 0 : Number(value);
-                                setPaymentMethods(updated);
-                              }}
-                              onFocus={(e) => {
-                                e.stopPropagation();
-                              }}
-                              onBlur={(e) => {
-                                e.stopPropagation();
-                              }}
-                              placeholder="0"
-                              disabled={onCredit}
-                              className={`w-full text-4xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 p-0 ${
-                                  onCredit ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
-                              }`}
-                          />
-                      )}
-                    </div>
-                ))}
-              </div>
+                        ))}
+                      </div>
+                    </>
+                );
+              })()}
             </div>
           </WideDialogContent>
         </WideDialog>
@@ -3745,7 +4209,7 @@ const POSInterfaceCore = () => {
                 </label>
                 <Select
                     value={newClientData.type}
-                    onValueChange={(value: 'Физ.лицо' | 'Юр.лицо') =>
+                    onValueChange={(value: 'Физ.лицо' | 'Юр.лицо' | 'Магазин') =>
                         setNewClientData({ ...newClientData, type: value })
                     }
                 >
@@ -3755,6 +4219,7 @@ const POSInterfaceCore = () => {
                   <SelectContent>
                     <SelectItem value="Физ.лицо">Физ.лицо</SelectItem>
                     <SelectItem value="Юр.лицо">Юр.лицо</SelectItem>
+                    <SelectItem value="Магазин">Магазин</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -3762,11 +4227,11 @@ const POSInterfaceCore = () => {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {newClientData.type === 'Юр.лицо' ? 'Название компании' : 'Имя'} *
+                  {newClientData.type === 'Юр.лицо' || newClientData.type === 'Магазин' ? 'Название компании' : 'Имя'} *
                 </label>
                 <Input
                     type="text"
-                    placeholder={newClientData.type === 'Юр.лицо' ? 'Введите название компании' : 'Введите имя'}
+                    placeholder={newClientData.type === 'Юр.лицо' || newClientData.type === 'Магазин' ? 'Введите название компании' : 'Введите имя'}
                     value={newClientData.name}
                     onChange={(e) => setNewClientData({ ...newClientData, name: e.target.value })}
                     onFocus={(e) => e.stopPropagation()}
@@ -3826,18 +4291,31 @@ const POSInterfaceCore = () => {
                           onBlur={(e) => e.stopPropagation()}
                       />
                     </div>
+                  </>
+              )}
+
+              {/* Store fields */}
+              {newClientData.type === 'Магазин' && (
+                  <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Баланс *
+                        Связанный магазин *
                       </label>
-                      <Input
-                          type="number"
-                          placeholder="Введите баланс"
-                          value={newClientData.balance}
-                          onChange={(e) => setNewClientData({ ...newClientData, balance: Number(e.target.value) })}
-                          onFocus={(e) => e.stopPropagation()}
-                          onBlur={(e) => e.stopPropagation()}
-                      />
+                      <Select
+                          value={newClientData.linked_store}
+                          onValueChange={(value) => setNewClientData({ ...newClientData, linked_store: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите магазин" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stores.map((store) => (
+                              <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                                {store.name}
+                              </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </>
               )}
@@ -3853,7 +4331,7 @@ const POSInterfaceCore = () => {
                         phone_number: '+998',
                         address: '',
                         ceo_name: '',
-                        balance: 0,
+                        linked_store: '',
                       });
                     }}
                     variant="outline"
@@ -3871,7 +4349,21 @@ const POSInterfaceCore = () => {
                               phone_number: newClientData.phone_number,
                               address: newClientData.address,
                             }
-                            : newClientData;
+                            : newClientData.type === 'Юр.лицо'
+                                ? {
+                                  type: newClientData.type,
+                                  name: newClientData.name,
+                                  phone_number: newClientData.phone_number,
+                                  address: newClientData.address,
+                                  ceo_name: newClientData.ceo_name,
+                                }
+                                : {
+                                  type: newClientData.type,
+                                  name: newClientData.name,
+                                  phone_number: newClientData.phone_number,
+                                  address: newClientData.address,
+                                  linked_store: parseInt(newClientData.linked_store),
+                                };
 
                         const createdClient = await createClientMutation.mutateAsync(dataToSubmit as any);
                         toast.success('Клиент успешно создан');
@@ -3883,7 +4375,7 @@ const POSInterfaceCore = () => {
                           phone_number: '+998',
                           address: '',
                           ceo_name: '',
-                          balance: 0,
+                          linked_store: '',
                         });
                       } catch (error) {
                         toast.error('Ошибка при создании клиента');
@@ -3892,7 +4384,8 @@ const POSInterfaceCore = () => {
                     }}
                     className="flex-1"
                     disabled={!newClientData.name || !newClientData.phone_number || !newClientData.address ||
-                        (newClientData.type === 'Юр.лицо' && (!newClientData.ceo_name || newClientData.balance === undefined))}
+                        (newClientData.type === 'Юр.лицо' && !newClientData.ceo_name) ||
+                        (newClientData.type === 'Магазин' && !newClientData.linked_store)}
                 >
                   Создать
                 </Button>

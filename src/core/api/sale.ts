@@ -119,6 +119,7 @@ export interface SaleRefund {
 export interface Sale {
   comment?:string
   id?: number;
+  use_client_balance:boolean;
   sale_id?: string;
   discount_amount?: string;
   store?: number;

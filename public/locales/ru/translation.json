@@ -522,6 +522,7 @@
     "stock_balance": "Остаток товаров",
     "attributes": "Атрибуты"
   },
+ 
   "shifts": {
     "shifts": "Смены",
     "shift": "Смена",
@@ -542,7 +543,8 @@
     "type": {
       "Физ.лицо": "Физ.лицо",
       "Юр.лицо": "Юр.лицо"
-    }
+    },
+    "store":"Магазин"
   },
   "validation": {
     "amount_exceeds_budget": "Сумма не может превышать бюджет",
@@ -562,6 +564,10 @@
   },
 
   "forms": {
+    "balance_uzs":"Баланс в УЗС",
+    "balance_usd":"Баланс в USD",
+
+    "linked_store":"Связанный магазин",
     "remainder_uzs":"Остаток в UZS",
     "total_amount_uzs":"Общая сумма в (UZS)",
     "total_remainder": "Остаток",
@@ -832,6 +838,8 @@
     "unpaid": "Не погашен"
   },
   "placeholders": {
+    "enter_balance_uzs":"Введите баланс в USD",
+      "enter_balance_usd":"Введите баланс в USD",
     "enter_usd_rate":"Введите курс USD",
     "select_permission": "Выберите разрешение",
     "select_budget_type": "Тип",

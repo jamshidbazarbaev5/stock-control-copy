@@ -18,10 +18,18 @@ export interface IndividualClient extends BaseClient {
 export interface CorporateClient extends BaseClient {
   type: "Юр.лицо";
   ceo_name: string;
-  balance: number;
+  balance_uzs: string;
+  balance_usd: string;
 }
 
-export type Client = IndividualClient | CorporateClient;
+export interface StoreClient extends BaseClient {
+  type: "Магазин";
+  linked_store: number;
+  balance_uzs: string;
+  balance_usd: string;
+}
+
+export type Client = IndividualClient | CorporateClient | StoreClient;
 
 export interface ClientHistoryEntry {
   sale: {

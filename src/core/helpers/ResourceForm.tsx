@@ -24,8 +24,10 @@ export interface FormField {
   options?: { value: string | number; label: string }[];
   required?: boolean;
   readOnly?: boolean;
+  disabled?: boolean;
   hidden?: boolean;
   helperText?: string;
+  description?: string;
   imageUrl?: string;
   preview?: string;
   existingImage?: string;
@@ -328,7 +330,8 @@ export function ResourceForm<T extends Record<string, any>>({
                             placeholder={field.placeholder}
                             {...formField}
                             readOnly={field.readOnly}
-                            className={field.readOnly ? 'bg-gray-100 dark:bg-gray-800' : ''}
+                            disabled={field.disabled}
+                            className={field.readOnly || field.disabled ? 'bg-gray-100 dark:bg-gray-800' : ''}
                             onChange={field.onChange
                               ? (e) => {
                                   const formatted = field.onChange!(e.target.value);
@@ -343,6 +346,9 @@ export function ResourceForm<T extends Record<string, any>>({
                           />
                         )}
                       </FormControl>
+                      {field.description && (
+                        <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">{field.description}</p>
+                      )}
                       {field.helperText && (
                         <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">{field.helperText}</p>
                       )}

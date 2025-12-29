@@ -67,7 +67,7 @@ import { useGetStores } from "../api/store";
 import { useGetClients, useCreateClient } from "../api/client";
 
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/api";
+import api, { fetchCurrencyRates } from "../api/api";
 import { useCreateSale } from "@/core/api/sale";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { addDays } from "date-fns";
@@ -184,14 +184,21 @@ function CreateSale() {
   // Client creation modal state
   const [isCreateClientModalOpen, setIsCreateClientModalOpen] = useState(false);
   const [newClientData, setNewClientData] = useState({
-    type: 'Физ.лицо' as 'Физ.лицо' | 'Юр.лицо',
+    type: 'Физ.лицо' as 'Физ.лицо' | 'Юр.лицо' | 'Магазин',
     name: '',
     phone_number: '+998',
     address: '',
     ceo_name: '',
-    balance: 0,
+    linked_store: '',
   });
   const createClientMutation = useCreateClient();
+
+  // Insufficient balance modal state
+  const [isInsufficientBalanceModalOpen, setIsInsufficientBalanceModalOpen] = useState(false);
+  const [insufficientBalanceChoice, setInsufficientBalanceChoice] = useState<"pay" | "debt" | null>(null);
+
+  // Debt details modal state
+  const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
 
   // Effect for enforcing seller's store
   useEffect(() => {
@@ -444,14 +451,29 @@ function CreateSale() {
 
     const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
     const expectedTotal = total - discountAmount;
+
+    // Get client balance info for payment calculation
+    const selectedClientId = form.getValues("sale_debt.client");
+    const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+    const clientBalanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+    const clientBalanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+    const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+    const totalClientBalance = clientBalanceUzs + (clientBalanceUsd * exchangeRate);
+    const useClientBalance = !form.getValues("on_credit") && selectedClientId && totalClientBalance > 0;
+
+    // Calculate amount to pay (subtract client balance if using it)
+    const amountToPay = useClientBalance
+      ? Math.max(0, expectedTotal - totalClientBalance)
+      : expectedTotal;
+
     const payments = form.getValues("sale_payments");
-    
+
     if (payments.length === 1) {
-      form.setValue("sale_payments.0.amount", expectedTotal);
+      form.setValue("sale_payments.0.amount", amountToPay);
     } else if (payments.length > 1) {
-      // Adjust last payment to match expected total
+      // Adjust last payment to match amount to pay
       const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
-      const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
+      const lastPaymentAmount = Math.max(0, amountToPay - otherPaymentsTotal);
       form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
     }
   };
@@ -732,20 +754,35 @@ const handleQuantityChange = (
         const pricePerUnit = parseFloat(item.price_per_unit) || 0;
         return sum + (quantity * pricePerUnit);
       }, 0);
-      
+
       const discountAmount = parseFloat(data.discount_amount || "0");
       const expectedPaymentTotal = totalFromItems - discountAmount;
-      
+
       // Validate payment amounts sum (subtract change amount)
       const actualPaymentTotal = data.sale_payments.reduce((sum, payment) => {
         const paymentAmount = parseFloat(String(payment.amount)) || 0;
         const changeAmount = parseFloat(String(payment.change_amount)) || 0;
         return sum + (paymentAmount - changeAmount);
       }, 0);
-      
+
+      // Check if using client balance
+      const selectedClientId = data.sale_debt?.client;
+      const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+      const clientBalanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+      const clientBalanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+      const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+      const totalClientBalance = clientBalanceUzs + (clientBalanceUsd * exchangeRate);
+      const useClientBalance = !data.on_credit && selectedClientId && totalClientBalance > 0;
+
+      // Validate that payments + client balance cover the total
+      const remaining = expectedPaymentTotal - actualPaymentTotal;
       if (Math.abs(actualPaymentTotal - expectedPaymentTotal) > 0.01) {
-        toast.error(`Сумма платежей (${actualPaymentTotal.toFixed(2)}) должна равняться общей сумме минус скидка (${expectedPaymentTotal.toFixed(2)})`);
-        return;
+        if (useClientBalance && remaining <= totalClientBalance) {
+          // Client balance will cover the difference - this is valid
+        } else {
+          toast.error(`Сумма платежей (${actualPaymentTotal.toFixed(2)}) должна равняться общей сумме минус скидка (${expectedPaymentTotal.toFixed(2)})`);
+          return;
+        }
       }
       
       // Set total_amount from items calculation
@@ -806,13 +843,31 @@ const handleQuantityChange = (
       const clickPayment = data.sale_payments.find(p => p.payment_method === "Click");
       const clickComment = clickPayment?.comment || "";
 
+      // Determine payment mode based on insufficientBalanceChoice
+      const isInsufficientBalancePay = insufficientBalanceChoice === "pay";
+      const isInsufficientBalanceDebt = insufficientBalanceChoice === "debt";
+
+      // use_client_balance is ALWAYS true when client is selected
+      // Scenario 1: "С баланса" (sufficient balance) -> use_client_balance: true, on_credit: false
+      // Scenario 2: "С баланса + В долг" -> use_client_balance: true, on_credit: true
+      // Scenario 3: "С баланса + оплатить разницу" -> use_client_balance: true, on_credit: false
+      const isUseClientBalance = Boolean(data.sale_debt?.client);
+
+      // on_credit is true ONLY when:
+      // - User selected "В долг" from dropdown (data.on_credit = true)
+      // - OR user clicked "В долг" button for insufficient balance (isInsufficientBalanceDebt)
+      // on_credit is false when:
+      // - User is just using client balance (sufficient)
+      // - OR user clicked "Оплатить разницу" (isInsufficientBalancePay)
+      const isOnCredit = (data.on_credit || isInsufficientBalanceDebt) && !isInsufficientBalancePay;
+
       const formattedData = {
         store: parseInt(data.store),
         payment_method: data.sale_payments[0]?.payment_method || "Наличные",
         total_amount: Number(String(data.total_amount).replace(/,/g, "")).toFixed(2),
         discount_amount: Number(String(data.discount_amount || "0").replace(/,/g, "")).toFixed(2),
         ...(isAdmin || isSuperUser ? { sold_by: data.sold_by } : {}),
-        on_credit: data.on_credit,
+        on_credit: isOnCredit,
         ...(clickPayment ? { comment: clickComment } : {}),
         sale_items: data.sale_items.map((item) => ({
           product_write: item.product_write,
@@ -821,50 +876,64 @@ const handleQuantityChange = (
           price_per_unit: item.price_per_unit,
           ...(item.stock ? { stock: item.stock } : {}),
         })),
-        sale_payments: data.sale_payments.map((payment, index) => {
-          const usdAmount = payment.payment_method === "Валюта" && usdInputValues[index]
-            ? parseFloat(usdInputValues[index])
-            : payment.payment_method === "Валюта" && payment.exchange_rate
-            ? payment.amount / payment.exchange_rate
-            : payment.amount;
-          
-          const paymentData: any = {
-            payment_method: payment.payment_method,
-            amount: payment.payment_method === "Валюта" 
-              ? Number(usdAmount).toFixed(2)
-              : Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
-          };
-          
-          if (payment.payment_method === "Валюта" && payment.exchange_rate) {
-            paymentData.exchange_rate = payment.exchange_rate;
-          }
-          
-          if (payment.payment_method === "Валюта" && payment.change_amount) {
-            paymentData.change_amount = Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2);
-          }
-          
-          return paymentData;
-        }),
-        ...(data.sale_debt?.client && !data.on_credit
-          ? { client: data.sale_debt.client }
-          : {}),
-        ...(data.on_credit && data.sale_debt?.client
+        // sale_payments: empty for debt, include for pay difference or normal
+        sale_payments: isOnCredit
+          ? []
+          : (isInsufficientBalancePay || !isUseClientBalance)
+            ? data.sale_payments.map((payment, index) => {
+                const usdAmount = payment.payment_method === "Валюта" && usdInputValues[index]
+                  ? parseFloat(usdInputValues[index])
+                  : payment.payment_method === "Валюта" && payment.exchange_rate
+                  ? payment.amount / payment.exchange_rate
+                  : payment.amount;
+
+                const paymentData: any = {
+                  payment_method: payment.payment_method,
+                  amount: payment.payment_method === "Валюта"
+                    ? Number(usdAmount).toFixed(2)
+                    : Number(String(payment.amount).replace(/,/g, "")).toFixed(2),
+                };
+
+                if (payment.payment_method === "Валюта" && payment.exchange_rate) {
+                  paymentData.exchange_rate = payment.exchange_rate;
+                }
+
+                if (payment.payment_method === "Валюта" && payment.change_amount) {
+                  paymentData.change_amount = Number(String(payment.change_amount).replace(/,/g, "")).toFixed(2);
+                }
+
+                return paymentData;
+              }).filter((p: any) => Number(p.amount) > 0)
+            : [],
+        ...(data.sale_debt?.client
+          ? {
+              client: data.sale_debt.client,
+              use_client_balance: isUseClientBalance,
+            }
+          : { use_client_balance: false }),
+        // Include sale_debt when on_credit is true (debt scenario)
+        // ALWAYS send sale_debt with due_date when making debt sale
+        ...(isOnCredit && data.sale_debt?.client
           ? {
               sale_debt: {
                 client: data.sale_debt.client,
-                due_date: data.sale_debt.due_date,
-                ...(data.sale_debt.deposit
-                  ? {
-                      deposit: Number(
-                        String(data.sale_debt.deposit).replace(/,/g, ""),
-                      ).toFixed(2),
-                      deposit_payment_method:
-                        data.sale_debt.deposit_payment_method || "Наличные",
-                    }
-                  : {}),
+                due_date: data.sale_debt.due_date || addDays(new Date(), 30).toISOString().split("T")[0],
+                deposit: data.sale_debt.deposit
+                  ? Number(String(data.sale_debt.deposit).replace(/,/g, "")).toFixed(2)
+                  : "",
+                deposit_payment_method: data.sale_debt.deposit_payment_method || "Наличные",
               },
             }
-          : {}),
+          : isOnCredit
+            ? {
+                sale_debt: {
+                  client: data.sale_debt?.client || 0,
+                  due_date: data.sale_debt?.due_date || addDays(new Date(), 30).toISOString().split("T")[0],
+                  deposit: "",
+                  deposit_payment_method: "Наличные",
+                },
+              }
+            : {}),
       };
 
       await createSale.mutateAsync(formattedData);
@@ -949,23 +1018,22 @@ const handleQuantityChange = (
   }, []);
 
   // Fetch currency rates
-  const fetchCurrencyRates = async () => {
-    try {
-      setLoadingRates(true);
-      const response = await api.get('currency/rates/');
-      setCurrencyRates(response.data);
-    } catch (error) {
-      console.error('Error fetching currency rates:', error);
-      toast.error('Ошибка загрузки курсов валют');
-    } finally {
-      setLoadingRates(false);
-    }
-  };
-
-  // Fetch rates on component mount
   useEffect(() => {
-    fetchCurrencyRates();
+    const getRates = async () => {
+      try {
+        setLoadingRates(true);
+        const data = await fetchCurrencyRates();
+        setCurrencyRates(data);
+      } catch (error) {
+        console.error('Error fetching currency rates:', error);
+        toast.error('Ошибка загрузки курсов валют');
+      } finally {
+        setLoadingRates(false);
+      }
+    };
+    getRates();
   }, []);
+
   const handleMobileSearch = (
     value: string,
     setter: (value: string) => void,
@@ -997,26 +1065,44 @@ const handleQuantityChange = (
     };
   }, [activeSearchIndex]);
 
-  // Update payment amount when discount changes
+  // Update payment amount when discount or client selection changes
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "discount_amount") {
+      if (name === "discount_amount" || name === "sale_debt.client" || name === "on_credit") {
         const totalAmount = parseFloat(form.getValues("total_amount") || "0");
         const discountAmount = parseFloat(value.discount_amount || "0");
         const expectedTotal = totalAmount - discountAmount;
+
+        // Get client balance info for payment calculation
+        const selectedClientId = form.getValues("sale_debt.client");
+        const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+        const clientBalanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+        const clientBalanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+        const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+        const totalClientBalance = clientBalanceUzs + (clientBalanceUsd * exchangeRate);
+
+        // Check if using client balance - also consider insufficientBalanceChoice
+        const showRemainingAmount = !form.getValues("on_credit") || insufficientBalanceChoice === "pay";
+        const useClientBalance = showRemainingAmount && selectedClientId && totalClientBalance > 0;
+
+        // Calculate amount to pay (subtract client balance if using it)
+        const amountToPay = useClientBalance
+          ? Math.max(0, expectedTotal - totalClientBalance)
+          : expectedTotal;
+
         const payments = form.getValues("sale_payments");
-        
+
         if (payments.length === 1) {
-          form.setValue("sale_payments.0.amount", expectedTotal);
+          form.setValue("sale_payments.0.amount", amountToPay);
         } else if (payments.length > 1) {
           const otherPaymentsTotal = payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
-          const lastPaymentAmount = Math.max(0, expectedTotal - otherPaymentsTotal);
+          const lastPaymentAmount = Math.max(0, amountToPay - otherPaymentsTotal);
           form.setValue(`sale_payments.${payments.length - 1}.amount`, lastPaymentAmount);
         }
       }
     });
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, clients, currencyRates, insufficientBalanceChoice]);
 
   // Check for prices below minimum (blocking submission)
   const hasBelowMinPrices = cartProducts.some((product) => {
@@ -1593,10 +1679,25 @@ const handleQuantityChange = (
                       const totalAmount = parseFloat(form.watch("total_amount"));
                       const discountAmount = parseFloat(form.watch("discount_amount") || "0");
                       const expectedTotal = totalAmount - discountAmount;
+
+                      // Get client balance info
+                      const selectedClientId = form.getValues("sale_debt.client");
+                      const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+                      const clientBalanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                      const clientBalanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                      const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                      const totalClientBalance = clientBalanceUzs + (clientBalanceUsd * exchangeRate);
+                      const useClientBalance = !form.getValues("on_credit") && selectedClientId && totalClientBalance > 0;
+
+                      // Calculate amount to pay (subtract client balance if using it)
+                      const amountToPay = useClientBalance
+                        ? Math.max(0, expectedTotal - totalClientBalance)
+                        : expectedTotal;
+
                       const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-                      
-                      if (payments.length > 0 && currentTotal !== expectedTotal) {
-                        const remaining = expectedTotal - payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                      if (payments.length > 0 && currentTotal !== amountToPay) {
+                        const remaining = amountToPay - payments.slice(0, -1).reduce((sum, p) => sum + (p.amount || 0), 0);
                         payments[payments.length - 1].amount = Math.max(0, remaining);
                       }
                       form.setValue("sale_payments", payments);
@@ -1628,11 +1729,26 @@ const handleQuantityChange = (
                 const totalAmount = parseFloat(form.watch("total_amount"));
                 const discountAmount = parseFloat(form.watch("discount_amount") || "0");
                 const expectedTotal = totalAmount - discountAmount;
+
+                // Get client balance info
+                const selectedClientId = form.getValues("sale_debt.client");
+                const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+                const clientBalanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                const clientBalanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                const totalClientBalance = clientBalanceUzs + (clientBalanceUsd * exchangeRate);
+                const useClientBalance = !form.getValues("on_credit") && selectedClientId && totalClientBalance > 0;
+
+                // Calculate amount to pay (subtract client balance if using it)
+                const amountToPay = useClientBalance
+                  ? Math.max(0, expectedTotal - totalClientBalance)
+                  : expectedTotal;
+
                 const currentTotal = payments.reduce(
                   (sum, p) => sum + (p.amount || 0),
                   0,
                 );
-                const remaining = expectedTotal - currentTotal;
+                const remaining = amountToPay - currentTotal;
 
                 if (remaining > 0) {
                   payments.push({
@@ -1661,8 +1777,16 @@ const handleQuantityChange = (
                     onValueChange={(value) => {
                       const isCredit = value === "true";
                       field.onChange(isCredit);
+                      // Reset insufficient balance choice when toggling on_credit
+                      setInsufficientBalanceChoice(null);
                       if (!isCredit) {
-                        form.setValue("sale_debt", undefined);
+                        // Keep client but reset debt-specific fields
+                        const currentClient = form.getValues("sale_debt.client");
+                        form.setValue("sale_debt", {
+                          client: currentClient || 0,
+                          due_date: addDays(new Date(), 30).toISOString().split("T")[0],
+                          deposit_payment_method: "Наличные",
+                        });
                       }
                     }}
                   >
@@ -1745,9 +1869,6 @@ const handleQuantityChange = (
                           clients
                             .filter(
                               (client) =>
-                                (form.watch("on_credit")
-                                  ? true
-                                  : client.type === "Юр.лицо") &&
                                 client.name
                                   .toLowerCase()
                                   .includes(searchTerm.toLowerCase()),
@@ -1757,9 +1878,7 @@ const handleQuantityChange = (
                                 key={client.id}
                                 value={client.id?.toString() || ""}
                               >
-                                {client.name}{" "}
-                                {client.type !== "Юр.лицо" &&
-                                  `(${client.type})`}
+                                {client.name} ({client.type})
                               </SelectItem>
                             ))
                         ) : (
@@ -1770,6 +1889,122 @@ const handleQuantityChange = (
                       </div>
                     </SelectContent>
                   </Select>
+
+                  {/* Client Balance Display */}
+                  {field.value && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      {(() => {
+                        const client = clients.find((c) => c.id === field.value);
+                        const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                        const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                        const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                        const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                        const finalTotal = totalAmount - discountAmount;
+                        const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                        const newTotalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate) - finalTotal;
+                        const useClientBalance = !form.getValues("on_credit") && field.value;
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-medium text-blue-700">
+                                Клиент: {client?.name}
+                              </div>
+                              {form.getValues("on_credit") ? (
+                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                                  В кредит
+                                </span>
+                              ) : useClientBalance ? (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                  Исп. баланс
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-xs text-blue-600">
+                              Баланс UZS: {balanceUzs.toLocaleString()} сум
+                            </div>
+                            <div className="text-xs text-blue-600">
+                              Баланс USD: {balanceUsd.toLocaleString()} $ (x{exchangeRate.toLocaleString()} = {(balanceUsd * exchangeRate).toLocaleString()} сум)
+                            </div>
+                            <div className="text-xs font-semibold text-blue-700">
+                              Общий баланс: {(balanceUzs + balanceUsd * exchangeRate).toLocaleString()} сум
+                            </div>
+                            <div className="text-xs pt-1 border-t border-blue-200">
+                              <span className={newTotalBalanceUzs < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                                Новый баланс: {newTotalBalanceUzs.toLocaleString()} сум
+                              </span>
+                              {!form.getValues("on_credit") && newTotalBalanceUzs < 0 && (
+                                <span className="text-red-600 font-medium ml-2">
+                                  Осталось оплатить: {Math.abs(newTotalBalanceUzs).toLocaleString()} сум
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Show action buttons when balance is insufficient */}
+                            {!form.getValues("on_credit") && newTotalBalanceUzs < 0 && !insufficientBalanceChoice && (
+                              <div className="flex gap-2 mt-3 pt-2 border-t border-blue-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsInsufficientBalanceModalOpen(true)}
+                                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-xs font-medium transition-colors"
+                                >
+                                  Оплатить разницу
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // Set default due_date before opening modal
+                                    if (!form.getValues("sale_debt.due_date")) {
+                                      form.setValue("sale_debt.due_date", addDays(new Date(), 30).toISOString().split("T")[0]);
+                                    }
+                                    form.setValue("sale_debt.deposit_payment_method", "Наличные");
+                                    // Open debt details modal
+                                    setIsDebtModalOpen(true);
+                                  }}
+                                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-lg text-xs font-medium transition-colors"
+                                >
+                                  В долг
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Show choice indicator */}
+                            {insufficientBalanceChoice === "pay" && (
+                              <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+                                <span className="text-xs font-medium text-blue-800">
+                                  ✓ Оплата разницы: {Math.abs(newTotalBalanceUzs).toLocaleString()} сум
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setInsufficientBalanceChoice(null)}
+                                  className="ml-2 text-xs text-blue-600 hover:underline"
+                                >
+                                  Изменить
+                                </button>
+                              </div>
+                            )}
+                            {insufficientBalanceChoice === "debt" && (
+                              <div className="mt-2 p-2 bg-amber-100 rounded-lg">
+                                <span className="text-xs font-medium text-amber-800">
+                                  ✓ Оформлено в долг (использ. баланс + долг)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setInsufficientBalanceChoice(null);
+                                    form.setValue("on_credit", false);
+                                  }}
+                                  className="ml-2 text-xs text-amber-600 hover:underline"
+                                >
+                                  Изменить
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
@@ -1866,7 +2101,66 @@ const handleQuantityChange = (
                   {parseFloat(form.watch("total_amount") || "0").toLocaleString()}
                 </p>
               </div>
-              
+
+              {/* Payment Summary */}
+              {(() => {
+                const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                const finalTotal = totalAmount - discountAmount;
+                const payments = form.getValues("sale_payments") || [];
+                const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                // Get client info for balance display
+                const selectedClientId = form.getValues("sale_debt.client");
+                const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+                const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                const totalClientBalance = balanceUzs + (balanceUsd * exchangeRate);
+                const useClientBalance = !form.getValues("on_credit") && selectedClientId && totalClientBalance > 0;
+
+                // Calculate what client actually needs to pay (payment + client balance)
+                const totalPaying = totalPaid + (useClientBalance ? Math.min(totalClientBalance, finalTotal) : 0);
+                const remainingAfterBalance = Math.max(0, finalTotal - totalPaying);
+
+                return (
+                  <div className="pt-3 border-t border-gray-300 dark:border-gray-600 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Вы платите:
+                      </span>
+                      <span className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">
+                        {totalPaid.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Client balance info in summary */}
+                    {client && !form.getValues("on_credit") && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Общий баланс клиента:
+                        </span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {totalClientBalance.toLocaleString()} сум
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Remaining to pay - only shows if something is still unpaid */}
+                    {remainingAfterBalance > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                          Осталось оплатить:
+                        </span>
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                          {remainingAfterBalance.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Discount Amount */}
               <div className="pt-3 border-t border-gray-300 dark:border-gray-600">
                 <FormField
@@ -1958,8 +2252,8 @@ const handleQuantityChange = (
               </label>
               <Select
                 value={newClientData.type}
-                onValueChange={(value: 'Физ.лицо' | 'Юр.лицо') => 
-                  setNewClientData({ ...newClientData, type: value })
+                onValueChange={(value: 'Физ.лицо' | 'Юр.лицо' | 'Магазин') =>
+                  setNewClientData({ ...newClientData, type: value, linked_store: '' })
                 }
               >
                 <SelectTrigger>
@@ -1968,6 +2262,7 @@ const handleQuantityChange = (
                 <SelectContent>
                   <SelectItem value="Физ.лицо">Физ.лицо</SelectItem>
                   <SelectItem value="Юр.лицо">Юр.лицо</SelectItem>
+                  <SelectItem value="Магазин">Магазин</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1975,11 +2270,11 @@ const handleQuantityChange = (
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {newClientData.type === 'Юр.лицо' ? 'Название компании' : 'Имя'} *
+                {newClientData.type === 'Юр.лицо' || newClientData.type === 'Магазин' ? 'Название компании' : 'Имя'} *
               </label>
               <Input
                 type="text"
-                placeholder={newClientData.type === 'Юр.лицо' ? 'Введите название компании' : 'Введите имя'}
+                placeholder={newClientData.type === 'Юр.лицо' || newClientData.type === 'Магазин' ? 'Введите название компании' : 'Введите имя'}
                 value={newClientData.name}
                 onChange={(e) => setNewClientData({ ...newClientData, name: e.target.value })}
               />
@@ -2019,30 +2314,41 @@ const handleQuantityChange = (
 
             {/* Corporate fields */}
             {newClientData.type === 'Юр.лицо' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Имя генерального директора *
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Введите имя генерального директора"
-                    value={newClientData.ceo_name}
-                    onChange={(e) => setNewClientData({ ...newClientData, ceo_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Баланс *
-                  </label>
-                  <Input
-                    type="number"
-                    placeholder="Введите баланс"
-                    value={newClientData.balance}
-                    onChange={(e) => setNewClientData({ ...newClientData, balance: Number(e.target.value) })}
-                  />
-                </div>
-              </>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Имя генерального директора *
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Введите имя генерального директора"
+                  value={newClientData.ceo_name}
+                  onChange={(e) => setNewClientData({ ...newClientData, ceo_name: e.target.value })}
+                />
+              </div>
+            )}
+
+            {/* Store fields */}
+            {newClientData.type === 'Магазин' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Связанный магазин *
+                </label>
+                <Select
+                  value={newClientData.linked_store}
+                  onValueChange={(value) => setNewClientData({ ...newClientData, linked_store: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите магазин" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                        {store.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
             {/* Action Buttons */}
@@ -2057,7 +2363,7 @@ const handleQuantityChange = (
                     phone_number: '+998',
                     address: '',
                     ceo_name: '',
-                    balance: 0,
+                    linked_store: '',
                   });
                 }}
                 variant="outline"
@@ -2076,7 +2382,21 @@ const handleQuantityChange = (
                           phone_number: newClientData.phone_number,
                           address: newClientData.address,
                         }
-                      : newClientData;
+                      : newClientData.type === 'Юр.лицо'
+                        ? {
+                            type: newClientData.type,
+                            name: newClientData.name,
+                            phone_number: newClientData.phone_number,
+                            address: newClientData.address,
+                            ceo_name: newClientData.ceo_name,
+                          }
+                        : {
+                            type: newClientData.type,
+                            name: newClientData.name,
+                            phone_number: newClientData.phone_number,
+                            address: newClientData.address,
+                            linked_store: parseInt(newClientData.linked_store),
+                          };
 
                     const createdClient = await createClientMutation.mutateAsync(dataToSubmit as any);
                     toast.success(t('messages.success.created', { item: t('navigation.clients') }));
@@ -2088,7 +2408,7 @@ const handleQuantityChange = (
                       phone_number: '+998',
                       address: '',
                       ceo_name: '',
-                      balance: 0,
+                      linked_store: '',
                     });
                   } catch (error) {
                     toast.error(t('messages.error.create', { item: t('navigation.clients') }));
@@ -2097,7 +2417,8 @@ const handleQuantityChange = (
                 }}
                 className="flex-1"
                 disabled={!newClientData.name || !newClientData.phone_number || !newClientData.address ||
-                  (newClientData.type === 'Юр.лицо' && (!newClientData.ceo_name || newClientData.balance === undefined))}
+                  (newClientData.type === 'Юр.лицо' && !newClientData.ceo_name) ||
+                  (newClientData.type === 'Магазин' && !newClientData.linked_store)}
               >
                 Создать
               </Button>
@@ -2105,6 +2426,216 @@ const handleQuantityChange = (
           </div>
         </WideDialogContent>
       </WideDialog>
+
+      {/* Insufficient Balance Modal */}
+      <WideDialog open={isInsufficientBalanceModalOpen} onOpenChange={setIsInsufficientBalanceModalOpen}>
+        <WideDialogContent className="max-w-md p-0">
+          <div className="p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Недостаточно баланса
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Баланс клиента меньше суммы покупки. Выберите действие:
+            </p>
+
+            {/* Balance Info */}
+            {form.getValues("sale_debt.client") && (() => {
+              const selectedClientId = form.getValues("sale_debt.client");
+              const client = clients.find((c) => c.id === selectedClientId);
+              const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+              const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+              const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+              const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+              const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+              const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+              const finalTotal = totalAmount - discountAmount;
+              const remaining = finalTotal - totalBalanceUzs;
+
+              return (
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <div className="text-sm text-blue-700 space-y-1">
+                    <p><strong>Баланс клиента:</strong> {totalBalanceUzs.toLocaleString()} сум</p>
+                    <p><strong>Сумма покупки:</strong> {finalTotal.toLocaleString()} сум</p>
+                    <p className="text-red-600 font-semibold"><strong>Не хватает:</strong> {remaining.toLocaleString()} сум</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setInsufficientBalanceChoice("pay");
+                  setIsInsufficientBalanceModalOpen(false);
+                  // Calculate remaining amount and set payment
+                  const selectedClientId = form.getValues("sale_debt.client");
+                  const client = clients.find((c) => c.id === selectedClientId);
+                  const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                  const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                  const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                  const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                  const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                  const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                  const remainingToPay = Math.max(0, (totalAmount - discountAmount) - totalBalanceUzs);
+                  form.setValue("sale_payments.0.amount", remainingToPay);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
+              >
+                Оплатить разницу ({(() => {
+                  const selectedClientId = form.getValues("sale_debt.client");
+                  const client = clients.find((c) => c.id === selectedClientId);
+                  const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+                  const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+                  const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+                  const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                  const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+                  const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+                  return Math.max(0, (totalAmount - discountAmount) - totalBalanceUzs).toLocaleString();
+                })()} сум)
+              </button>
+              <button
+                onClick={() => {
+                  setIsInsufficientBalanceModalOpen(false);
+                  // Set default due_date before opening modal
+                  if (!form.getValues("sale_debt.due_date")) {
+                    form.setValue("sale_debt.due_date", addDays(new Date(), 30).toISOString().split("T")[0]);
+                  }
+                  form.setValue("sale_debt.deposit_payment_method", "Наличные");
+                  // Open debt details modal
+                  setIsDebtModalOpen(true);
+                }}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
+              >
+                Оформить в долг
+              </button>
+              <button
+                onClick={() => {
+                  setIsInsufficientBalanceModalOpen(false);
+                }}
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl text-base font-medium transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </WideDialogContent>
+      </WideDialog>
+
+      {/* Debt Details Modal - Выбор пользователя для долга */}
+      <WideDialog open={isDebtModalOpen} onOpenChange={setIsDebtModalOpen}>
+        <WideDialogContent className="max-w-md p-0">
+          <WideDialogHeader className="p-6 pb-4">
+            <WideDialogTitle>Выбор пользователя для долга</WideDialogTitle>
+          </WideDialogHeader>
+          <div className="px-6 pb-6 space-y-4">
+            {/* Client Info */}
+            {(() => {
+              const selectedClientId = form.getValues("sale_debt.client");
+              const client = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+              const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
+              const balanceUsd = (client as any)?.balance_usd ? parseFloat(String((client as any).balance_usd)) : 0;
+              const exchangeRate = currencyRates[0]?.rate ? parseFloat(currencyRates[0].rate) : 12500;
+              const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+              const totalAmount = parseFloat(form.getValues("total_amount") || "0");
+              const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
+              const finalTotal = totalAmount - discountAmount;
+              const debtAmount = Math.max(0, finalTotal - totalBalanceUzs);
+
+              return (
+                <div className="bg-amber-50 rounded-lg p-4">
+                  <div className="text-sm text-amber-800 space-y-1">
+                    <p><strong>Клиент:</strong> {client?.name || "Не выбран"}</p>
+                    <p><strong>Баланс клиента:</strong> {totalBalanceUzs.toLocaleString()} сум</p>
+                    <p><strong>Сумма покупки:</strong> {finalTotal.toLocaleString()} сум</p>
+                    <p className="text-red-600 font-semibold"><strong>Сумма долга:</strong> {debtAmount.toLocaleString()} сум</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Due Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Срок оплаты <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="date"
+                value={form.watch("sale_debt.due_date") || addDays(new Date(), 30).toISOString().split("T")[0]}
+                onChange={(e) => form.setValue("sale_debt.due_date", e.target.value)}
+              />
+            </div>
+
+            {/* Deposit */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Задаток (необязательно)
+              </label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={form.watch("sale_debt.deposit") || ""}
+                onChange={(e) => form.setValue("sale_debt.deposit", e.target.valueAsNumber)}
+              />
+            </div>
+
+            {/* Deposit Payment Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Способ оплаты задатка
+              </label>
+              <Select
+                value={form.watch("sale_debt.deposit_payment_method") || "Наличные"}
+                onValueChange={(value) => form.setValue("sale_debt.deposit_payment_method", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Наличные">Наличные</SelectItem>
+                  <SelectItem value="Карта">Карта</SelectItem>
+                  <SelectItem value="Click">Click</SelectItem>
+                  <SelectItem value="Перечисление">Перечисление</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsDebtModalOpen(false);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 bg-amber-600 hover:bg-amber-700"
+                onClick={() => {
+                  // Set debt mode
+                  setInsufficientBalanceChoice("debt");
+                  form.setValue("on_credit", true);
+                  // Set default due_date if not set
+                  if (!form.getValues("sale_debt.due_date")) {
+                    form.setValue("sale_debt.due_date", addDays(new Date(), 30).toISOString().split("T")[0]);
+                  }
+                  if (!form.getValues("sale_debt.deposit_payment_method")) {
+                    form.setValue("sale_debt.deposit_payment_method", "Наличные");
+                  }
+                  setIsDebtModalOpen(false);
+                }}
+              >
+                Подтвердить
+              </Button>
+            </div>
+          </div>
+        </WideDialogContent>
+      </WideDialog>
+
     </div>
   );
 }

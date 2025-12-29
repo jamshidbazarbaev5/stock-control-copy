@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical } from 'lucide-react';
+import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical, RotateCcw, ClipboardList } from 'lucide-react';
 import '../../expanded-row-dark.css';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ResourceTable } from '../helpers/ResourseTable';
@@ -44,6 +44,14 @@ export default function SupplierDetailPage() {
   const [paymentComment, setPaymentComment] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Return dialog state
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnEntry, setReturnEntry] = useState<any>(null);
+  const [returnItems, setReturnItems] = useState<{ stock_id: number; quantity: string; product_name: string; max_quantity: number }[]>([]);
+  const [returnNote, setReturnNote] = useState('');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
   
 
   // Fetch stock entries for this supplier
@@ -127,6 +135,76 @@ export default function SupplierDetailPage() {
       }
     );
 
+  };
+
+  // Handle return click - fetch stock entry details with stocks
+  const handleReturnClick = async (entry: any) => {
+    try {
+      // Fetch full stock entry details with stocks
+      const response = await api.get(`/items/stock-entries/${entry.id}/`);
+      const entryWithStocks = response.data;
+
+      setReturnEntry(entryWithStocks);
+      // Initialize return items from stocks
+      const items = (entryWithStocks.stocks || []).map((stock: any) => ({
+        stock_id: stock.id,
+        quantity: '',
+        product_name: stock.product?.product_name || 'N/A',
+        max_quantity: parseFloat(stock.quantity || 0),
+      }));
+      setReturnItems(items);
+      setReturnNote('');
+      setReturnDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching stock entry details:', error);
+      toast.error('Ошибка при загрузке данных');
+    }
+  };
+
+  // Handle return submit
+  const handleReturnSubmit = async () => {
+    if (!returnEntry) return;
+
+    // Filter items with quantity > 0
+    const itemsToReturn = returnItems
+      .filter(item => parseFloat(item.quantity) > 0)
+      .map(item => ({
+        stock_id: item.stock_id,
+        quantity: parseFloat(item.quantity),
+      }));
+
+    if (itemsToReturn.length === 0) {
+      toast.error('Укажите количество для возврата');
+      return;
+    }
+
+    // Validate quantities
+    for (const item of returnItems) {
+      const qty = parseFloat(item.quantity);
+      if (qty > 0 && qty > item.max_quantity) {
+        toast.error(`Количество для "${item.product_name}" превышает доступное (${item.max_quantity})`);
+        return;
+      }
+    }
+
+    setIsSubmittingReturn(true);
+    try {
+      await api.post('/items/stock-returns/', {
+        stock_entry_id: returnEntry.id,
+        items: itemsToReturn,
+        note: returnNote || undefined,
+      });
+
+      toast.success('Возврат успешно оформлен');
+      setReturnDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error submitting return:', error);
+      toast.error(error?.response?.data?.message || 'Ошибка при оформлении возврата');
+    } finally {
+      setIsSubmittingReturn(false);
+    }
   };
 
   // Fetch stock details for an expanded entry
@@ -277,6 +355,24 @@ export default function SupplierDetailPage() {
             >
               <Edit className="w-4 h-4 mr-2" />
               {t('common.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReturnClick(row);
+              }}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Возврат
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/suppliers/${id}/stock-entries/${row.id}/returns`);
+              }}
+            >
+              <ClipboardList className="w-4 h-4 mr-2" />
+              История возвратов
             </DropdownMenuItem>
             {row.is_debt && (
               <>
@@ -479,6 +575,107 @@ export default function SupplierDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Return Dialog */}
+      <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Возврат товара поставщику</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Entry Info */}
+            {returnEntry && (
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Поставщик:</span>
+                  <span className="font-medium">{returnEntry.supplier?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Магазин:</span>
+                  <span className="font-medium">{returnEntry.store?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Дата поступления:</span>
+                  <span className="font-medium">{formatDate(returnEntry.date_of_arrived)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Stock Items Table */}
+            <div className="space-y-2">
+              <Label>Товары для возврата</Label>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Товар</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Доступно</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Кол-во возврата</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {returnItems.map((item, index) => (
+                      <tr key={item.stock_id} className="hover:bg-gray-50">
+                        <td className="px-3 py-3 text-sm text-gray-900 font-medium">
+                          {item.product_name}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600">
+                          {item.max_quantity}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <Input
+                            type="number"
+                            min="0"
+                            max={item.max_quantity}
+                            placeholder="0"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newItems = [...returnItems];
+                              newItems[index].quantity = e.target.value;
+                              setReturnItems(newItems);
+                            }}
+                            className="w-24"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label htmlFor="return-note">Комментарий (необязательно)</Label>
+              <Textarea
+                id="return-note"
+                placeholder="Введите комментарий..."
+                value={returnNote}
+                onChange={(e) => setReturnNote(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setReturnDialogOpen(false)}
+                disabled={isSubmittingReturn}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleReturnSubmit}
+                disabled={isSubmittingReturn}
+              >
+                {isSubmittingReturn ? 'Оформление...' : 'Оформить возврат'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
