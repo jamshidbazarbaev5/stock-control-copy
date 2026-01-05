@@ -29,10 +29,11 @@ export default function DebtsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
   const [selectedDebtClient, setSelectedDebtClient] =
     useState<DebtByClient | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо">(
+  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин">(
     "Физ.лицо",
   );
   const [searchName, setSearchName] = useState<string>("");
@@ -49,6 +50,7 @@ export default function DebtsPage() {
     type: selectedTab,
     page: currentPage,
     page_size: pageSize,
+    // ...(selectedStore && selectedStore !== "all" && { store: selectedStore }),
   });
 
   const debtsByClients = debtsByClientsData?.results || [];
@@ -75,6 +77,7 @@ export default function DebtsPage() {
       await queryClient.invalidateQueries({ queryKey: ["debtsByClients"] });
       setIsPaymentModalOpen(false);
       setSelectedDebtClient(null);
+      window.location.reload();
     } catch (error) {
     }
   };
@@ -217,13 +220,14 @@ export default function DebtsPage() {
   return (
     <div className="container mx-auto py-8">
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
             type="text"
             value={searchName}
             onChange={(e) => setSearchName(e.target.value)}
             placeholder={t("forms.search_by_name")}
           />
+       
         </div>
       </Card>
 
@@ -232,9 +236,10 @@ export default function DebtsPage() {
         onValueChange={setSelectedTab as (value: string) => void}
         className="mb-6"
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="Физ.лицо">{t("forms.individual")}</TabsTrigger>
           <TabsTrigger value="Юр.лицо">{t("forms.legal_entity")}</TabsTrigger>
+           <TabsTrigger value="Магазин">{t("forms.store")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -248,7 +253,15 @@ export default function DebtsPage() {
         onPageChange={setCurrentPage}
       />
 
-      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+      <Dialog
+        open={isPaymentModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            window.location.reload();
+          }
+          setIsPaymentModalOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("forms.payment_method")}</DialogTitle>

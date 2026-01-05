@@ -9,6 +9,7 @@ import {
   useGetSuppliers,
   useDeleteSupplier,
   useAddSupplierBalance,
+  useCreateDebt,
 } from "../api/supplier";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -35,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet, ArrowUp, ArrowDown, CreditCard, History, MoreHorizontal } from "lucide-react";
+import { Wallet, ArrowUp, ArrowDown, CreditCard, History, MoreHorizontal, AlertCircle } from "lucide-react";
 
 const formatPrice = (value: number | string | null | undefined) => {
   if (value === undefined || value === null || value === "") return "0";
@@ -118,6 +119,14 @@ export default function SuppliersPage() {
   });
   const [selectedMassPaymentStore, setSelectedMassPaymentStore] = useState<Store | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [isDebtDialogOpen, setIsDebtDialogOpen] = useState(false);
+  const [selectedSupplierForDebt, setSelectedSupplierForDebt] = useState<Supplier | null>(null);
+  const [debtForm, setDebtForm] = useState({
+    store: "",
+    amount: "",
+    debt_currency: "USD" as "USD" | "UZS",
+    note: "",
+  });
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
@@ -126,6 +135,7 @@ export default function SuppliersPage() {
   const { data: storesData } = useGetStores({});
   const deleteSupplier = useDeleteSupplier();
   const addSupplierBalance = useAddSupplierBalance();
+  const createDebt = useCreateDebt();
 
   const massPayment = useMutation({
     mutationFn: async (data: {
@@ -303,7 +313,59 @@ export default function SuppliersPage() {
         );
         setIsMassPaymentDialogOpen(false);
       },
-    
+
+    });
+  };
+
+  const handleCreateDebt = (supplier: Supplier) => {
+    setSelectedSupplierForDebt(supplier);
+    setDebtForm({
+      store: "",
+      amount: "",
+      debt_currency: "USD",
+      note: "",
+    });
+    setIsDebtDialogOpen(true);
+  };
+
+  const handleDebtSubmit = async () => {
+    if (
+        !selectedSupplierForDebt?.id ||
+        !debtForm.store ||
+        !debtForm.amount
+    ) {
+      toast.error(
+          t("messages.error.fill_required_fields") ||
+          "Please fill all required fields",
+      );
+      return;
+    }
+
+    const data = {
+      supplier: selectedSupplierForDebt.id,
+      store: Number(debtForm.store),
+      is_debt: true,
+      ...(debtForm.debt_currency === "UZS"
+          ? { total_amount_uzs: Number(debtForm.amount) }
+          : { total_amount_usd: Number(debtForm.amount) }),
+      ...(debtForm.note && { note: debtForm.note }),
+    };
+
+    createDebt.mutate(data, {
+      onSuccess: () => {
+        toast.success(
+            t("messages.success.debt_created") || "Debt created successfully",
+        );
+        setIsDebtDialogOpen(false);
+        setSelectedSupplierForDebt(null);
+        // Refresh suppliers data
+        window.location.reload();
+      },
+      onError: () => {
+        toast.error(
+            t("messages.error.debt_creation_failed") || "Failed to create debt",
+        );
+      },
     });
   };
 
@@ -405,6 +467,17 @@ export default function SuppliersPage() {
                         >
                           <History className="h-4 w-4 mr-2" />
                           {t("common.balance_history")}
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-muted flex items-center text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(null);
+                            handleCreateDebt(supplier);
+                          }}
+                        >
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          {t("common.create_debt")}
                         </button>
                       </div>
                     </>
@@ -815,6 +888,109 @@ export default function SuppliersPage() {
                     className="bg-blue-500 hover:bg-blue-600"
                 >
                   {massPayment.isPending
+                      ? t("common.submitting")
+                      : t("common.submit")}
+                </Button>
+              </div>
+            </div>
+          </WideDialogContent>
+        </WideDialog>
+
+        {/* Create Debt Dialog */}
+        <WideDialog open={isDebtDialogOpen} onOpenChange={setIsDebtDialogOpen}>
+          <WideDialogContent width="wide">
+            <WideDialogHeader>
+              <WideDialogTitle>
+                {t("common.create_debt") || "Create Debt"} -{" "}
+                {selectedSupplierForDebt?.name}
+              </WideDialogTitle>
+            </WideDialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="debt_currency_debt">
+                  {t("common.debt_currency") || "Debt Currency"} *
+                </Label>
+                <Select
+                    value={debtForm.debt_currency}
+                    onValueChange={(value: "USD" | "UZS") =>
+                        setDebtForm({ ...debtForm, debt_currency: value })
+                    }
+                >
+                  <SelectTrigger id="debt_currency_debt">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="UZS">UZS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="debt_store">{t("forms.store")} *</Label>
+                <Select
+                    value={debtForm.store}
+                    onValueChange={(value) =>
+                        setDebtForm({ ...debtForm, store: value })
+                    }
+                >
+                  <SelectTrigger id="debt_store">
+                    <SelectValue
+                        placeholder={
+                            t("placeholders.select_store") || "Select store"
+                        }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stores.map((store: Store) => (
+                        <SelectItem key={store.id} value={String(store.id)}>
+                          {store.name}
+                        </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="debt_amount">
+                  {t("common.amount_of_debt") || "Debt Amount"} * ({debtForm.debt_currency})
+                </Label>
+                <Input
+                    id="debt_amount"
+                    type="number"
+                    step="0.01"
+                    value={debtForm.amount}
+                    onChange={(e) =>
+                        setDebtForm({ ...debtForm, amount: e.target.value })
+                    }
+                    placeholder={t("common.enter_amount_of_debt") || "Enter debt amount"}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="debt_note">{t("common.comment")}</Label>
+                <Input
+                    id="debt_note"
+                    value={debtForm.note}
+                    onChange={(e) =>
+                        setDebtForm({ ...debtForm, note: e.target.value })
+                    }
+                    placeholder={t("placeholders.enter_comment") || "Enter comment"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                    variant="outline"
+                    onClick={() => setIsDebtDialogOpen(false)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                    onClick={handleDebtSubmit}
+                    disabled={createDebt.isPending}
+                >
+                  {createDebt.isPending
                       ? t("common.submitting")
                       : t("common.submit")}
                 </Button>

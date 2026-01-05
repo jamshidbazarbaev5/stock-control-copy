@@ -51,12 +51,14 @@ interface CommonFormValues {
   store: number | string;
   supplier: number | string;
   date_of_arrived: string;
+  payment_type?: "payment" | "debt" | "supplier_balance" | "inventory_adjustment";
   is_debt?: boolean;
   amount_of_debt?: number | string;
   advance_of_debt?: number | string;
   use_supplier_balance?: boolean;
   supplier_balance_type?: "USD" | "UZS";
   deposit_payment_method?: string;
+  is_inventory_adjustment?: boolean;
   payments?: Array<{
     amount: number | string;
     payment_type: string;
@@ -289,11 +291,13 @@ export default function CreateStock() {
         date.setHours(date.getHours() + 5);
         return date.toISOString().slice(0, 16);
       })(),
+      payment_type: "payment",
       is_debt: false,
       amount_of_debt: undefined,
       advance_of_debt: undefined,
       use_supplier_balance: false,
       deposit_payment_method: "",
+      is_inventory_adjustment: false,
       payments: [],
     },
   });
@@ -1140,6 +1144,9 @@ export default function CreateStock() {
         ...(commonValues.deposit_payment_method && {
           deposit_payment_method: commonValues.deposit_payment_method,
         }),
+        ...(commonValues.is_inventory_adjustment && {
+          is_inventory_adjustment: true,
+        }),
         ...(commonValues.payments &&
           commonValues.payments.length > 0 && {
             payments: commonValues.payments.map((p) => ({
@@ -1218,14 +1225,13 @@ export default function CreateStock() {
     commonForm.watch("date_of_arrived"),
   ]);
 
-  // Auto-initialize payment when entering payment mode (both checkboxes unchecked)
+  // Auto-initialize payment when entering payment mode (payment_type === "payment")
   useEffect(() => {
-    const isDebt = commonForm.watch("is_debt");
-    const useSupplierBalance = commonForm.watch("use_supplier_balance");
+    const paymentType = commonForm.watch("payment_type");
     const payments = commonForm.watch("payments") || [];
 
-    // Only initialize when in payment mode (both checkboxes false)
-    if (!isDebt && !useSupplierBalance) {
+    // Only initialize when in payment mode
+    if (paymentType === "payment") {
       const totalAmount = stockItems.reduce((sum, item) => {
         if (item.isCalculated) {
           return sum + (Number(item.form.total_price_in_uz) || 0);
@@ -1254,11 +1260,7 @@ export default function CreateStock() {
         }
       }
     }
-  }, [
-    commonForm.watch("is_debt"),
-    commonForm.watch("use_supplier_balance"),
-    stockItems,
-  ]);
+  }, [commonForm.watch("payment_type"), stockItems]);
 
   const handleCreateProductSubmit = async (data: CreateProductForm) => {
     try {
@@ -1391,30 +1393,63 @@ export default function CreateStock() {
               />
             </div>
 
-            {/* Is Debt */}
-            <div className="space-y-2 flex items-center gap-2 pt-8">
-              <Checkbox
-                id="is_debt"
-                checked={commonForm.watch("is_debt") === true}
-                onCheckedChange={(checked) => {
-                  if (checked) {
+            {/* Payment Type */}
+            <div className="pt-2 ">
+              <Label htmlFor="payment_type">
+                {t("common.payment_type") || "Payment Type"}
+              </Label>
+              <Select
+                value={commonForm.watch("payment_type") || "payment"}
+                onValueChange={(value) => {
+                  if (value === "debt") {
+                    commonForm.setValue("payment_type", "debt");
                     commonForm.setValue("is_debt", true);
                     commonForm.setValue("use_supplier_balance", false);
-                    // Clear payments when switching to debt mode
+                    commonForm.setValue("is_inventory_adjustment", false);
+                    commonForm.setValue("payments", []);
+                  } else if (value === "supplier_balance") {
+                    commonForm.setValue("payment_type", "supplier_balance");
+                    commonForm.setValue("is_debt", false);
+                    commonForm.setValue("use_supplier_balance", true);
+                    commonForm.setValue("is_inventory_adjustment", false);
+                    commonForm.setValue("payments", []);
+                  } else if (value === "inventory_adjustment") {
+                    commonForm.setValue("payment_type", "inventory_adjustment");
+                    commonForm.setValue("is_debt", false);
+                    commonForm.setValue("use_supplier_balance", false);
+                    commonForm.setValue("is_inventory_adjustment", true);
                     commonForm.setValue("payments", []);
                   } else {
+                    commonForm.setValue("payment_type", "payment");
                     commonForm.setValue("is_debt", false);
+                    commonForm.setValue("use_supplier_balance", false);
+                    commonForm.setValue("is_inventory_adjustment", false);
                   }
                 }}
-              />
-              <Label htmlFor="is_debt" className="cursor-pointer">
-                {t("common.is_debt")}
-              </Label>
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("common.select_payment_type") || "Select payment type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="payment">
+                    {t("common.payment") || "Payment"}
+                  </SelectItem>
+                  <SelectItem value="debt">
+                    {t("common.debt") || "Debt"}
+                  </SelectItem>
+                  <SelectItem value="supplier_balance">
+                    {t("common.supplier_balance") || "Supplier Balance"}
+                  </SelectItem>
+                  <SelectItem value="inventory_adjustment">
+                    {t("common.inventory_adjustment") || "Inventory Adjustment"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* Debt fields */}
-          {commonForm.watch("is_debt") && (
+          {commonForm.watch("payment_type") === "debt" && (
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1479,7 +1514,7 @@ export default function CreateStock() {
               </div>
 
               {/* Deposit Payment Method - show when debt and NOT using supplier balance */}
-              {!commonForm.watch("use_supplier_balance") && (
+              {commonForm.watch("payment_type") === "debt" && !commonForm.watch("use_supplier_balance") && (
                 <div className="space-y-2">
                   <Label htmlFor="deposit_payment_method">
                     {t("common.deposit_payment_method") ||
@@ -1511,27 +1546,8 @@ export default function CreateStock() {
             </div>
           )}
 
-          {/* Use Supplier Balance Section - Separate from debt */}
-          <div className="space-y-2 flex items-center gap-2 pt-8">
-            <Checkbox
-              id="use_supplier_balance"
-              checked={commonForm.watch("use_supplier_balance") === true}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  commonForm.setValue("use_supplier_balance", true);
-                  commonForm.setValue("is_debt", false);
-                  // Clear payments when switching to supplier balance mode
-                  commonForm.setValue("payments", []);
-                } else {
-                  commonForm.setValue("use_supplier_balance", false);
-                }
-              }}
-            />
-            <Label htmlFor="use_supplier_balance" className="cursor-pointer">
-              {t("common.use_supplier_balance") || "Use Supplier Balance"}
-            </Label>
-          </div>
-          {commonForm.watch("use_supplier_balance") && commonForm.watch("supplier") && (
+          {/* Supplier Balance Info - show when supplier_balance is selected */}
+          {commonForm.watch("payment_type") === "supplier_balance" && commonForm.watch("supplier") && (
             <div className="space-y-2">
               <Label htmlFor="supplier_balance_type">{t("forms.balance_type") || "Balance Type"} *</Label>
               <div className="p-3 bg-muted border border-border rounded-md text-sm font-medium">
@@ -1638,9 +1654,8 @@ export default function CreateStock() {
               </div>
             )}
 
-          {/* Payments Section - show when NOT using supplier balance AND NOT debt */}
-          {commonForm.watch("use_supplier_balance") !== true &&
-            commonForm.watch("is_debt") !== true && (
+          {/* Payments Section - show when payment type is 'payment' */}
+          {commonForm.watch("payment_type") === "payment" && (
               <div className="space-y-4 mt-4 p-4 bg-muted/50 rounded-lg">
                 <div className="flex justify-between items-center">
                   <Label className="text-lg font-semibold">
@@ -2264,7 +2279,7 @@ export default function CreateStock() {
               (() => {
                 // Disable if using supplier balance and insufficient balance
                 if (
-                  commonForm.watch("use_supplier_balance") &&
+                  commonForm.watch("payment_type") === "supplier_balance" &&
                   commonForm.watch("supplier")
                 ) {
                   const selectedSupplier = suppliers.find(

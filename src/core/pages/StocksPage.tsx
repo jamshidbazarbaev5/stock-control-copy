@@ -54,6 +54,7 @@ type PaginatedData<T> = { results: T[]; count: number } | T[];
 const COLUMN_CONFIG: Record<string, { label: string }> = {
   select: { label: "Выбор" },
   product: { label: "Продукт" },
+  id: { label: "ID" },
   store: { label: "Магазин" },
   supplier: { label: "Поставщик" },
   total_price_in_currency: { label: "Общая цена (валюта)" },
@@ -63,6 +64,7 @@ const COLUMN_CONFIG: Record<string, { label: string }> = {
   date_of_arrived: { label: "Дата прихода" },
   quantity: { label: "Количество (базовая единица)" },
   purchase_unit_quantity: { label: "Количество (единица закупки)" },
+  sale_id: { label: "Sale ID" },
   is_debt: { label: "Долг" },
   amount_of_debt: { label: "Сумма долга" },
   advance_of_debt: { label: "Аванс долга" },
@@ -118,10 +120,10 @@ export default function StocksPage() {
         if (saved) {
           return JSON.parse(saved);
         }
-        // Default: all columns visible
+        // Default: all columns visible except debt-related and sale_id
         return Object.keys(COLUMN_CONFIG).reduce(
             (acc, key) => {
-              acc[key] = true;
+              acc[key] = !["is_debt", "amount_of_debt", "advance_of_debt", "sale_id"].includes(key);
               return acc;
             },
             {} as Record<string, boolean>,
@@ -217,6 +219,11 @@ export default function StocksPage() {
             />
         );
       },
+    },
+    {
+      header:'ID',
+      accessorKey:"id",
+      cell:(row:any)=> row.id
     },
 
     {
@@ -358,6 +365,11 @@ export default function StocksPage() {
       accessorKey: "store",
       cell: (row: any) => row.store?.name || row.store_read?.name || "-",
     },
+     {
+      header: "Продажа ИД",
+      accessorKey: "sale_id",
+      cell: (row: any) => row?.sale_id || "-",
+    },
     {
       header: "Поставщик",
       accessorKey: "supplier",
@@ -425,6 +437,7 @@ export default function StocksPage() {
               ? `${Number(row.purchase_unit_quantity).toFixed(2)} ${row.purchase_unit?.short_name || ""}`
               : "-",
     },
+   
     {
       header: "Долг",
       accessorKey: "is_debt",

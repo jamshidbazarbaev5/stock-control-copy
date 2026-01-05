@@ -48,7 +48,7 @@ import api from "@/core/api/api";
 
 interface ProductInCart {
   id: number;
-  productId: number; 
+  productId: number;
   name: string;
   price: number;
   quantity: number;
@@ -230,7 +230,9 @@ const POSInterfaceCore = () => {
   );
   // Insufficient balance modal state
   const [isInsufficientBalanceModalOpen, setIsInsufficientBalanceModalOpen] = useState(false);
-  const [insufficientBalanceChoice, setInsufficientBalanceChoice] = useState<"pay" | "debt" | null>(null);
+  const [_insufficientBalanceChoice, setInsufficientBalanceChoice] = useState<"pay" | "debt" | null>(null);
+  // Track if we came from insufficient balance modal (to skip sale_debt in this scenario)
+  const [isFromInsufficientBalanceModal, setIsFromInsufficientBalanceModal] = useState(false);
 
   // Global modal states (shared across sessions)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -280,7 +282,9 @@ const POSInterfaceCore = () => {
             : 0
         : 0;
     const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
-    const targetAmount = selectedClient && paymentMode !== "balance"
+    // When paymentMode === "balance", use remaining amount (what needs to be paid)
+    // When paymentMode === "debt" or no client, use full total
+    const targetAmount = selectedClient && paymentMode === "balance"
         ? Math.max(0, finalTotal - totalBalanceUzs)
         : finalTotal;
 
@@ -454,11 +458,15 @@ const POSInterfaceCore = () => {
       usersData: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     });
 
-    if (!isAdmin && !isSuperUser && currentUser?.id && !selectedSeller) {
-      console.log("Setting selectedSeller to:", currentUser.id);
-      setSelectedSeller(currentUser.id);
+    // For non-admin users, always set seller to current user's ID
+    // This prevents stale seller IDs from localStorage
+    if (!isAdmin && !isSuperUser && currentUser?.id) {
+      if (selectedSeller !== currentUser.id) {
+        console.log("Setting selectedSeller to current user:", currentUser.id);
+        setSelectedSeller(currentUser.id);
+      }
     }
-  }, [currentUser?.id, isAdmin, isSuperUser, selectedSeller]);
+  }, [currentUser?.id, isAdmin, isSuperUser]);
 
   // Calculate totals
   const total = cartProducts.reduce((sum, product) => sum + product.total, 0);
@@ -1551,12 +1559,12 @@ const POSInterfaceCore = () => {
                             const client = clients.find((c) => c.id === selectedClient);
                             if (paymentMode === "debt") {
                               return (
-                                <div className="text-blue-700 font-medium">
-                                  Клиент: {client?.name}
-                                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                                  <div className="text-blue-700 font-medium">
+                                    Клиент: {client?.name}
+                                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
                                     В долг
                                   </span>
-                                </div>
+                                  </div>
                               );
                             }
                             const balanceUzs = (client as any)?.balance_uzs ? parseFloat(String((client as any).balance_uzs)) : 0;
@@ -2094,6 +2102,8 @@ const POSInterfaceCore = () => {
                           }
 
                           setDiscountAmount(0);
+                          // Reset insufficient balance choice since we're opening payment modal directly
+                          setInsufficientBalanceChoice(null);
                           // Calculate remaining amount to pay if client balance is used
                           const balanceUzs = selectedClient
                               ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
@@ -2370,6 +2380,8 @@ const POSInterfaceCore = () => {
                       }
 
                       setDiscountAmount(0);
+                      // Reset insufficient balance choice since we're opening payment modal directly
+                      setInsufficientBalanceChoice(null);
                       // Calculate remaining amount to pay if client balance is used
                       const balanceUzs = selectedClient
                           ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
@@ -2756,7 +2768,7 @@ const POSInterfaceCore = () => {
                 </Select>
               </div>
 
-              {/* Client Selection */}
+              {/* Client Selection with Live Search - Custom Dropdown */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700">
@@ -2773,118 +2785,126 @@ const POSInterfaceCore = () => {
                     Создать клиента
                   </Button>
                 </div>
-                <Input
-                    type="text"
-                    placeholder="Поиск клиентов..."
-                    value={clientSearchTerm}
-                    onChange={(e) => setClientSearchTerm(e.target.value)}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                    }}
-                    onBlur={(e) => {
-                      e.stopPropagation();
-                    }}
-                    className="mb-2"
-                    autoComplete="off"
-                />
-                <Select
-                    value={selectedClient?.toString() || ""}
-                    onValueChange={(value) =>
-                        setSelectedClient(parseInt(value, 10))
-                    }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите клиента" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="max-h-[200px] overflow-y-auto">
-                      {clients && clients.length > 0 ? (
-                          clients
-                              .filter((client) =>
-                                  client.name
-                                      .toLowerCase()
-                                      .includes(clientSearchTerm.toLowerCase()),
-                              )
-                              .map((client) => (
-                                  <SelectItem
-                                      key={client.id}
-                                      value={client.id?.toString() || ""}
-                                  >
-                                    {client.name}{" "}
-                                    {client.type !== "Юр.лицо" && `(${client.type})`}
-                                  </SelectItem>
-                              ))
-                      ) : (
-                          <div className="p-2 text-center text-gray-500 text-sm">
-                            Клиенты не найдены
-                          </div>
-                      )}
-                    </div>
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                      type="text"
+                      placeholder="Поиск клиентов..."
+                      value={clientSearchTerm}
+                      onChange={(e) => setClientSearchTerm(e.target.value)}
+                      autoComplete="off"
+                  />
+                  {clientSearchTerm && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        {clients && clients.length > 0 ? (
+                            clients
+                                .filter((client) =>
+                                    client.name
+                                        .toLowerCase()
+                                        .includes(clientSearchTerm.toLowerCase()),
+                                )
+                                .map((client) => (
+                                    <div
+                                        key={client.id}
+                                        onClick={() => {
+                                          if (client.id) {
+                                            setSelectedClient(client.id);
+                                            setClientSearchTerm("");
+                                          }
+                                        }}
+                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 text-sm"
+                                    >
+                                      {client.name}{" "}
+                                      {client.type !== "Юр.лицо" && `(${client.type})`}
+                                    </div>
+                                ))
+                        ) : (
+                            <div className="p-4 text-center text-gray-500 text-sm">
+                              Клиенты не найдены
+                            </div>
+                        )}
+                      </div>
+                  )}
+                  {selectedClient && (
+                      <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm flex justify-between items-center">
+                      <span className="font-medium text-blue-900">
+                        {clients.find((c) => c.id === selectedClient)?.name || "Выбранный клиент"}
+                      </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedClient(null);
+                              setClientSearchTerm("");
+                            }}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                  )}
+                </div>
               </div>
 
               {/* Debt specific fields - shown only when paymentMode === "debt" */}
               {paymentMode === "debt" && (
-                <>
-                  {/* Due date */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Срок погашения
-                    </label>
-                    <Input
-                        type="date"
-                        value={debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0]}
-                        onChange={(e) => setDebtDueDate(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                        }}
-                        onBlur={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="mb-2"
-                        autoComplete="off"
-                    />
-                  </div>
+                  <>
+                    {/* Due date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Срок погашения
+                      </label>
+                      <Input
+                          type="date"
+                          value={debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0]}
+                          onChange={(e) => setDebtDueDate(e.target.value)}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="mb-2"
+                          autoComplete="off"
+                      />
+                    </div>
 
-                  {/* Deposit amount */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Сумма залога (сум)
-                    </label>
-                    <Input
-                        type="number"
-                        placeholder="Введите сумму залога..."
-                        value={debtDeposit}
-                        onChange={(e) => setDebtDeposit(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                        }}
-                        onBlur={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="mb-2"
-                        autoComplete="off"
-                    />
-                  </div>
+                    {/* Deposit amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Сумма залога (сум)
+                      </label>
+                      <Input
+                          type="number"
+                          placeholder="Введите сумму залога..."
+                          value={debtDeposit}
+                          onChange={(e) => setDebtDeposit(e.target.value)}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="mb-2"
+                          autoComplete="off"
+                      />
+                    </div>
 
-                  {/* Deposit payment method */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Способ оплаты залога
-                    </label>
-                    <select
-                        value={depositPaymentMethod}
-                        onChange={(e) => setDepositPaymentMethod(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="Наличные">Наличные</option>
-                      <option value="Карта">Карта</option>
-                      <option value="Click">Click</option>
-                      <option value="Перечисление">Перечисление</option>
-                    </select>
-                  </div>
-                </>
+                    {/* Deposit payment method */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Способ оплаты залога
+                      </label>
+                      <select
+                          value={depositPaymentMethod}
+                          onChange={(e) => setDepositPaymentMethod(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="Наличные">Наличные</option>
+                        <option value="Карта">Карта</option>
+                        <option value="Click">Click</option>
+                        <option value="Перечисление">Перечисление</option>
+                      </select>
+                    </div>
+                  </>
               )}
 
               {/* Current Selection Display */}
@@ -3064,20 +3084,24 @@ const POSInterfaceCore = () => {
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
                 >
                   Оплатить разницу ({Math.max(0, (() => {
-                    const balanceUzs = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs || 0 : 0;
-                    const balanceUsd = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd || 0 : 0;
-                    return total - (balanceUzs + balanceUsd * exchangeRate);
-                  })()).toLocaleString()} сум)
+                  const balanceUzs = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs || 0 : 0;
+                  const balanceUsd = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd || 0 : 0;
+                  return total - (balanceUzs + balanceUsd * exchangeRate);
+                })()).toLocaleString()} сум)
                 </button>
                 <button
                     onClick={() => {
                       setIsInsufficientBalanceModalOpen(false);
-                      // Switch to debt mode and open user selection modal
+                      // Switch to debt mode and open payment modal directly (skip user selection modal)
                       setPaymentMode("debt");
                       // Set default due date to 30 days from now
                       setDebtDueDate(addDays(new Date(), 30).toISOString().split("T")[0]);
                       setDepositPaymentMethod("Наличные");
-                      setIsUserModalOpen(true);
+                      // Mark that we came from insufficient balance modal (don't send sale_debt)
+                      setIsFromInsufficientBalanceModal(true);
+                      // Open payment modal directly instead of user selection modal
+                      setDiscountAmount(0);
+                      setIsPaymentModalOpen(true);
                     }}
                     className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
                 >
@@ -3356,14 +3380,23 @@ const POSInterfaceCore = () => {
         {/* Payment Modal */}
         <WideDialog
             open={isPaymentModalOpen}
-            onOpenChange={setIsPaymentModalOpen}
+            onOpenChange={(open) => {
+              setIsPaymentModalOpen(open);
+              if (!open) {
+                // Reset the flag when payment modal closes
+                setIsFromInsufficientBalanceModal(false);
+              }
+            }}
         >
           <WideDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="p-4">
               {/* Header with Back Button and Pay Button */}
               <div className="flex items-center justify-between mb-4">
                 <button
-                    onClick={() => setIsPaymentModalOpen(false)}
+                    onClick={() => {
+                      setIsPaymentModalOpen(false);
+                      setIsFromInsufficientBalanceModal(false);
+                    }}
                     className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   <span className="text-xl">←</span>
@@ -3395,19 +3428,32 @@ const POSInterfaceCore = () => {
                         setIsProcessingSale(true);
 
                         // Determine payload based on client type and payment mode
-                        const isInsufficientBalancePay = insufficientBalanceChoice === "pay";
+                        // const isInsufficientBalancePay = insufficientBalanceChoice === "pay";
+
+                        // Calculate if balance is insufficient
+                        const balanceUzs = selectedClient
+                            ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                                ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                                : 0
+                            : 0;
+                        const balanceUsd = selectedClient
+                            ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                                ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                                : 0
+                            : 0;
+                        const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
+                        const finalTotal = total - discountAmount;
+                        const isBalanceInsufficient = selectedClient && paymentMode === "balance" && totalBalanceUzs < finalTotal;
 
                         // For different client types and payment modes:
                         // "С баланса" (sufficient): use_client_balance=true, on_credit=false
-                        // "С баланса" + "Оплатить разницу": use_client_balance=true, on_credit=false, with sale_payments
-                        // "С баланса" + "В долг": use_client_balance=true, on_credit=true, with sale_debt
-                        // "В долг" (pure debt, no balance): use_client_balance=true, on_credit=true, with sale_debt
+                        // "С баланса" + insufficient + "Оплатить разницу": use_client_balance=true, on_credit=false, NO sale_debt, with sale_payments
+                        // "В долг": use_client_balance=true, on_credit=true, with sale_debt
 
                         // use_client_balance is ALWAYS true when client is selected
                         const isUseClientBalance = Boolean(selectedClient);
-                        // on_credit is true when "В долг" selected
-                        const isOnCredit = paymentMode === "debt";
-                        const isPayDifference = isInsufficientBalancePay;
+                        // on_credit is ONLY true when "В долг" mode (paymentMode === "debt")
+                        const isOnCredit: boolean = paymentMode === "debt";
 
                         // Create your custom payload structure as specified
                         const customSalePayload: SalePayload = {
@@ -3422,11 +3468,12 @@ const POSInterfaceCore = () => {
                                 item.selectedUnit?.id || item.product.base_unit || 1,
                             price_per_unit: item.price,
                           })),
-                          // For balance + debt (isInsufficientBalancePay), no sale_payments
-                          // For debt only, no sale_payments either
-                          sale_payments: (isUseClientBalance || isOnCredit) ? [] : paymentMethods.filter((p) => p.amount > 0),
-                          // sale_debt ALWAYS sent when on_credit is true (В долг)
-                          ...(isOnCredit && selectedClient && {
+                          // For sufficient balance, no sale_payments (use balance)
+                          // For insufficient balance + payment, include sale_payments (pay the difference)
+                          // For debt mode, no sale_payments (use sale_debt)
+                          sale_payments: (isUseClientBalance && !isBalanceInsufficient) || isOnCredit ? [] : paymentMethods.filter((p) => p.amount > 0),
+                          // sale_debt sent ONLY when "В долг" mode (paymentMode === "debt") from user modal, NOT from insufficient balance modal
+                          ...(isOnCredit && paymentMode === "debt" && selectedClient && !isFromInsufficientBalanceModal && {
                             sale_debt: {
                               client: selectedClient,
                               deposit: Number(debtDeposit) || 0,
@@ -3456,7 +3503,7 @@ const POSInterfaceCore = () => {
                           use_client_balance: isUseClientBalance,
                           total_amount: total.toFixed(2),
                           discount_amount: discountAmount.toFixed(2),
-                          sale_payments: (isOnCredit || (isUseClientBalance && !isPayDifference))
+                          sale_payments: (isUseClientBalance && !isBalanceInsufficient) || isOnCredit
                               ? []
                               : paymentMethods
                                   .map((payment) => {
@@ -3482,8 +3529,8 @@ const POSInterfaceCore = () => {
                                     };
                                   })
                                   .filter((p) => Number(p.amount) > 0),
-                          // sale_debt ALWAYS sent when on_credit is true (В долг)
-                          ...(isOnCredit && selectedClient && {
+                          // sale_debt sent ONLY when "В долг" mode (paymentMode === "debt") from user modal, NOT from insufficient balance modal
+                          ...(isOnCredit && paymentMode === "debt" && selectedClient && !isFromInsufficientBalanceModal && {
                             sale_debt: {
                               client: selectedClient,
                               deposit: Number(debtDeposit) || 0,
@@ -3549,6 +3596,7 @@ const POSInterfaceCore = () => {
                         setDebtDeposit("");
                         setDebtDueDate("");
                         setDepositPaymentMethod("Наличные");
+                        setIsFromInsufficientBalanceModal(false);
 
                         // Clear persisted state after successful sale
                         clearPersistedState();
@@ -3635,21 +3683,24 @@ const POSInterfaceCore = () => {
                         : 0;
                     const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                     const finalTotal = total - discountAmount;
-                    const targetAmount = selectedClient && paymentMode !== "balance"
+                    // When paymentMode === "balance", show remaining amount (what needs to be paid)
+                    // When paymentMode === "debt", show full total
+                    const targetAmount = selectedClient && paymentMode === "balance"
                         ? Math.max(0, finalTotal - totalBalanceUzs)
                         : finalTotal;
+                    const isInsufficientBalance = selectedClient && paymentMode === "balance" && totalBalanceUzs < finalTotal;
 
                     return (
                         <>
                           <div className="text-gray-500 text-sm mb-1">
-                            {selectedClient && paymentMode !== "balance" && totalBalanceUzs < finalTotal
+                            {isInsufficientBalance
                                 ? "Осталось внести:"
                                 : "Итого:"}
                           </div>
                           <div className="text-3xl font-bold text-gray-900">
                             {targetAmount.toLocaleString()} UZS
                           </div>
-                          {selectedClient && paymentMode !== "balance" && totalBalanceUzs > 0 && (
+                          {selectedClient && paymentMode === "balance" && totalBalanceUzs > 0 && (
                               <div className="text-xs text-blue-600 mt-1">
                                 С баланса: {Math.min(totalBalanceUzs, finalTotal).toLocaleString()}
                               </div>
@@ -3675,17 +3726,20 @@ const POSInterfaceCore = () => {
                           : 0;
                       const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                       const finalTotal = total - discountAmount;
-                      const targetAmount = selectedClient && paymentMode !== "balance"
+                      // When paymentMode === "balance", show remaining amount (what needs to be paid)
+                      // When paymentMode === "debt", show full total
+                      const targetAmount = selectedClient && paymentMode === "balance"
                           ? Math.max(0, finalTotal - totalBalanceUzs)
                           : finalTotal;
 
+                      const totalPaid = paymentMethods.reduce(
+                          (sum, p) => sum + (p.amount || 0),
+                          0,
+                      );
+
                       return Math.max(
                           0,
-                          targetAmount -
-                          paymentMethods.reduce(
-                              (sum, p) => sum + (p.amount || 0),
-                              0,
-                          ),
+                          targetAmount - totalPaid,
                       ).toLocaleString();
                     })()}
                     {" "}
@@ -3696,9 +3750,23 @@ const POSInterfaceCore = () => {
                   <div className="text-blue-500 text-sm mb-1">СДАЧА:</div>
                   <div className="text-3xl font-bold text-blue-500">
                     {(() => {
-                      const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
+                      const balanceUzs = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_uzs))
+                              : 0
+                          : 0;
+                      const balanceUsd = selectedClient
+                          ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd
+                              ? parseFloat(String((clients.find((c) => c.id === selectedClient) as any)?.balance_usd))
+                              : 0
+                          : 0;
+                      const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                       const finalTotal = total - discountAmount;
-                      return totalPaid > finalTotal ? (totalPaid - finalTotal).toLocaleString() : "0";
+                      const targetAmount = selectedClient && paymentMode === "balance"
+                          ? Math.max(0, finalTotal - totalBalanceUzs)
+                          : finalTotal;
+                      const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
+                      return totalPaid > targetAmount ? (totalPaid - targetAmount).toLocaleString() : "0";
                     })()}{" "}
                     UZS
                   </div>
@@ -3738,7 +3806,7 @@ const POSInterfaceCore = () => {
                                     : 0;
                                 const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                                 const finalTotal = total - discountAmount;
-                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                const targetAmount = selectedClient && paymentMode === "balance"
                                     ? Math.max(0, finalTotal - totalBalanceUzs)
                                     : finalTotal;
                                 const remaining = targetAmount - totalPaid;
@@ -3801,7 +3869,7 @@ const POSInterfaceCore = () => {
                                     : 0;
                                 const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                                 const finalTotal = total - discountAmount;
-                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                const targetAmount = selectedClient && paymentMode === "balance"
                                     ? Math.max(0, finalTotal - totalBalanceUzs)
                                     : finalTotal;
                                 const remaining = targetAmount - totalPaid;
@@ -3864,7 +3932,7 @@ const POSInterfaceCore = () => {
                                     : 0;
                                 const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                                 const finalTotal = total - discountAmount;
-                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                const targetAmount = selectedClient && paymentMode === "balance"
                                     ? Math.max(0, finalTotal - totalBalanceUzs)
                                     : finalTotal;
                                 const remaining = targetAmount - totalPaid;
@@ -3927,7 +3995,7 @@ const POSInterfaceCore = () => {
                                     : 0;
                                 const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                                 const finalTotal = total - discountAmount;
-                                const targetAmount = selectedClient && paymentMode !== "balance"
+                                const targetAmount = selectedClient && paymentMode === "balance"
                                     ? Math.max(0, finalTotal - totalBalanceUzs)
                                     : finalTotal;
                                 const remaining = targetAmount - totalPaid;
@@ -4030,7 +4098,7 @@ const POSInterfaceCore = () => {
                                   : 0;
                               const totalBalanceUzs = balanceUzs + (balanceUsd * exchangeRate);
                               const finalTotal = total - discountAmount;
-                              const targetAmount = selectedClient && paymentMode !== "balance"
+                              const targetAmount = selectedClient && paymentMode === "balance"
                                   ? Math.max(0, finalTotal - totalBalanceUzs)
                                   : finalTotal;
                               const remaining = targetAmount - totalPaid;

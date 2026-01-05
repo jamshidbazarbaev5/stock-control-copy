@@ -10,25 +10,29 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  User2,
   Phone,
   MapPin,
-  Calendar,
   DollarSign,
-  Store,
   Package,
   ShoppingCart,
-  ChevronDown,
+  History,
+  MoreVertical,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { ResourceForm } from "../helpers/ResourceForm";
-
-interface DebtListItem {
-  id: number;
-  isExpanded: boolean;
-}
+import { ResourceTable } from "../helpers/ResourseTable";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import api from "../api/api";
 
 interface PaymentFormData {
   amount: number;
@@ -40,7 +44,7 @@ export default function DebtDetailsPage() {
   const { t } = useTranslation();
   const { id: clientId } = useParams();
   const queryClient = useQueryClient();
-  const [expandedDebts, setExpandedDebts] = useState<DebtListItem[]>([]);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<{
     id: number;
@@ -50,6 +54,8 @@ export default function DebtDetailsPage() {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [storeData, setStoreData] = useState<any>(null);
+  const [clientInfo, setClientInfo] = useState<any>(null);
 
   const { data: debtsData, isLoading } = useGetDebtsHistory(
     Number(clientId),
@@ -57,77 +63,189 @@ export default function DebtDetailsPage() {
   );
   const createPayment = useCreateDebtPayment();
 
-  // Access the paginated data
   const debts = debtsData?.results || [];
-  const totalPages = debtsData?.total_pages || 1;
+  const totalCount = (debtsData as any)?.count || 0;
 
-  // Function to handle page changes
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    // Reset expanded states when changing page
-    setExpandedDebts([]);
+  // Fetch store data when debts are loaded
+  useEffect(() => {
+    if (debts.length > 0) {
+      const client = debts[0]?.client_read;
+      setClientInfo(client);
+      
+      // If client type is Магазин, fetch the linked store
+      if (client?.type === "Магазин" && client?.linked_store) {
+        const fetchStoreData = async () => {
+          try {
+            const response = await api.get(
+              `/store/${client.linked_store}/`
+            );
+            // Handle both direct response and nested data structure
+            const storeInfo = response?.data || response;
+            setStoreData(storeInfo);
+            console.log("Store data fetched:", storeInfo);
+          } catch (error) {
+            console.error("Failed to fetch store data:", error);
+          }
+        };
+        fetchStoreData();
+      }
+    }
+  }, [debts]);
+
+  const handleRowClick = (row: any) => {
+    if (row.id === expandedRowId) {
+      setExpandedRowId(null);
+    } else {
+      setExpandedRowId(row.id || null);
+    }
   };
 
-  // Function to handle debt expansion
-  const handleDebtClick = (debtId: number) => {
-    setExpandedDebts((prev) => {
-      const index = prev.findIndex((d) => d.id === debtId);
-      if (index === -1) {
-        return [...prev, { id: debtId, isExpanded: true }];
-      }
-      return prev.map((d) =>
-        d.id === debtId ? { ...d, isExpanded: !d.isExpanded } : d,
-      );
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("ru-RU", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     });
   };
-  const navigation = useNavigate();
-  // Check if a debt is expanded
-  const isDebtExpanded = (debtId: number) => {
-    return expandedDebts.find((d) => d.id === debtId)?.isExpanded || false;
+
+  const formatCurrency = (amount: number | string | undefined) => {
+    return new Intl.NumberFormat("ru-RU").format(Number(amount) || 0);
   };
+
   const goToPaymentHistory = (debtId: number) => {
     navigation(`/debts/${debtId}/payments`);
   };
 
   // Payment handling
-  // Determine max remainder based on selected payment method
   const getMaxRemainder = () => {
     if (!selectedDebt) return 0;
-    // If payment method is "Валюта" (USD), use remainder_usd
+    
+    let remainder = Number(selectedDebt.remainder);
     if (selectedPaymentMethod === "Валюта" && selectedDebt.remainder_usd) {
-      return Number(selectedDebt.remainder_usd);
+      remainder = Number(selectedDebt.remainder_usd);
     }
-    // For all other payment methods, use remainder (UZS)
-    return Number(selectedDebt.remainder);
+
+    // If client type is Магазин, check store budget
+    if (clientInfo?.type === "Магазин" && storeData?.budgets) {
+      const budget = storeData.budgets.find(
+        (b: any) => b.budget_type === selectedPaymentMethod
+      );
+      const budgetAmount = budget ? Number(budget.amount) : 0;
+      
+      // Return the minimum of remainder and available budget
+      return Math.min(remainder, budgetAmount);
+    }
+
+    return remainder;
   };
+
+  const getAvailableBalance = () => {
+    if (clientInfo?.type !== "Магазин" || !storeData?.budgets || !selectedPaymentMethod) {
+      return 0;
+    }
+
+    const budget = storeData.budgets.find(
+      (b: any) => b.budget_type === selectedPaymentMethod
+    );
+    return budget ? Number(budget.amount) : 0;
+  };
+
+  const handlePaymentClick = (debt: {
+    id: number;
+    remainder: string | number;
+    remainder_usd?: string | number;
+    total_amount_usd?: string | number;
+  }) => {
+    const hasUsdDebt = debt.total_amount_usd && Number(debt.total_amount_usd) > 0;
+    setSelectedDebt({
+      id: debt.id,
+      remainder: Number(debt.remainder),
+      remainder_usd: debt.remainder_usd ? Number(debt.remainder_usd) : undefined,
+      hasUsdDebt: !!hasUsdDebt,
+    });
+    setSelectedPaymentMethod("");
+    setIsPaymentModalOpen(true);
+  };
+
+  const handlePaymentSubmit = async (data: PaymentFormData) => {
+    if (!selectedDebt) return;
+
+    const maxRemainder = getMaxRemainder();
+    const availableBalance = getAvailableBalance();
+    
+    // For Магазин clients, check store budget first
+    if (clientInfo?.type === "Магазин" && selectedPaymentMethod) {
+      // If no balance available at all
+      if (availableBalance === 0) {
+        toast.error(
+         
+          `Недостаточно средств`
+        );
+        return;
+      }
+      
+      // If balance is less than requested amount
+      if (data.amount > availableBalance) {
+        toast.error(
+         
+          `Недостаточно средств. Доступно: ${formatCurrency(availableBalance)}`
+        );
+        return;
+      }
+    }
+    
+    // Check against remainder for non-store clients or when balance check passed
+    if (data.amount > maxRemainder) {
+      toast.error(
+        t("validation.amount_exceeds_remainder") ||
+        `Сумма не может превышать остаток: ${formatCurrency(maxRemainder)}`
+      );
+      return;
+    }
+
+    try {
+      await createPayment.mutateAsync({
+        debt: selectedDebt.id,
+        ...data,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["debtsHistory", Number(clientId), currentPage],
+      });
+
+      toast.success(t("messages.success.payment_created"));
+      setIsPaymentModalOpen(false);
+      setSelectedDebt(null);
+      window.location.reload();
+    } catch (error) {
+      toast.error(t("messages.error.payment_failed"));
+    }
+  };
+
+  const navigation = useNavigate();
+
 
   const paymentFields = [
     {
       name: "amount",
-      label: selectedPaymentMethod === "Валюта"
-        ? (t("forms.amount") + " (USD)")
-        : t("forms.amount"),
+      label:
+        selectedPaymentMethod === "Валюта"
+          ? t("forms.amount") + " (USD)"
+          : t("forms.amount"),
       type: "number",
       placeholder: t("placeholders.enter_amount"),
       required: true,
       validation: {
         min: {
           value: 0.01,
-          message: t("validation.amount_must_be_positive"),
+          message: t("validation.amount_must_be_positive") || "Сумма должна быть больше 0",
         },
         max: {
           value: getMaxRemainder(),
-          message: t("validation.amount_exceeds_total"),
-        },
-        validate: {
-          notGreaterThanRemainder: (value: number) => {
-            if (!selectedDebt) return true;
-            const maxRemainder = getMaxRemainder();
-            return (
-              value <= maxRemainder ||
-              t("validation.amount_exceeds_remainder")
-            );
-          },
+          message: 
+            clientInfo?.type === "Магазин" && selectedPaymentMethod && getAvailableBalance() > 0
+              ? `Недостаточно средств. Доступно: ${formatCurrency(getAvailableBalance())}`
+              : `Сумма не может превышать остаток: ${formatCurrency(getMaxRemainder())}`,
         },
       },
     },
@@ -155,65 +273,287 @@ export default function DebtDetailsPage() {
       validation: {
         min: {
           value: 0.01,
-          message: t("validation.rate_must_be_positive") || "Курс должен быть положительным",
+          message:
+            t("validation.rate_must_be_positive") || "Курс должен быть положительным",
         },
       },
     },
   ];
 
-  const handlePaymentClick = (debt: { id: number; remainder: string | number; remainder_usd?: string | number; total_amount_usd?: string | number }) => {
-    const hasUsdDebt = debt.total_amount_usd && Number(debt.total_amount_usd) > 0;
-    setSelectedDebt({
-      id: debt.id,
-      remainder: Number(debt.remainder),
-      remainder_usd: debt.remainder_usd ? Number(debt.remainder_usd) : undefined,
-      hasUsdDebt: !!hasUsdDebt,
-    });
-    setSelectedPaymentMethod("");
-    setIsPaymentModalOpen(true);
+  const renderExpandedRow = (debt: any) => {
+    return (
+      <div className="bg-muted/30 border-t">
+       
+      
+
+        {/* Sale Items Table */}
+        <div className="p-4 pt-2">
+          <div className="bg-card rounded-lg border overflow-hidden">
+            <div className="bg-muted/50 px-4 py-2 border-b">
+              <h4 className="text-sm font-semibold flex items-center gap-2 text-emerald-700">
+                <ShoppingCart className="w-4 h-4" />
+                {t("forms.sale_items")}
+              </h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-muted/30">
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">
+                      {t("forms.product")}
+                    </th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-20">
+                      {t("forms.quantity")}
+                    </th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-24">
+                      {t("forms.price_per_unit")}
+                    </th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-24">
+                      {t("forms.subtotal")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debt.sale_read?.sale_items?.map((item: any) => (
+                    <tr key={item.id} className="border-b hover:bg-muted/20">
+                      <td className="py-2 px-4">
+                        <div className="flex items-start gap-2">
+                          <Package className="w-4 h-4 text-emerald-500 mt-0.5" />
+                          <div>
+                            <div className="font-medium">{item.product_read.product_name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {item.product_read?.category_read?.category_name}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-right py-2 px-4">{item.quantity}</td>
+                      <td className="text-right py-2 px-4">
+                        {formatCurrency(item.price_per_unit)}
+                      </td>
+                      <td className="text-right py-2 px-4 font-medium">
+                        {formatCurrency(item.subtotal)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/40 font-semibold">
+                    <td colSpan={3} className="text-right py-3 px-4">
+                      {t("forms.total_amount")}
+                    </td>
+                    <td className="text-right py-3 px-4 text-emerald-600">
+                      {formatCurrency(debt.total_amount)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Summary */}
+        <div className="p-4 pt-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.total_amount_uzs")}
+              </div>
+              <div className="font-semibold text-emerald-600">
+                {formatCurrency(debt.total_amount_uzs)} UZS
+              </div>
+            </div>
+            {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-xs text-muted-foreground mb-1">
+                  {t("forms.total_amount_usd") || "Сумма (USD)"}
+                </div>
+                <div className="font-semibold text-blue-600">
+                  {formatCurrency((debt as any).total_amount_usd)} $
+                </div>
+              </div>
+            )}
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">{t("forms.deposit")}</div>
+              <div className="font-semibold">{formatCurrency(debt.deposit)}</div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">{t("forms.remainder_uzs")}</div>
+              <div
+                className={`font-semibold ${
+                  Number(debt.remainder_uzs) < 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {formatCurrency(debt.remainder_uzs)}
+              </div>
+            </div>
+            {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0 && (
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-xs text-muted-foreground mb-1">
+                  {t("forms.remainder_usd") || "Остаток (USD)"}
+                </div>
+                <div
+                  className={`font-semibold ${
+                    Number((debt as any).remainder_usd) < 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {formatCurrency((debt as any).remainder_usd)} $
+                </div>
+              </div>
+            )}
+            {debt.usd_rate_at_creation && (
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-xs text-muted-foreground mb-1">
+                  {t("forms.usd_rate_at_creation")}
+                </div>
+                <div className="font-semibold">
+                  {formatCurrency(debt.usd_rate_at_creation)} UZS
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  const handlePaymentSubmit = async (data: PaymentFormData) => {
-    if (!selectedDebt) return;
-
-    // Additional validation to prevent overpayment
-    const maxRemainder = getMaxRemainder();
-    if (data.amount > maxRemainder) {
-      toast.error(t("validation.amount_exceeds_remainder"));
-      return;
-    }
-
-    try {
-      await createPayment.mutateAsync({
-        debt: selectedDebt.id,
-        ...data,
-      });
-
-      // Invalidate and refetch to get fresh data from server
-      await queryClient.invalidateQueries({
-        queryKey: ["debtsHistory", Number(clientId), currentPage]
-      });
-
-      toast.success(t("messages.success.payment_created"));
-      setIsPaymentModalOpen(false);
-      setSelectedDebt(null);
-    } catch (error) {
-    }
-  };
+  const columns = [
+    
+   {   
+    header: t("common.sale_id"),
+      accessorKey: "sale_id",
+      cell: (row: any) => (row?.sale_read?.sale_id),
+    },
+    {
+      header: t("common.date"),
+      accessorKey: "created_at",
+      cell: (row: any) => formatDate(row.created_at),
+    },
+    {
+      header: t("forms.due_date"),
+      accessorKey: "due_date",
+      cell: (row: any) => formatDate(row.due_date),
+    },
+    {
+      header: t("common.total_amount") + " (UZS)",
+      accessorKey: "total_amount_uzs",
+      cell: (row: any) => (
+        <span className="font-semibold text-emerald-600">
+          {formatCurrency(row.total_amount_uzs)} UZS
+        </span>
+      ),
+    },
+    {
+      header: t("common.total_amount") + " (USD)",
+      accessorKey: "total_amount_usd",
+      cell: (row: any) =>
+        row.total_amount_usd && Number(row.total_amount_usd) > 0 ? (
+          <span className="font-semibold text-blue-600">
+            {formatCurrency(row.total_amount_usd)} $
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        ),
+    },
+    {
+      header: t("forms.remainder_uzs"),
+      accessorKey: "remainder_uzs",
+      cell: (row: any) => (
+        <span
+          className={`font-semibold ${
+            Number(row.remainder_uzs) < 0 ? "text-green-600" : "text-red-600"
+          }`}
+        >
+          {formatCurrency(row.remainder_uzs)}
+        </span>
+      ),
+    },
+    {
+      header: t("forms.remainder_usd"),
+      accessorKey: "remainder_usd",
+      cell: (row: any) =>
+        row.remainder_usd && Number(row.remainder_usd) > 0 ? (
+          <span
+            className={`font-semibold ${
+              Number(row.remainder_usd) < 0 ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {formatCurrency(row.remainder_usd)} $
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        ),
+    },
+    {
+      header: t("common.status"),
+      accessorKey: "is_paid",
+      cell: (row: any) => (
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+            row.is_paid
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-red-100 text-red-700"
+          }`}
+        >
+          {row.is_paid ? (
+            <CheckCircle2 className="w-3 h-3" />
+          ) : (
+            <AlertCircle className="w-3 h-3" />
+          )}
+          {row.is_paid ? t("common.paid") : t("common.unpaid")}
+        </span>
+      ),
+    },
+    {
+      header: t("common.actions"),
+      accessorKey: "actions",
+      cell: (row: any) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPaymentHistory(row.id);
+              }}
+            >
+              <History className="w-4 h-4 mr-2" />
+              {t("forms.payment_history")}
+            </DropdownMenuItem>
+            {!row.is_paid && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePaymentClick({
+                    id: row.id,
+                    remainder: Number(row.remainder),
+                    remainder_usd: (row as any).remainder_usd,
+                    total_amount_usd: (row as any).total_amount_usd,
+                  });
+                }}
+              >
+                <DollarSign className="w-4 h-4 mr-2" />
+                {t("forms.add_payment")}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="animate-pulse space-y-8">
-          <div className="h-12 bg-muted rounded-lg w-1/3"></div>
-          <div className="grid grid-cols-1 gap-6">
-            {[1, 2, 3].map((n) => (
-              <div
-                key={n}
-                className="h-48 bg-muted rounded-lg shadow-sm"
-              ></div>
-            ))}
-          </div>
+      <div className="container mx-auto py-6">
+        <Skeleton className="h-8 w-64 mb-6" />
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
         </div>
       </div>
     );
@@ -226,406 +566,139 @@ export default function DebtDetailsPage() {
         <h2 className="text-2xl font-semibold text-muted-foreground">
           {t("common.no_data")}
         </h2>
+        <p className="text-muted-foreground mt-2">
+          {debts[0]?.client_read?.name || ""}
+        </p>
       </div>
     );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const formatCurrency = (amount: number | string) => {
-    return Number(amount).toLocaleString();
-  };
-
   return (
-      <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl animate-in fade-in duration-500">
-      <div className="mb-6 sm:mb-8 animate-in slide-in-from-left duration-500">
-        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent mb-4 sm:mb-6">
-          <DollarSign className="w-6 h-6 sm:w-10 sm:h-10 text-emerald-500" />
-          <span className="break-words">{t("pages.debt_details")} - {debts[0]?.client_read.name}</span>
-        </h1>
-
-        {debts[0] && (
-          <Card className="overflow-hidden mb-6 sm:mb-8">
-            <div className="bg-muted/50 rounded-lg p-4 sm:p-6">
-              <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
-                <User2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-                {t("forms.client_info")}
-              </h4>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div className="flex items-start gap-3">
-                  <Phone className="w-4 h-4 text-emerald-500 mt-1" />
-                  <div>
-                    <dt className="text-sm text-muted-foreground">
-                      {t("forms.phone")}
-                    </dt>
-                    <dd className="font-medium text-foreground">
-                      {debts[0].client_read.phone_number}
-                    </dd>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-4 h-4 text-emerald-500 mt-1" />
-                  <div>
-                    <dt className="text-sm text-muted-foreground">
-                      {t("forms.address")}
-                    </dt>
-                    <dd className="font-medium text-foreground">
-                      {debts[0].client_read.address}
-                    </dd>
-                  </div>
-                </div>
-              </dl>
+    <div className="container mx-auto py-4 sm:py-6 md:py-8 px-2 sm:px-4">
+      {/* Header with client info */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="bg-emerald-500/10 p-2 rounded-lg">
+            <DollarSign className="w-6 h-6 text-emerald-500" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">
+              {t("pages.debt_details")} - {debts[0]?.client_read?.name}
+            </h1>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Phone className="w-4 h-4" />
+                {debts[0]?.client_read?.phone_number}
+              </span>
+              <span className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {debts[0]?.client_read?.address}
+              </span>
             </div>
-          </Card>
-        )}
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {debts.map((debt, index) => (
-          <div
-            key={debt.id}
-            className="animate-in fade-in slide-in-from-bottom duration-500"
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <Card className="overflow-hidden hover:shadow-lg transition-all duration-300">
-              <div
-                className="flex items-center justify-between p-4 sm:p-6 cursor-pointer transition-colors duration-200 hover:bg-muted/50 min-h-[44px]"
-                onClick={() => handleDebtClick(debt.id!)}
-              >
-                <div className="space-y-2 flex-1 min-w-0">
-                  <h3 className="text-base sm:text-xl font-semibold flex flex-wrap items-center gap-2">
-                    {Number(debt.total_amount_uzs) > 0 && (
-                      <span className="text-emerald-600">
-                        {formatCurrency(debt.total_amount_uzs)} UZS
-                      </span>
-                    )}
-                    {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
-                      <>
-                        {Number(debt.total_amount_uzs) > 0 && (
-                          <span className="text-muted-foreground">+</span>
-                        )}
-                        <span className="text-blue-600">
-                          {formatCurrency((debt as any).total_amount_usd)} $
-                        </span>
-                      </>
-                    )}
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-foreground text-sm sm:text-base">
-                      {formatDate(debt.created_at)}
-                    </span>
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground flex flex-wrap items-center gap-2">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {t("forms.due_date")}: {formatDate(debt.due_date)}
-                    <span className="text-muted-foreground">|</span>
-                    <span
-                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
-                        debt.is_paid
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {debt.is_paid ? t("common.paid") : t("common.unpaid")}
-                    </span>
-                  </p>
-                </div>
-                <div
-                  className={`transform transition-transform duration-200 ml-2 flex-shrink-0 ${
-                    isDebtExpanded(debt.id!) ? "rotate-180" : ""
-                  }`}
-                >
-                  <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
-                </div>
-              </div>
-
-              <div
-                className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                  isDebtExpanded(debt.id!)
-                    ? "max-h-[2000px] opacity-100"
-                    : "max-h-0 opacity-0"
-                }`}
-              >
-                <div className="border-t">
-                  <div className="grid grid-cols-1 gap-4 sm:gap-6 p-4 sm:p-6">
-                    <div className="bg-muted/50 rounded-lg p-4 sm:p-6 hover:bg-muted transition-colors duration-200">
-                      <h4 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4 text-emerald-700">
-                        <Store className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-                        {t("forms.store_info")}
-                      </h4>
-                      <dl className="space-y-3 sm:space-y-4">
-                        <div className="flex items-start gap-3">
-                          <Store className="w-4 h-4 text-emerald-500 mt-1" />
-                          <div>
-                            <dt className="text-sm text-muted-foreground">
-                              {t("forms.store_name")}
-                            </dt>
-                            <dd className="font-medium text-foreground">
-                              {debt.sale_read?.store_read?.name}
-                            </dd>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="w-4 h-4 text-emerald-500 mt-1" />
-                          <div>
-                            <dt className="text-sm text-muted-foreground">
-                              {t("forms.phone")}
-                            </dt>
-                            <dd className="font-medium text-foreground">
-                              {debt.sale_read?.store_read?.phone_number}
-                            </dd>
-                          </div>
-                        </div>
-                      </dl>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border p-6 bg-card">
-                    <h4 className="text-lg font-semibold flex items-center gap-2 mb-6 text-emerald-700">
-                      <ShoppingCart className="w-5 h-5 text-emerald-500" />
-                      {t("forms.sale_items")}
-                    </h4>
-                    <div className="overflow-x-auto rounded-lg border">
-                      <table className="w-full bg-card">
-                        <thead className="bg-muted/50">
-                          <tr className="border-b">
-                            <th className="text-left py-3 px-4 font-semibold text-muted-foreground">
-                              {t("forms.product")}
-                            </th>
-                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
-                              {t("forms.quantity")}
-                            </th>
-                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
-                              {t("forms.price_per_unit")}
-                            </th>
-                            <th className="text-right py-3 px-4 font-semibold text-muted-foreground">
-                              {t("forms.subtotal")}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {debt.sale_read?.sale_items?.map((item) => (
-                            <tr
-                              key={item.id}
-                              className="border-b border-border hover:bg-muted/50 transition-colors duration-150"
-                            >
-                              <td className="py-3 px-4">
-                                <div className="flex items-start gap-3">
-                                  <Package className="w-4 h-4 text-emerald-500 mt-1" />
-                                  <div>
-                                    <div className="font-medium text-foreground">
-                                      {item.product_read.product_name}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {
-                                        item.product_read?.category_read?.category_name
-                                      }
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="text-right py-3 px-4 text-foreground">
-                                {item.quantity}
-                              </td>
-                              <td className="text-right py-3 px-4 text-foreground">
-                                {formatCurrency(item.price_per_unit)}
-                              </td>
-                              <td className="text-right py-3 px-4 font-medium text-foreground">
-                                {formatCurrency(item.subtotal)}
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold bg-muted/50">
-                            <td colSpan={3} className="text-right py-4 px-4">
-                              {t("forms.total_amount")}
-                            </td>
-                            <td className="text-right py-4 px-4 text-emerald-600">
-                              {formatCurrency(debt.total_amount)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border p-6 bg-muted/30">
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="text-lg font-semibold flex items-center gap-2 text-emerald-700">
-                        <DollarSign className="w-5 h-5 text-emerald-500" />
-                        {t("forms.payment_info")}
-                      </h4>
-                      {!debt.is_paid && (
-                        <Button
-                          onClick={() =>
-                            handlePaymentClick({
-                              id: debt.id!,
-                              remainder: Number(debt.remainder),
-                              remainder_usd: (debt as any).remainder_usd,
-                              total_amount_usd: (debt as any).total_amount_usd,
-                            })
-                          }
-                          className="bg-emerald-500 hover:bg-emerald-600"
-                        >
-                          {t("forms.add_payment")}
-                        </Button>
-                      )}
-                      <Button
-                        onClick={() => goToPaymentHistory(debt.id!)}
-                        className="bg-emerald-500 hover:bg-emerald-600"
-                      >
-                        {t("forms.payment_history")}
-                      </Button>
-                    </div>
-                    <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-start gap-3">
-                          <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
-                          <div>
-                            <dt className="text-sm text-muted-foreground">
-                              {t("forms.total_amount_uzs")}
-                            </dt>
-                            <dd className="text-2xl font-semibold text-foreground">
-                              {formatCurrency(debt.total_amount_uzs)}
-                            </dd>
-                          </div>
-                        </div>
-                      </div>
-                      {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
-                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start gap-3">
-                            <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
-                            <div>
-                              <dt className="text-sm text-muted-foreground">
-                                {t("forms.total_amount_usd") || "Сумма (USD)"}
-                              </dt>
-                              <dd className="text-2xl font-semibold text-foreground">
-                                {formatCurrency((debt as any).total_amount_usd)} $
-                              </dd>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-start gap-3">
-                          <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
-                          <div>
-                            <dt className="text-sm text-muted-foreground">
-                              {t("forms.deposit")}
-                            </dt>
-                            <dd className="text-2xl font-semibold text-foreground">
-                              {formatCurrency(debt.deposit)}
-                            </dd>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-start gap-3">
-                          <DollarSign className="w-5 h-5 text-emerald-500 mt-1" />
-                          <div>
-                            <dt className="text-sm text-muted-foreground">
-                              {t("forms.remainder_uzs")}
-                            </dt>
-                            <dd
-                              className={`text-2xl font-semibold ${debt.remainder_uzs < 0 ? "text-green-600" : "text-red-600"}`}
-                            >
-                              {formatCurrency(debt.remainder_uzs)}
-                            </dd>
-                          </div>
-                        </div>
-                      </div>
-                      {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0 && (
-                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start gap-3">
-                            <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
-                            <div>
-                              <dt className="text-sm text-muted-foreground">
-                                {t("forms.remainder_usd") || "Остаток (USD)"}
-                              </dt>
-                              <dd
-                                className={`text-2xl font-semibold ${Number((debt as any).remainder_usd) < 0 ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {formatCurrency((debt as any).remainder_usd)} $
-                              </dd>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {debt.usd_rate_at_creation && (
-                        <div className="bg-card rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start gap-3">
-                            <DollarSign className="w-5 h-5 text-blue-500 mt-1" />
-                            <div>
-                              <dt className="text-sm text-muted-foreground">
-                                {t("forms.usd_rate_at_creation")}
-                              </dt>
-                              <dd className="text-2xl font-semibold text-foreground">
-                                {formatCurrency(debt.usd_rate_at_creation)} UZS
-                              </dd>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                   
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("common.total_debt")} (UZS)
           </div>
-        ))}
-
-        {/* Pagination Controls */}
-        {totalPages && (
-          <div className="flex justify-center items-center gap-2 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-4 py-2"
-            >
-              {t("common.previous")}
-            </Button>
-            <div className="flex items-center gap-2">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <Button
-                    key={page}
-                    variant={currentPage === page ? "default" : "outline"}
-                    onClick={() => handlePageChange(page)}
-                    className="w-10 h-10 p-0"
-                  >
-                    {page}
-                  </Button>
-                ),
-              )}
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2"
-            >
-              {t("common.next")}
-            </Button>
+          <div className="text-xl font-bold text-emerald-600">
+            {formatCurrency(
+              debts.reduce((sum, d) => sum + Number(d.total_amount_uzs || 0), 0)
+            )}{" "}
+            UZS
           </div>
-        )}
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("common.total_deposit")} (UZS)
+          </div>
+          <div className="text-xl font-bold">
+            {formatCurrency(
+              debts.reduce((sum, d) => sum + Number(d.deposit || 0), 0)
+            )}{" "}
+            UZS
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("dashboard.remaining_debt")} (UZS)
+          </div>
+          <div className="text-xl font-bold text-red-600">
+            {formatCurrency(
+              debts.reduce((sum, d) => sum + Number(d.remainder_uzs || 0), 0)
+            )}{" "}
+            UZS
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("common.paid_debts")}
+          </div>
+          <div className="text-xl font-bold text-emerald-600">
+            {debts.filter((d) => d.is_paid).length} / {debts.length}
+          </div>
+        </Card>
+      </div>
 
-        {/* Payment Dialog */}
-        <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("forms.add_payment")}</DialogTitle>
-            </DialogHeader>
-            <ResourceForm
-              fields={paymentFields}
-              onSubmit={handlePaymentSubmit}
-              isSubmitting={createPayment.isPending}
-              title=""
+      {/* Main Table */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[800px]">
+            <ResourceTable
+              data={debts}
+              columns={columns}
+              isLoading={isLoading}
+              totalCount={totalCount}
+              pageSize={20}
+              currentPage={currentPage}
+              onPageChange={(newPage) => {
+                setCurrentPage(newPage);
+                setExpandedRowId(null);
+              }}
+              expandedRowRenderer={(row: any) => renderExpandedRow(row)}
+              onRowClick={(row: any) => handleRowClick(row)}
             />
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Payment Dialog */}
+      <Dialog
+        open={isPaymentModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            window.location.reload();
+          }
+          setIsPaymentModalOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("forms.add_payment")}</DialogTitle>
+          </DialogHeader>
+          {clientInfo?.type === "Магазин" && selectedPaymentMethod && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="text-sm text-blue-700">
+                <div className="font-semibold mb-2">{t("forms.available_balance") || "Available Balance"}</div>
+                <div className="text-lg font-bold text-blue-900">
+                  {formatCurrency(getAvailableBalance())}
+                  {selectedPaymentMethod === "Валюта" ? " $" : ""}
+                </div>
+              </div>
+            </div>
+          )}
+          <ResourceForm
+            fields={paymentFields}
+            onSubmit={handlePaymentSubmit}
+            isSubmitting={createPayment.isPending}
+            title=""
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

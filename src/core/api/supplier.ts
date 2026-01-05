@@ -22,6 +22,15 @@ export interface AddSupplierBalanceRequest {
   payment_method: string;
 }
 
+export interface CreateDebtRequest {
+  supplier: number;
+  store: number;
+  is_debt: boolean;
+  total_amount_uzs?: number;
+  total_amount_usd?: number;
+  note?: string;
+}
+
 // API endpoints
 const SUPPLIER_URL = "suppliers/";
 const SUPPLIER_BALANCE_URL = "suppliers/balance/";
@@ -75,6 +84,21 @@ export const useAddSupplierBalance = () => {
   return useMutation({
     mutationFn: async (data: AddSupplierBalanceRequest) => {
       const response = await api.post(SUPPLIER_BALANCE_URL, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+};
+
+// Create debt mutation
+export const useCreateDebt = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateDebtRequest) => {
+      const response = await api.post("items/stock-entries/debt/", data);
       return response.data;
     },
     onSuccess: () => {

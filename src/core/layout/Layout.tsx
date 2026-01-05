@@ -277,6 +277,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         label: t("navigation.exchange_loans"),
         href: "/exchange-loans",
       },
+      {
+        icon: BanknoteIcon,
+        label: t("navigation.vehicle_incomes"),
+        href: "/vehicle-incomes",
+      },
     ];
 
     // Add money to budget - only for superuser

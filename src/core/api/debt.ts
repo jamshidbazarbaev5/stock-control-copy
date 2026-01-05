@@ -159,6 +159,8 @@ export interface Debt {
     address: string;
     ceo_name?: string;
     balance?: string;
+    linked_store?: number;
+    stores?: number[];
   };
   due_date: string;
   total_amount: string;

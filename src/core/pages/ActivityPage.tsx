@@ -898,12 +898,6 @@ export default function ActivityPage() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <SummaryCard
-              title="На странице"
-              totals={activityData?.page_totals}
-              debtTotal={activityData?.page_totals?.debt_total}
-              variant="sales"
-            />
-            <SummaryCard
               title="Продажи (Общее)"
               totals={activityData?.overall_totals?.sales_total}
               debtTotal={activityData?.overall_totals?.debt_total}
@@ -918,7 +912,12 @@ export default function ActivityPage() {
               title="Оплаты долгов (Общее)"
               totals={activityData?.overall_totals?.debt_payments_total}
               variant="debt"
-            />  
+            />
+            <SummaryCard
+              title="Остаток"
+              totals={activityData?.overall_totals?.remaining}
+              variant="default"
+            />
           </div>
         </TabsContent>
 
@@ -1029,44 +1028,6 @@ export default function ActivityPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Remaining Totals Block */}
-      {activityData?.overall_totals?.remaining && (
-        <Card className="mt-6 p-4 border-2 border-blue-300 bg-white dark:bg-gray-900 dark:border-blue-700">
-          <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-4">
-            Остаток
-          </h3>
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="text-left">
-              <div className="text-sm text-gray-500 dark:text-gray-400">Общий остаток</div>
-              <div className={`text-2xl font-bold ${activityData.overall_totals.remaining.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {formatCurrency(activityData.overall_totals.remaining.total)}
-              </div>
-              {activityData.overall_totals.remaining.total_in_currency !== 0 && (
-                <div className={`text-sm font-semibold ${activityData.overall_totals.remaining.total_in_currency >= 0 ? 'text-yellow-600' : 'text-red-500'}`}>
-                  $ {activityData.overall_totals.remaining.total_in_currency.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                </div>
-              )}
-            </div>
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {Object.entries(activityData.overall_totals.remaining.by_payment_type).map(([method, amount]) => (
-                <div
-                  key={method}
-                  className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
-                    <PaymentIcon method={method} />
-                    {method}
-                  </div>
-                  <span className={`font-semibold text-sm ${amount >= 0 ? 'text-gray-900 dark:text-gray-100' : 'text-red-600'}`}>
-                    {formatCurrency(amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

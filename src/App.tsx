@@ -96,6 +96,15 @@ import SupplierBalanceHistoryPage from "./core/pages/SupplierBalanceHistoryPage"
 import ActivityPage from "./core/pages/ActivityPage";
 import ProductMovementsPage from "./core/pages/ProductMovementsPage";
 import StockReturnsHistoryPage from "./core/pages/StockReturnsHistoryPage";
+import VehiclesPage from "./core/pages/VehiclesPage";
+import CreateVehicle from "./core/pages/create-vehicle";
+import EditVehicle from "./core/pages/edit-vehicle";
+import DriversPage from "./core/pages/DriversPage";
+import CreateDriver from "./core/pages/create-driver";
+import EditDriver from "./core/pages/edit-driver";
+import VehicleIncomesPage from "./core/pages/VehicleIncomesPage";
+import CreateVehicleIncome from "./core/pages/create-vehicle-income";
+import EditVehicleIncome from "./core/pages/edit-vehicle-income";
 // import W9FormDemo from "./core/pages/W9FormDemo";
 // import CreateSalePos from "./core/pages/create-sale-2";
 
@@ -579,6 +588,79 @@ function App() {
                     }
                 />
 
+              {/* Vehicle, Driver, and Vehicle Income Management Routes */}
+              <Route
+                path="/vehicles"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <VehiclesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/create-vehicle"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <CreateVehicle />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/edit-vehicle/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <EditVehicle />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/drivers"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <DriversPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/create-driver"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <CreateDriver />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/edit-driver/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <EditDriver />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/vehicle-incomes"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <VehicleIncomesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/create-vehicle-income"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <CreateVehicleIncome />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/edit-vehicle-income/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <EditVehicleIncome />
+                  </PrivateRoute>
+                }
+              />
 
               {/* Routes accessible by both Администратор and Продавец */}
               <Route

@@ -4,7 +4,7 @@ import { ResourceTable } from "../helpers/ResourseTable";
 import {
   type Client,
   useGetClients,
-    useDeleteClientCustom,
+  useDeleteClientCustom,
   useIncrementBalance,
   useClientCashOut,
   useMassPayment,
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-  import { MoreHorizontal, Wallet, History, DollarSign, Plus, CreditCard } from "lucide-react";
+import { MoreHorizontal, Wallet, History, DollarSign, Plus, CreditCard } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -77,8 +77,8 @@ function BalanceIncrementDialog({
 
   const onSubmit = async (data: FormData) => {
     try {
-      await incrementBalance.mutateAsync({ 
-        id: clientId, 
+      await incrementBalance.mutateAsync({
+        id: clientId,
         amount: data.amount,
         store: data.store,
         payment_method: data.payment_method,
@@ -86,6 +86,8 @@ function BalanceIncrementDialog({
       toast.success(t("messages.success.balance_incremented"));
       form.reset();
       onClose();
+      // Refresh the page to get fresh data
+      window.location.reload();
     } catch (error) {
       toast.error(t("messages.error.balance_increment"));
       console.error("Failed to increment balance:", error);
@@ -101,32 +103,32 @@ function BalanceIncrementDialog({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {currentUser?.is_superuser && (
-                <FormField
-                  control={form.control}
-                  name="store"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("forms.store")}</FormLabel>
-                      <FormControl>
-                        <Select 
-                          value={field.value?.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("placeholders.select_store")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stores.map((store) => (
-                              <SelectItem key={store.id} value={store.id!.toString()}>
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                      control={form.control}
+                      name="store"
+                      render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("forms.store")}</FormLabel>
+                            <FormControl>
+                              <Select
+                                  value={field.value?.toString()}
+                                  onValueChange={(val) => field.onChange(parseInt(val))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t("placeholders.select_store")} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {stores.map((store) => (
+                                      <SelectItem key={store.id} value={store.id!.toString()}>
+                                        {store.name}
+                                      </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                          </FormItem>
+                      )}
+                  />
               )}
               <FormField
                   control={form.control}
@@ -230,7 +232,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
   const { data: currentUser } = useCurrentUser();
   const { data: storesData } = useGetStores({});
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
-  
+
   const createDebt = useMutation({
     mutationFn: async (data: { client_write: number; store_write: number; total_amount: number; due_date: string; debt_type: string }) => {
       const response = await api.post('/debts/create/', data);
@@ -268,102 +270,102 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("common.create_debt", "Create Debt")}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {currentUser?.is_superuser && (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("common.create_debt", "Create Debt")}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {currentUser?.is_superuser && (
+                  <FormField
+                      control={form.control}
+                      name="store"
+                      render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("forms.store")}</FormLabel>
+                            <FormControl>
+                              <Select
+                                  value={field.value?.toString()}
+                                  onValueChange={(val) => field.onChange(parseInt(val))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t("placeholders.select_store")} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {stores.map((store) => (
+                                      <SelectItem key={store.id} value={store.id!.toString()}>
+                                        {store.name}
+                                      </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                          </FormItem>
+                      )}
+                  />
+              )}
               <FormField
-                control={form.control}
-                name="store"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("forms.store")}</FormLabel>
-                    <FormControl>
-                      <Select 
-                        value={field.value?.toString()} 
-                        onValueChange={(val) => field.onChange(parseInt(val))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("placeholders.select_store")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stores.map((store) => (
-                            <SelectItem key={store.id} value={store.id!.toString()}>
-                              {store.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                  </FormItem>
-                )}
+                  control={form.control}
+                  name="total_amount"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.amount")}</FormLabel>
+                        <FormControl>
+                          <Input
+                              type="number"
+                              step="0.01"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                      </FormItem>
+                  )}
               />
-            )}
-            <FormField
-              control={form.control}
-              name="total_amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("common.amount")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="due_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("common.due_date", "Due Date")}</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="debt_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("common.debt_type", "Тип долга")}</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("placeholders.select_debt_type", "Выберите тип")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="UZS">UZS</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                {t("common.cancel")}
-              </Button>
-              <Button type="submit" disabled={createDebt.isPending}>
-                {t("common.save")}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              <FormField
+                  control={form.control}
+                  name="due_date"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.due_date", "Due Date")}</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="debt_type"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.debt_type", "Тип долга")}</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t("placeholders.select_debt_type", "Выберите тип")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="UZS">UZS</SelectItem>
+                              <SelectItem value="USD">USD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                      </FormItem>
+                  )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" disabled={createDebt.isPending}>
+                  {t("common.save")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
   );
 }
 
@@ -389,6 +391,8 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
       toast.success(t("common.payment_successful", "Успешно"));
       form.reset();
       onClose();
+      // Refresh the page to get fresh data
+      window.location.reload();
     } catch (error) {
       toast.error(t("common.payment_failed", "Ошибка"));
       console.error("Failed to cash out:", error);
@@ -404,32 +408,32 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {currentUser?.is_superuser && (
-                <FormField
-                  control={form.control}
-                  name="store"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("forms.store")}</FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value?.toString()}
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("placeholders.select_store")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stores.map((store) => (
-                              <SelectItem key={store.id} value={store.id!.toString()}>
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                      control={form.control}
+                      name="store"
+                      render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("forms.store")}</FormLabel>
+                            <FormControl>
+                              <Select
+                                  value={field.value?.toString()}
+                                  onValueChange={(val) => field.onChange(parseInt(val))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t("placeholders.select_store")} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {stores.map((store) => (
+                                      <SelectItem key={store.id} value={store.id!.toString()}>
+                                        {store.name}
+                                      </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                          </FormItem>
+                      )}
+                  />
               )}
               <FormField
                   control={form.control}
@@ -665,8 +669,12 @@ export default function ClientsPage() {
       accessorKey: "address",
     },
     {
-      header: t("forms.balance"),
-      accessorKey: (row: Client) => ("balance" in row ? row.balance : "-"),
+      header: t("forms.balance_uzs"),
+      accessorKey: (row: Client) => ((row as any).balance_uzs ? `${Number((row as any).balance_uzs).toLocaleString()} UZS` : "-"),
+    },
+    {
+      header: t("forms.balance_usd"),
+      accessorKey: (row: Client) => ((row as any).balance_usd ? `${Number((row as any).balance_usd).toLocaleString()} USD` : "-"),
     },
 
   ];
@@ -708,122 +716,122 @@ export default function ClientsPage() {
             onDelete={handleDelete}
             totalCount={totalCount}
             actions={(client: Client) => (
-              <div className="relative" style={{ position: 'static' }}>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const dropdownHeight = 280; // Approximate dropdown height
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    const spaceAbove = rect.top;
+                <div className="relative" style={{ position: 'static' }}>
+                  <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const dropdownHeight = 280; // Approximate dropdown height
+                        const spaceBelow = window.innerHeight - rect.bottom;
+                        const spaceAbove = rect.top;
 
-                    // Check if there's not enough space below but enough above
-                    const flip = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
+                        // Check if there's not enough space below but enough above
+                        const flip = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
 
-                    if (flip) {
-                      setDropdownPosition({ top: rect.top, right: window.innerWidth - rect.right, flip: true });
-                    } else {
-                      setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right, flip: false });
-                    }
-                    if (client.id !== undefined) {
-                      setOpenDropdown(openDropdown === client.id ? null : client.id);
-                    }
-                  }}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-                {openDropdown === client.id && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setOpenDropdown(null)}
-                    />
-                    <div
-                      className="fixed w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700"
-                      style={{
-                        top: dropdownPosition?.flip ? undefined : dropdownPosition?.top,
-                        bottom: dropdownPosition?.flip ? window.innerHeight - dropdownPosition!.top : undefined,
-                        right: dropdownPosition?.right,
+                        if (flip) {
+                          setDropdownPosition({ top: rect.top, right: window.innerWidth - rect.right, flip: true });
+                        } else {
+                          setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right, flip: false });
+                        }
+                        if (client.id !== undefined) {
+                          setOpenDropdown(openDropdown === client.id ? null : client.id);
+                        }
                       }}
-                    >
-                      {client.type === "Юр.лицо" && (
-                        <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenDropdown(null);
-                            navigate(`/clients/${client.id}/history`);
-                          }}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                  {openDropdown === client.id && (
+                      <>
+                        <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setOpenDropdown(null)}
+                        />
+                        <div
+                            className="fixed w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700"
+                            style={{
+                              top: dropdownPosition?.flip ? undefined : dropdownPosition?.top,
+                              bottom: dropdownPosition?.flip ? window.innerHeight - dropdownPosition!.top : undefined,
+                              right: dropdownPosition?.right,
+                            }}
                         >
-                          <History className="h-4 w-4 mr-2" />
-                          {t("common.history")}
-                        </button>
-                      )}
-                      <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdown(null);
-                          navigate(`/debts/${client.id}`);
-                        }}
-                      >
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Долги
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdown(null);
-                          if (client.id) setCreateDebtClientId(client.id);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        {t("common.create_debt", "Create Debt")}
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdown(null);
-                          if (client.id) setMassPaymentClientId(client.id);
-                        }}
-                      >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        {t("common.mass_payment", "Массовая оплата")}
-                      </button>
-                      {currentUser?.is_superuser && client.type === "Юр.лицо" && (
-                        <>
+                          {client.type === "Юр.лицо" && (
+                              <button
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenDropdown(null);
+                                    navigate(`/clients/${client.id}/history`);
+                                  }}
+                              >
+                                <History className="h-4 w-4 mr-2" />
+                                {t("common.history")}
+                              </button>
+                          )}
                           <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdown(null);
-                              if (client.id) setSelectedClientId(client.id);
-                            }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdown(null);
+                                navigate(`/debts/${client.id}`);
+                              }}
                           >
-                            <Wallet className="h-4 w-4 mr-2" />
-                            {t("common.increment_balance")}
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Долги
                           </button>
                           <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdown(null);
-                              if (client.id) setCashOutClientId(client.id);
-                            }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdown(null);
+                                if (client.id) setCreateDebtClientId(client.id);
+                              }}
                           >
-                            <Wallet className="h-4 w-4 mr-2" />
-                            Обналичичка
+                            <Plus className="h-4 w-4 mr-2" />
+                            {t("common.create_debt", "Create Debt")}
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+                          <button
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdown(null);
+                                if (client.id) setMassPaymentClientId(client.id);
+                              }}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            {t("common.mass_payment", "Массовая оплата")}
+                          </button>
+                          {currentUser?.is_superuser && (
+                              <>
+                                <button
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenDropdown(null);
+                                      if (client.id) setSelectedClientId(client.id);
+                                    }}
+                                >
+                                  <Wallet className="h-4 w-4 mr-2" />
+                                  {t("common.increment_balance")}
+                                </button>
+                                <button
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenDropdown(null);
+                                      if (client.id) setCashOutClientId(client.id);
+                                    }}
+                                >
+                                  <Wallet className="h-4 w-4 mr-2" />
+                                  Обналичичка
+                                </button>
+                              </>
+                          )}
+                        </div>
+                      </>
+                  )}
+                </div>
             )}
         />
         {selectedClientId && (

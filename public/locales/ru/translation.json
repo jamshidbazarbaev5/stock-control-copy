@@ -3,7 +3,8 @@
     "amount_must_be_positive": "Сумма должна быть положительной",
     "amount_exceeds_total": "Сумма не может превышать общую сумму долга",
     "selling_price_greater_than_min_price": "Цена продажи не может быть ниже минимальной цены",
-    "fill_all_required_fields": "Заполните все обязательные поля"
+    "fill_all_required_fields": "Заполните все обязательные поля",
+    "required_field": "{{field}} - обязательное поле"
   },
   "errors": {
     "no_sale_selected": "Продажа не выбрана",
@@ -188,6 +189,11 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "sale_id":"Продажа ID",
+    "inventory_adjustment":"Простой приход",
+    "total_debt":"Общий долг",
+    "total_deposit": "Всего аванс",
+    "paid_debts": "Оплаченные долги",
     "mass_payment":"Массовая оплата",
     "mass_payment_successful":"Массовая оплата успешна",
     "mass_payment_failed":"Ошибка массовой оплаты",
@@ -218,6 +224,8 @@
     "average_payment": "Средная оплата",
     "reason": "Причина",
     "clear_filters": "Очистить фильтры",
+    "from": "От",
+    "to": "До",
     "create_payment": "Оплатить",
     "stock_name": "Партия",
     "enter_stock_name": "Партия",
@@ -520,7 +528,10 @@
     "sale": "Продажи",
     "clients": "Клиенты",
     "stock_balance": "Остаток товаров",
-    "attributes": "Атрибуты"
+    "attributes": "Атрибуты",
+    "vehicles": "Автомобили",
+    "drivers": "Водители",
+    "vehicle_incomes": "Доходы от транспорта"
   },
  
   "shifts": {
@@ -787,7 +798,13 @@
       "boolean": "Логический",
       "choice": "Выбор",
       "many_to_many": "Многие ко многим"
-    }
+    },
+    "vehicle": "Автомобиль",
+    "driver": "Водитель",
+    "worker": "Работник",
+    "full_name": "Полное имя",
+    "payment_methods": "Способ оплаты",
+    "payments": "Платежи"
   },
   "roles": {
     "owner": "Владелец",
@@ -808,9 +825,11 @@
       "money_updated": "Депозит успешно обновлен",
       "updated": " успешно обновлен",
       "deleted": " успешно удален",
-      "payment_created": "Платеж успешно создан"
+      "payment_created": "Платеж успешно создан",
+      "debt_created": "Долг успешно создан"
     },
     "error": {
+      "payment_failed": "Ошибка при создании платежа",
       "payment_exceeds_budget": "Вы не можете оплатить этот долг бюджет магазина не хватет",
       "add_money": "Пополните все поля",
       "negative": "Невозможно создать: прибыль не может быть отрицательной.",
@@ -826,7 +845,9 @@
       "same_store_transfer": "Невозможно перевести между складами в одном магазине",
       "payment_create": "Ошибка при создании платежа",
       "balance_add_failed": "Не удалось добавить баланс",
-      "fill_required_fields": "Пожалуйста, заполните все обязательные поля"
+      "fill_required_fields": "Пожалуйста, заполните все обязательные поля",
+      "debt_creation_failed": "Не удалось создать долг",
+      "not_found": "{{item}} не найден"
     },
     "confirmation": {
       "delete": "Вы уверены, что хотите удалить это?"
@@ -926,7 +947,16 @@
     "selected": "Выбрано",
     "search": "Поиск...",
     "no_results": "Ничего не найдено",
-    "clear_all": "Очистить все"
+    "clear_all": "Очистить все",
+    "enter_vehicle_name": "Введите название автомобиля",
+    "enter_full_name": "Введите полное имя",
+    "select_vehicle": "Выберите автомобиль",
+    "select_driver": "Выберите водителя",
+    "select_store": "Выберите магазин",
+    "select_worker": "Выберите работника",
+    "select_payment_method": "Выберите способ оплаты",
+    "enter_amount": "Введите сумму",
+    "search": "Поиск..."
   },
   "payment_methods": {
     "cash": "Наличные",
@@ -1064,6 +1094,7 @@
     },
 
     "error": {
+      "payment_failed": "Ошибка при создании платежа",
       "payment_exceeds_budget": "Вы не можете оплатить этот долг бюджет магазина не хватет",
       "add_money": "Пополните все поля",
       "negative": "Невозможно создать: прибыль не может быть отрицательной.",
