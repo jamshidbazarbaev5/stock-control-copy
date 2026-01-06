@@ -116,29 +116,6 @@ export default function DebtDetailsPage() {
     navigation(`/debts/${debtId}/payments`);
   };
 
-  // Payment handling
-  const getMaxRemainder = () => {
-    if (!selectedDebt) return 0;
-    
-    let remainder = Number(selectedDebt.remainder);
-    if (selectedPaymentMethod === "Валюта" && selectedDebt.remainder_usd) {
-      remainder = Number(selectedDebt.remainder_usd);
-    }
-
-    // If client type is Магазин, check store budget
-    if (clientInfo?.type === "Магазин" && storeData?.budgets) {
-      const budget = storeData.budgets.find(
-        (b: any) => b.budget_type === selectedPaymentMethod
-      );
-      const budgetAmount = budget ? Number(budget.amount) : 0;
-      
-      // Return the minimum of remainder and available budget
-      return Math.min(remainder, budgetAmount);
-    }
-
-    return remainder;
-  };
-
   const getAvailableBalance = () => {
     if (clientInfo?.type !== "Магазин" || !storeData?.budgets || !selectedPaymentMethod) {
       return 0;
@@ -169,39 +146,6 @@ export default function DebtDetailsPage() {
 
   const handlePaymentSubmit = async (data: PaymentFormData) => {
     if (!selectedDebt) return;
-
-    const maxRemainder = getMaxRemainder();
-    const availableBalance = getAvailableBalance();
-    
-    // For Магазин clients, check store budget first
-    if (clientInfo?.type === "Магазин" && selectedPaymentMethod) {
-      // If no balance available at all
-      if (availableBalance === 0) {
-        toast.error(
-         
-          `Недостаточно средств`
-        );
-        return;
-      }
-      
-      // If balance is less than requested amount
-      if (data.amount > availableBalance) {
-        toast.error(
-         
-          `Недостаточно средств. Доступно: ${formatCurrency(availableBalance)}`
-        );
-        return;
-      }
-    }
-    
-    // Check against remainder for non-store clients or when balance check passed
-    if (data.amount > maxRemainder) {
-      toast.error(
-        t("validation.amount_exceeds_remainder") ||
-        `Сумма не может превышать остаток: ${formatCurrency(maxRemainder)}`
-      );
-      return;
-    }
 
     try {
       await createPayment.mutateAsync({
@@ -235,19 +179,6 @@ export default function DebtDetailsPage() {
       type: "number",
       placeholder: t("placeholders.enter_amount"),
       required: true,
-      validation: {
-        min: {
-          value: 0.01,
-          message: t("validation.amount_must_be_positive") || "Сумма должна быть больше 0",
-        },
-        max: {
-          value: getMaxRemainder(),
-          message: 
-            clientInfo?.type === "Магазин" && selectedPaymentMethod && getAvailableBalance() > 0
-              ? `Недостаточно средств. Доступно: ${formatCurrency(getAvailableBalance())}`
-              : `Сумма не может превышать остаток: ${formatCurrency(getMaxRemainder())}`,
-        },
-      },
     },
     {
       name: "payment_method",
@@ -270,13 +201,6 @@ export default function DebtDetailsPage() {
       type: "number",
       placeholder: t("placeholders.enter_usd_rate") || "Введите курс USD",
       required: true,
-      validation: {
-        min: {
-          value: 0.01,
-          message:
-            t("validation.rate_must_be_positive") || "Курс должен быть положительным",
-        },
-      },
     },
   ];
 

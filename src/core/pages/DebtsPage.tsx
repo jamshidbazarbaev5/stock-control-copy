@@ -7,11 +7,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateDebtPayment } from "../api/debt";
+import {
+  useCreateDebtPayment,
+} from "../api/debt";
+import {
+  useMassPayment,
+} from "../api/client";
 import {
   useGetDebtsByClients,
   type DebtByClient,
@@ -19,10 +25,13 @@ import {
 import { ResourceTable } from "../helpers/ResourseTable";
 import { useNavigate } from "react-router-dom";
 import { ResourceForm } from "../helpers/ResourceForm";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
 
 interface PaymentFormData {
   amount: number;
-  payment_method: string;
+  payment_method: "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта";
+  usd_rate_at_payment?: number;
 }
 
 export default function DebtsPage() {
@@ -33,6 +42,11 @@ export default function DebtsPage() {
   const [selectedDebtClient, setSelectedDebtClient] =
     useState<DebtByClient | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isMassPaymentOpen, setIsMassPaymentOpen] = useState(false);
+  const [selectedMassPaymentClient, setSelectedMassPaymentClient] =
+    useState<DebtByClient | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [storeData, setStoreData] = useState<any>(null);
   const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин">(
     "Физ.лицо",
   );
@@ -57,14 +71,57 @@ export default function DebtsPage() {
   const totalCount = debtsByClientsData?.count || 0;
 
   const createPayment = useCreateDebtPayment();
+  const massPayment = useMassPayment();
+
+  // Get the latest USD rate from currency rates
+  const { data: currencyRates } = useQuery<Array<{ id: number; rate: string; currency_detail: any }>>({
+    queryKey: ["currency-rates"],
+    queryFn: async () => {
+      const response = await api.get("/currency/rates/");
+      return response.data;
+    },
+  });
+
+  const usdRate = currencyRates?.[0] ? parseFloat(currencyRates[0].rate) : 0;
+
+  // Fetch store data when mass payment is opened for a store client
+  useEffect(() => {
+    if (selectedMassPaymentClient && selectedMassPaymentClient.type === "Магазин") {
+      const fetchStoreData = async () => {
+        try {
+          const response = await api.get(`/store/${selectedMassPaymentClient.linked_store}/`);
+          const storeInfo = response?.data || response;
+          setStoreData(storeInfo);
+        } catch (error) {
+          console.error("Failed to fetch store data:", error);
+        }
+      };
+      fetchStoreData();
+    } else {
+      setStoreData(null);
+    }
+  }, [selectedMassPaymentClient]);
+
+  const getAvailableBalance = () => {
+    if (selectedMassPaymentClient?.type !== "Магазин" || !storeData?.budgets || !selectedPaymentMethod) {
+      return 0;
+    }
+
+    const budget = storeData.budgets.find(
+      (b: any) => b.budget_type === selectedPaymentMethod
+    );
+    return budget ? Number(budget.amount) : 0;
+  };
+
+  const handleMassPaymentClick = (client: DebtByClient) => {
+    setSelectedMassPaymentClient(client);
+    setSelectedPaymentMethod("");
+    setStoreData(null);
+    setIsMassPaymentOpen(true);
+  };
 
   const handlePaymentSubmit = async (data: PaymentFormData) => {
     if (!selectedDebtClient) return;
-
-    if (data.amount > Number(selectedDebtClient.total_amount)) {
-      toast.error(t("validation.amount_exceeds_remainder"));
-      return;
-    }
 
     try {
       await createPayment.mutateAsync({
@@ -79,6 +136,25 @@ export default function DebtsPage() {
       setSelectedDebtClient(null);
       window.location.reload();
     } catch (error) {
+    }
+  };
+
+  const handleMassPaymentSubmit = async (data: PaymentFormData) => {
+    if (!selectedMassPaymentClient) return;
+
+    try {
+      await massPayment.mutateAsync({
+        id: selectedMassPaymentClient.id,
+        amount: data.amount,
+        payment_method: data.payment_method as "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта",
+        usd_rate_at_payment: data.usd_rate_at_payment || usdRate,
+      });
+      toast.success(t("common.mass_payment_successful", "Mass payment successful"));
+      setIsMassPaymentOpen(false);
+      setSelectedMassPaymentClient(null);
+      window.location.reload();
+    } catch (error) {
+      toast.error(t("messages.error.payment_failed"));
     }
   };
 
@@ -111,6 +187,38 @@ export default function DebtsPage() {
         { value: "Карта", label: t("forms.card") },
         { value: "Click", label: t("forms.click") },
       ],
+    },
+  ];
+
+  const massPaymentFields = [
+    {
+      name: "amount",
+      label: t("forms.amount"),
+      type: "number",
+      placeholder: t("placeholders.enter_amount"),
+      required: true,
+    },
+    {
+      name: "payment_method",
+      label: t("forms.payment_method"),
+      type: "select",
+      placeholder: t("placeholders.select_payment_method"),
+      required: true,
+      options: [
+        { value: "Наличные", label: t("forms.cash") },
+        { value: "Карта", label: t("forms.card") },
+        { value: "Click", label: t("forms.click") },
+        { value: "Перечисление", label: t("forms.per") || "Перечисление" },
+        { value: "Валюта", label: t("forms.currency") || "Валюта" },
+      ],
+      onChange: (value: string) => setSelectedPaymentMethod(value),
+    },
+    {
+      name: "usd_rate_at_payment",
+      label: t("forms.usd_rate_at_payment") || "Курс USD при оплате",
+      type: "number",
+      placeholder: t("placeholders.enter_usd_rate") || "Введите курс USD",
+      required: true,
     },
   ];
 
@@ -210,6 +318,12 @@ export default function DebtsPage() {
               {t("forms.history")}
             </button>
           )}
+          <button
+            onClick={() => handleMassPaymentClick(client)}
+            className="px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            Массовая оплата
+          </button>
         </div>
       ),
     });
@@ -271,6 +385,42 @@ export default function DebtsPage() {
             onSubmit={handlePaymentSubmit}
             isSubmitting={createPayment.isPending}
             title={t("forms.payment_method")}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isMassPaymentOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsMassPaymentOpen(false);
+            setSelectedMassPaymentClient(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("common.mass_payment", "Mass Payment")}</DialogTitle>
+            <DialogDescription>
+              {selectedMassPaymentClient?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMassPaymentClient?.type === "Магазин" && selectedPaymentMethod && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="text-sm text-blue-700">
+                <div className="font-semibold mb-2">{t("forms.available_balance") || "Available Balance"}</div>
+                <div className="text-lg font-bold text-blue-900">
+                  {getAvailableBalance().toLocaleString()}
+                  {selectedPaymentMethod === "Валюта" ? " $" : ""}
+                </div>
+              </div>
+            </div>
+          )}
+          <ResourceForm
+            fields={massPaymentFields}
+            onSubmit={handleMassPaymentSubmit}
+            isSubmitting={massPayment.isPending}
+            title={t("common.mass_payment", "Mass Payment")}
           />
         </DialogContent>
       </Dialog>

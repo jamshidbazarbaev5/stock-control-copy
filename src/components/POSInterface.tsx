@@ -42,6 +42,7 @@ import {
 } from "@/services/saleReceiptService";
 import { toast } from "sonner";
 import type { Stock } from "@/core/api/stock";
+import { fetchStockByProduct } from "@/core/api/stock";
 import { StockSelectionModal } from "./StockSelectionModal";
 import { useGetStores } from "@/core/api/store";
 import api from "@/core/api/api";
@@ -254,6 +255,12 @@ const POSInterfaceCore = () => {
       useState<number | null>(null);
   const [isManualQuantityMode, setIsManualQuantityMode] = useState(true);
   const [manualQuantityInput, setManualQuantityInput] = useState("");
+
+  // Loading all products state
+  const [isLoadingAllProducts, setIsLoadingAllProducts] = useState(false);
+  const [loadingAllProductsProgress, setLoadingAllProductsProgress] = useState(0);
+  const [loadingAllProductsCount, setLoadingAllProductsCount] = useState(0);
+  const [loadingAllProductsAdded, setLoadingAllProductsAdded] = useState(0);
 
   // Payment modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -471,9 +478,168 @@ const POSInterfaceCore = () => {
   // Calculate totals
   const total = cartProducts.reduce((sum, product) => sum + product.total, 0);
 
+  // Function to load all products and add them to cart with max quantity
+  const handleLoadAllProducts = async () => {
+    // Close modal immediately and show loading overlay
+    setIsSearchModalOpen(false);
+    setIsLoadingAllProducts(true);
+    setLoadingAllProductsProgress(0);
+    setLoadingAllProductsCount(0);
+    setLoadingAllProductsAdded(0);
+
+    try {
+      const response = await api.get("/items/product/?non_zero=1&no_pagination=true");
+      console.log("API Response structure:", {
+        data: response.data,
+        isArray: Array.isArray(response.data),
+        dataType: typeof response.data,
+        hasResults: response.data?.results !== undefined,
+        resultsLength: response.data?.results?.length,
+      });
+
+      // Handle different response structures
+      let allProducts = [];
+      if (Array.isArray(response.data)) {
+        allProducts = response.data;
+      } else if (response.data?.results) {
+        allProducts = response.data.results;
+      }
+
+      console.log(`Processing ${allProducts.length} products`);
+
+      // Debug: Log first few products to check quantity field
+      if (allProducts.length > 0) {
+        console.log("First 3 products sample:", allProducts.slice(0, 3).map((p:any) => ({
+          id: p.id,
+          name: p.product_name,
+          quantity: p.quantity,
+          quantityType: typeof p.quantity,
+        })));
+      }
+
+      setLoadingAllProductsCount(allProducts.length);
+
+      // Clear cart first before adding new products
+      setCartProducts([]);
+
+      // Local counter for toast message (state updates are async, so we need local var)
+      let actualAddedCount = 0;
+      let zeroQuantityCount = 0;
+
+      // Add delay between products to show progress
+      for (let i = 0; i < allProducts.length; i++) {
+        const product = allProducts[i];
+
+        // Small delay to show loading animation
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Calculate max quantity (available quantity)
+        const availableQuantity = product.quantity
+          ? parseFloat(String(product.quantity))
+          : 0;
+
+        if (availableQuantity > 0) {
+          // Check if product requires stock selection
+          if (product.category_read?.sell_from_stock) {
+            // Fetch stocks for this product
+            const stocks = await fetchStockByProduct(product.id!);
+            if (stocks.length > 0) {
+              // Get default unit (base unit or first available)
+              const defaultUnit = product.available_units?.find(
+                (unit: any) => unit.is_base,
+              ) || product.available_units?.[0] || {
+                id: product.base_unit || 1,
+                short_name: "шт",
+                factor: 1,
+                is_base: true,
+              };
+
+              // Use selling_price from product data, fallback to min_price
+              const price = product.selling_price
+                ? parseFloat(String(product.selling_price))
+                : product.min_price
+                    ? parseFloat(String(product.min_price))
+                    : 10000;
+
+              // Add product with each available stock
+              for (const stock of stocks) {
+                const stockQuantity = stock.quantity
+                  ? parseFloat(String(stock.quantity))
+                  : 0;
+                if (stockQuantity > 0) {
+                  const newProduct: ProductInCart = {
+                    id: generateCartItemId(),
+                    productId: product.id!,
+                    name: product.product_name,
+                    price: price,
+                    quantity: stockQuantity,
+                    total: price * stockQuantity,
+                    product: product,
+                    barcode: product.barcode,
+                    selectedUnit: defaultUnit || null,
+                    stock: stock,
+                    stockId: stock.id,
+                  };
+                  setCartProducts((prev) => [...prev, newProduct]);
+                  actualAddedCount++;
+                }
+              }
+            }
+          } else {
+            // Get default unit (base unit or first available)
+            const defaultUnit = product.available_units?.find(
+              (unit: any) => unit.is_base,
+            ) || product.available_units?.[0] || {
+              id: product.base_unit || 1,
+              short_name: "шт",
+              factor: 1,
+              is_base: true,
+            };
+
+            // Use selling_price from product data, fallback to min_price
+            const price = product.selling_price
+              ? parseFloat(String(product.selling_price))
+              : product.min_price
+                  ? parseFloat(String(product.min_price))
+                  : 10000;
+
+            // Add product with max quantity
+            const newProduct: ProductInCart = {
+              id: generateCartItemId(),
+              productId: product.id,
+              name: product.product_name,
+              price: price,
+              quantity: availableQuantity,
+              total: price * availableQuantity,
+              product: product,
+              barcode: product.barcode,
+              selectedUnit: defaultUnit || null,
+            };
+
+            setCartProducts((prev) => [...prev, newProduct]);
+            actualAddedCount++;
+          }
+        } else {
+          zeroQuantityCount++;
+        }
+
+        setLoadingAllProductsAdded(i + 1);
+        setLoadingAllProductsProgress(Math.round(((i + 1) / allProducts.length) * 100));
+      }
+
+      console.log(`Final counts: total=${allProducts.length}, added=${actualAddedCount}, zeroQuantity=${zeroQuantityCount}`);
+      toast.success(`Добавлено ${actualAddedCount} товаров`);
+    } catch (error) {
+      console.error("Error loading all products:", error);
+      toast.error("Ошибка при загрузке товаров");
+    } finally {
+      setIsLoadingAllProducts(false);
+    }
+  };
+
   // Fetch products when modal opens or search term changes
   useEffect(() => {
-    if (isSearchModalOpen) {
+    if (isSearchModalOpen && !isLoadingAllProducts) {
       const timeoutId = setTimeout(() => {
         setLoadingProducts(true);
         fetchFirstPageProducts({
@@ -490,7 +656,7 @@ const POSInterfaceCore = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [isSearchModalOpen, searchTerm, barcodeSearchTerm]);
+  }, [isSearchModalOpen, searchTerm, barcodeSearchTerm, isLoadingAllProducts]);
 
   // Fetch exchange rates when payment modal opens
   useEffect(() => {
@@ -1504,7 +1670,7 @@ const POSInterfaceCore = () => {
                           <div className="text-xs opacity-75 mt-0.5">
                             {session.products
                                 .reduce((sum, product) => sum + product.total, 0)
-                                .toLocaleString()}{" "}
+                                .toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}{" "}
                             сум
                           </div>
                       )}
@@ -1536,7 +1702,7 @@ const POSInterfaceCore = () => {
                     : "Корзина пуста"}
               </h2>
               <div className="text-sm text-gray-700 font-medium">
-                Общая сумма: {total.toLocaleString()} сум
+                Общая сумма: {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
               </div>
 
               {/* User Selection Display */}
@@ -1580,24 +1746,24 @@ const POSInterfaceCore = () => {
                                     </span>
                                   </div>
                                   <div className="text-xs text-blue-600">
-                                    Баланс UZS: {balanceUzs.toLocaleString()} сум
+                                    Баланс UZS: {balanceUzs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </div>
                                   <div className="text-xs text-blue-600">
-                                    Баланс USD: {balanceUsd.toLocaleString()} $ (x{exchangeRate.toLocaleString()} = {(balanceUsd * exchangeRate).toLocaleString()} сум)
+                                    Баланс USD: {balanceUsd.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} $ (x{exchangeRate.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} = {(balanceUsd * exchangeRate).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум)
                                   </div>
                                   <div className="text-xs font-semibold text-blue-700">
-                                    Общий баланс: {(balanceUzs + balanceUsd * exchangeRate).toLocaleString()} сум
+                                    Общий баланс: {(balanceUzs + balanceUsd * exchangeRate).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </div>
                                   <div className="text-xs font-semibold text-blue-700">
-                                    Сумма покупки: {total.toLocaleString()} сум
+                                    Сумма покупки: {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </div>
                                   <div className="text-xs text-blue-600">
                                   <span className={newTotalBalanceUzs < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
-                                    Новый баланс: {newTotalBalanceUzs.toLocaleString()} сум
+                                    Новый баланс: {newTotalBalanceUzs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </span>
                                     {remainingToPay > 0 && (
                                         <span className="text-red-600 font-medium ml-2">
-                                      Осталось оплатить: {remainingToPay.toLocaleString()} сум
+                                      Осталось оплатить: {remainingToPay.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                     </span>
                                     )}
                                   </div>
@@ -1678,7 +1844,7 @@ const POSInterfaceCore = () => {
                   <div className="text-right">
                     <div className="text-gray-600 text-sm mb-0.5 font-medium">Итого</div>
                     <div className="text-2xl font-bold text-gray-900">
-                      {total.toLocaleString()}
+                      {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                     </div>
                   </div>
                 </div>
@@ -1691,7 +1857,7 @@ const POSInterfaceCore = () => {
                   <div className="text-right">
                     <div className="text-gray-600 text-sm mb-0.5 font-medium">К оплате</div>
                     <div className="text-2xl font-bold text-gray-900">
-                      {total.toLocaleString()}
+                      {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                     </div>
                   </div>
                 </div>
@@ -1883,7 +2049,7 @@ const POSInterfaceCore = () => {
                                       }}
                                       className="w-20 text-right px-2 py-1 text-xs font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
                                   >
-                                    {product.price.toLocaleString()}
+                                    {product.price.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                   </button>
                                 </td>
                                 <td className="p-2 text-center text-gray-900">
@@ -1988,7 +2154,7 @@ const POSInterfaceCore = () => {
                                   </div>
                                 </td>
                                 <td className="p-2 text-right font-bold text-gray-900 text-xs">
-                                  {product.total.toLocaleString()}
+                                  {product.total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                 </td>
                                 <td className="p-2 text-center">
                                   <button
@@ -2135,15 +2301,15 @@ const POSInterfaceCore = () => {
                                     ? "bg-green-600 text-white hover:bg-green-700"
                                     : "bg-blue-600 text-white hover:bg-blue-700"
                         }`}
-                        title={cartProducts.length === 0 ? "Добавьте товары" : paymentMode === "debt" ? `В долг ${total.toLocaleString()} сум` : `Оплатить ${total.toLocaleString()} сум`}
+                        title={cartProducts.length === 0 ? "Добавьте товары" : paymentMode === "debt" ? `В долг ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум` : `Оплатить ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум`}
                     >
                       {cartProducts.length === 0
                           ? "Товары"
                           : paymentMode === "debt"
-                              ? `Долг: ${total.toLocaleString()}`
+                              ? `Долг: ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
                               : paymentMode === "balance"
-                                  ? `С баланса: ${total.toLocaleString()}`
-                                  : `Оплата: ${total.toLocaleString()}`}
+                                  ? `С баланса: ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+                                  : `Оплата: ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`}
                     </button>
                 )}
 
@@ -2417,10 +2583,10 @@ const POSInterfaceCore = () => {
                   {cartProducts.length === 0
                       ? "Добавьте товары"
                       : paymentMode === "debt"
-                          ? `В долг ${total.toLocaleString()} сум`
+                          ? `В долг ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум`
                           : paymentMode === "balance"
-                              ? `С баланса ${total.toLocaleString()} сум`
-                              : `Оплатить ${total.toLocaleString()} сум`}
+                              ? `С баланса ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум`
+                              : `Оплатить ${total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум`}
                 </button>
               </div>
             </div>
@@ -2499,7 +2665,7 @@ const POSInterfaceCore = () => {
                   )}
                 </div>
 
-                {selectedProducts.size > 0 && (
+                {selectedProducts.size > 0 ? (
                     <div className="flex space-x-2">
                       <button
                           onClick={() => setSelectedProducts(new Set())}
@@ -2514,6 +2680,30 @@ const POSInterfaceCore = () => {
                         Добавить в корзину ({selectedProducts.size})
                       </button>
                     </div>
+                ) : (
+                  <button
+                    onClick={handleLoadAllProducts}
+                    disabled={isLoadingAllProducts}
+                    className={`px-6 py-2 text-base rounded-lg transition-colors flex items-center gap-2 ${
+                      isLoadingAllProducts
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                    }`}
+                  >
+                    {isLoadingAllProducts ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        Загрузка...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Загрузить все товары
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
             </div>
@@ -2656,7 +2846,7 @@ const POSInterfaceCore = () => {
                                     {(
                                         parseFloat(String(product.quantity || 0)) +
                                         parseFloat(String(product.extra_quantity || 0))
-                                    ).toLocaleString()}
+                                    ).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                   </div>
                                 </td>
                             )}
@@ -2665,11 +2855,11 @@ const POSInterfaceCore = () => {
                                 {product.selling_price
                                     ? parseFloat(
                                         String(product.selling_price),
-                                    ).toLocaleString()
+                                    ).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
                                     : product.min_price
                                         ? parseFloat(
                                             String(product.min_price),
-                                        ).toLocaleString()
+                                        ).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
                                         : "—"}
                               </div>
                             </td>
@@ -2695,6 +2885,47 @@ const POSInterfaceCore = () => {
             </div>
           </WideDialogContent>
         </WideDialog>
+
+        {/* Loading All Products Progress Overlay - OUTSIDE modal */}
+        {isLoadingAllProducts && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+                  <div
+                    className="absolute inset-0 border-4 border-emerald-500 rounded-full animate-spin"
+                    style={{
+                      borderTopColor: "transparent",
+                      borderRightColor: "transparent",
+                      borderLeftColor: "transparent",
+                    }}
+                  ></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-emerald-600">
+                      {loadingAllProductsProgress}%
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Загрузка товаров
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Пожалуйста, подождите...
+                </p>
+                <div className="bg-gray-100 rounded-full h-4 mb-2 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full transition-all duration-200 ease-out"
+                    style={{ width: `${loadingAllProductsProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Обработано: {loadingAllProductsAdded} из {loadingAllProductsCount}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* User Selection Modal */}
         <WideDialog open={isUserModalOpen} onOpenChange={setIsUserModalOpen}>
@@ -2947,28 +3178,28 @@ const POSInterfaceCore = () => {
                                 <div className="text-sm text-blue-700 mt-2 space-y-1">
                                   <p>
                                     <strong>Баланс UZS:</strong>{" "}
-                                    {balanceUzs.toLocaleString()} сум
+                                    {balanceUzs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </p>
                                   <p>
                                     <strong>Баланс USD:</strong>{" "}
-                                    {balanceUsd.toLocaleString()} $ (x{exchangeRate.toLocaleString()} = {(balanceUsd * exchangeRate).toLocaleString()} сум)
+                                    {balanceUsd.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} $ (x{exchangeRate.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} = {(balanceUsd * exchangeRate).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум)
                                   </p>
                                   <p className="font-semibold text-blue-800">
                                     <strong>Общий баланс:</strong>{" "}
-                                    {(balanceUzs + balanceUsd * exchangeRate).toLocaleString()} сум
+                                    {(balanceUzs + balanceUsd * exchangeRate).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </p>
                                   <p>
                                     <strong>Сумма покупки:</strong>{" "}
-                                    {total.toLocaleString()} сум
+                                    {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </p>
                                   <p className={newTotalBalanceUzs < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
                                     <strong>Новый баланс:</strong>{" "}
-                                    {newTotalBalanceUzs.toLocaleString()} сум
+                                    {newTotalBalanceUzs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                   </p>
                                   {remainingToPay > 0 && (
                                       <p className="text-red-600 font-medium">
                                         <strong>Осталось оплатить:</strong>{" "}
-                                        {remainingToPay.toLocaleString()} сум
+                                        {remainingToPay.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                       </p>
                                   )}
                                 </div>
@@ -2979,7 +3210,7 @@ const POSInterfaceCore = () => {
                                 {debtDeposit && (
                                     <p>
                                       <strong>Залог:</strong>{" "}
-                                      {parseInt(debtDeposit).toLocaleString()} сум
+                                      {parseInt(debtDeposit).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
                                     </p>
                                 )}
                                 {debtDueDate && (
@@ -3049,9 +3280,9 @@ const POSInterfaceCore = () => {
                 return (
                     <div className="bg-blue-50 rounded-lg p-4 mb-6">
                       <div className="text-sm text-blue-700 space-y-1">
-                        <p><strong>Баланс клиента:</strong> {totalBalanceUzs.toLocaleString()} сум</p>
-                        <p><strong>Сумма покупки:</strong> {total.toLocaleString()} сум</p>
-                        <p className="text-red-600 font-semibold"><strong>Не хватает:</strong> {remaining.toLocaleString()} сум</p>
+                        <p><strong>Баланс клиента:</strong> {totalBalanceUzs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум</p>
+                        <p><strong>Сумма покупки:</strong> {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум</p>
+                        <p className="text-red-600 font-semibold"><strong>Не хватает:</strong> {remaining.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум</p>
                       </div>
                     </div>
                 );
@@ -3087,7 +3318,7 @@ const POSInterfaceCore = () => {
                   const balanceUzs = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_uzs || 0 : 0;
                   const balanceUsd = selectedClient ? (clients.find((c) => c.id === selectedClient) as any)?.balance_usd || 0 : 0;
                   return total - (balanceUzs + balanceUsd * exchangeRate);
-                })()).toLocaleString()} сум)
+                })()).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум)
                 </button>
                 <button
                     onClick={() => {
@@ -3698,11 +3929,11 @@ const POSInterfaceCore = () => {
                                 : "Итого:"}
                           </div>
                           <div className="text-3xl font-bold text-gray-900">
-                            {targetAmount.toLocaleString()} UZS
+                            {targetAmount.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} UZS
                           </div>
                           {selectedClient && paymentMode === "balance" && totalBalanceUzs > 0 && (
                               <div className="text-xs text-blue-600 mt-1">
-                                С баланса: {Math.min(totalBalanceUzs, finalTotal).toLocaleString()}
+                                С баланса: {Math.min(totalBalanceUzs, finalTotal).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                               </div>
                           )}
                         </>
@@ -3740,7 +3971,7 @@ const POSInterfaceCore = () => {
                       return Math.max(
                           0,
                           targetAmount - totalPaid,
-                      ).toLocaleString();
+                      ).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
                     })()}
                     {" "}
                     UZS
@@ -3766,7 +3997,7 @@ const POSInterfaceCore = () => {
                           ? Math.max(0, finalTotal - totalBalanceUzs)
                           : finalTotal;
                       const totalPaid = paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
-                      return totalPaid > targetAmount ? (totalPaid - targetAmount).toLocaleString() : "0";
+                      return totalPaid > targetAmount ? (totalPaid - targetAmount).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : "0,00";
                     })()}{" "}
                     UZS
                   </div>
@@ -4211,7 +4442,7 @@ const POSInterfaceCore = () => {
                                       />
                                     </div>
                                     <div className="text-sm text-gray-600 pt-2 border-t border-gray-300">
-                                      = {payment.amount?.toLocaleString() || 0} UZS
+                                      = {(payment.amount || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} UZS
                                     </div>
                                   </div>
                               ) : (

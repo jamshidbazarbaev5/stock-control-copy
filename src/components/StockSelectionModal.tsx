@@ -17,6 +17,8 @@ interface StockSelectionModalProps {
   productId: number;
   productName: string;
   onStockSelect: (stock: Stock) => void;
+  allowMultipleSelect?: boolean;
+  onMultipleStockSelect?: (stocks: Stock[]) => void;
 }
 
 export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
@@ -25,14 +27,19 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
   productId,
   productName,
   onStockSelect,
+  allowMultipleSelect = false,
+  onMultipleStockSelect,
 }) => {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedStockId, setSelectedStockId] = useState<number | null>(null);
+  const [selectedStockIds, setSelectedStockIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (isOpen && productId) {
       setLoading(true);
+      setSelectedStockId(null);
+      setSelectedStockIds(new Set());
       fetchStockByProduct(productId, false)
         .then((data) => {
           setStocks(data);
@@ -49,12 +56,40 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
   }, [isOpen, productId]);
 
   const handleSelect = () => {
-    const selectedStock = stocks.find((s) => s.id === selectedStockId);
-    if (selectedStock) {
-      onStockSelect(selectedStock);
+    if (allowMultipleSelect) {
+      // Multiple selection mode
+      if (selectedStockIds.size === 0) {
+        toast.error("Пожалуйста, выберите хотя бы один склад");
+        return;
+      }
+      const selectedStocks = stocks.filter((s) => selectedStockIds.has(s.id || 0));
+      if (onMultipleStockSelect) {
+        onMultipleStockSelect(selectedStocks);
+      }
       onClose();
     } else {
-      toast.error("Пожалуйста, выберите склад");
+      // Single selection mode
+      const selectedStock = stocks.find((s) => s.id === selectedStockId);
+      if (selectedStock) {
+        onStockSelect(selectedStock);
+        onClose();
+      } else {
+        toast.error("Пожалуйста, выберите склад");
+      }
+    }
+  };
+
+  const handleStockToggle = (stockId: number) => {
+    if (allowMultipleSelect) {
+      const newSelected = new Set(selectedStockIds);
+      if (newSelected.has(stockId)) {
+        newSelected.delete(stockId);
+      } else {
+        newSelected.add(stockId);
+      }
+      setSelectedStockIds(newSelected);
+    } else {
+      setSelectedStockId(stockId);
     }
   };
 
@@ -101,37 +136,51 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
         ) : (
           <div className="space-y-4">
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {stocks.map((stock:any) => (
-                <div
-                  key={stock.id}
-                  onClick={() => setSelectedStockId(stock.id || null)}
-                  className={`
-                    border rounded-lg p-4 cursor-pointer transition-all
-                    ${
-                      selectedStockId === stock.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }
-                  `}
-                >
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Количество</p>
-                      <p className="font-medium">
-                        {formatCurrency(
-                          (Number(stock.quantity) || 0) + (Number(stock.extra_quantity) || 0)
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Рулон</p>
-                      <p className="font-medium">
-                        {stock.stock_name || "-"}
-                      </p>
+              {stocks.map((stock:any) => {
+                const isSelected = allowMultipleSelect
+                  ? selectedStockIds.has(stock.id || 0)
+                  : selectedStockId === stock.id;
+
+                return (
+                  <div
+                    key={stock.id}
+                    onClick={() => handleStockToggle(stock.id || 0)}
+                    className={`
+                      border rounded-lg p-4 cursor-pointer transition-all flex items-start gap-3
+                      ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }
+                    `}
+                  >
+                    {allowMultipleSelect && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleStockToggle(stock.id || 0)}
+                        className="mt-1"
+                      />
+                    )}
+                    <div className="grid grid-cols-2 gap-4 flex-1">
+                      <div>
+                        <p className="text-xs text-gray-500">Количество</p>
+                        <p className="font-medium">
+                          {formatCurrency(
+                            (Number(stock.quantity) || 0) + (Number(stock.extra_quantity) || 0)
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Рулон / Склад</p>
+                        <p className="font-medium">
+                          {stock.stock_name || "-"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex justify-between gap-2 pt-4 border-t">
@@ -142,10 +191,10 @@ export const StockSelectionModal: React.FC<StockSelectionModalProps> = ({
                 </Button>
                 <Button
                   onClick={handleSelect}
-                  disabled={!selectedStockId}
+                  disabled={allowMultipleSelect ? selectedStockIds.size === 0 : !selectedStockId}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Выбрать
+                  {allowMultipleSelect ? `Выбрать (${selectedStockIds.size})` : "Выбрать"}
                 </Button>
               </div>
             </div>

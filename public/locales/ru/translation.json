@@ -575,6 +575,7 @@
   },
 
   "forms": {
+    "available_balance":"Баланс",
     "balance_uzs":"Баланс в УЗС",
     "balance_usd":"Баланс в USD",
 

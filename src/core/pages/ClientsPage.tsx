@@ -494,11 +494,14 @@ interface MassPaymentDialogProps {
   clientId: number;
   isOpen: boolean;
   onClose: () => void;
+  client?: Client;
 }
 
-function MassPaymentDialog({ clientId, isOpen, onClose }: MassPaymentDialogProps) {
+function MassPaymentDialog({ clientId, isOpen, onClose, client }: MassPaymentDialogProps) {
   const { t } = useTranslation();
   const massPayment = useMassPayment();
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("Наличные");
+  const [storeData, setStoreData] = useState<any>(null);
 
   // Get the latest USD rate from currency rates
   const { data: currencyRates } = useQuery<Array<{ id: number; rate: string; currency_detail: any }>>({
@@ -510,6 +513,35 @@ function MassPaymentDialog({ clientId, isOpen, onClose }: MassPaymentDialogProps
   });
 
   const usdRate = currencyRates?.[0] ? parseFloat(currencyRates[0].rate) : 0;
+
+  // Fetch store data when dialog opens for Магазин type
+  useEffect(() => {
+    if (isOpen && client?.type === "Магазин" && (client as any)?.linked_store) {
+      const fetchStoreData = async () => {
+        try {
+          const response = await api.get(`/store/${(client as any).linked_store}/`);
+          const storeInfo = response?.data || response;
+          setStoreData(storeInfo);
+        } catch (error) {
+          console.error("Failed to fetch store data:", error);
+        }
+      };
+      fetchStoreData();
+    } else {
+      setStoreData(null);
+    }
+  }, [isOpen, client]);
+
+  const getAvailableBalance = () => {
+    if (client?.type !== "Магазин" || !storeData?.budgets || !selectedPaymentMethod) {
+      return 0;
+    }
+
+    const budget = storeData.budgets.find(
+      (b: any) => b.budget_type === selectedPaymentMethod
+    );
+    return budget ? Number(budget.amount) : 0;
+  };
 
   const form = useForm<MassPaymentForm>({
     resolver: zodResolver(massPaymentSchema),
@@ -551,6 +583,17 @@ function MassPaymentDialog({ clientId, isOpen, onClose }: MassPaymentDialogProps
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {client?.type === "Магазин" && selectedPaymentMethod && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-blue-700">
+                    <div className="font-semibold mb-2">{t("forms.available_balance") || "Available Balance"}</div>
+                    <div className="text-lg font-bold text-blue-900">
+                      {getAvailableBalance().toLocaleString()}
+                      {selectedPaymentMethod === "Валюта" ? " $" : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
               <FormField
                   control={form.control}
                   name="amount"
@@ -575,7 +618,10 @@ function MassPaymentDialog({ clientId, isOpen, onClose }: MassPaymentDialogProps
                       <FormItem>
                         <FormLabel>{t("common.payment_method")}</FormLabel>
                         <FormControl>
-                          <Select value={field.value} onValueChange={field.onChange}>
+                          <Select value={field.value} onValueChange={(value) => {
+                            field.onChange(value);
+                            setSelectedPaymentMethod(value);
+                          }}>
                             <SelectTrigger>
                               <SelectValue placeholder={t("placeholders.select_payment_method")} />
                             </SelectTrigger>
@@ -634,6 +680,7 @@ export default function ClientsPage() {
   const [cashOutClientId, setCashOutClientId] = useState<number | null>(null);
   const [createDebtClientId, setCreateDebtClientId] = useState<number | null>(null);
   const [massPaymentClientId, setMassPaymentClientId] = useState<number | null>(null);
+  const [massPaymentClient, setMassPaymentClient] = useState<Client | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number; flip?: boolean } | null>(null);
   const { data: clientsData, isLoading } = useGetClients({
@@ -704,6 +751,7 @@ export default function ClientsPage() {
               <SelectItem value="all">{t("common.all")}</SelectItem>
               <SelectItem value="Физ.лицо">{t("forms.individual")}</SelectItem>
               <SelectItem value="Юр.лицо">{t("forms.legal_entity")}</SelectItem>
+              <SelectItem value="Магазин">Магазин</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -796,7 +844,10 @@ export default function ClientsPage() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenDropdown(null);
-                                if (client.id) setMassPaymentClientId(client.id);
+                                if (client.id) {
+                                  setMassPaymentClientId(client.id);
+                                  setMassPaymentClient(client);
+                                }
                               }}
                           >
                             <CreditCard className="h-4 w-4 mr-2" />
@@ -858,8 +909,12 @@ export default function ClientsPage() {
         {massPaymentClientId && (
             <MassPaymentDialog
                 clientId={massPaymentClientId}
+                client={massPaymentClient || undefined}
                 isOpen={!!massPaymentClientId}
-                onClose={() => setMassPaymentClientId(null)}
+                onClose={() => {
+                  setMassPaymentClientId(null);
+                  setMassPaymentClient(null);
+                }}
             />
         )}
       </div>

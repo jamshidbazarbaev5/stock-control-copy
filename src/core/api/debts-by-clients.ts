@@ -16,6 +16,7 @@ export interface DebtByClient {
   balance?: string;
   total_amount: string;
   total_deposit: string;
+  linked_store?: number | null;
 }
 
 interface DebtsByClientsFilters {

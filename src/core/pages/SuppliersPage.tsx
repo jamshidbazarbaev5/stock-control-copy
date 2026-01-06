@@ -247,6 +247,7 @@ export default function SuppliersPage() {
         );
         setIsBalanceDialogOpen(false);
         setSelectedSupplierForBalance(null);
+        window.location.reload();
       },
 
     });
@@ -312,6 +313,7 @@ export default function SuppliersPage() {
             t("messages.success.mass_payment") || "Mass payment completed successfully",
         );
         setIsMassPaymentDialogOpen(false);
+        window.location.reload();
       },
 
     });

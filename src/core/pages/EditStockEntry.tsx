@@ -378,11 +378,13 @@ export default function EditStockEntry() {
       // Set is_inventory_adjustment
       commonForm.setValue("is_inventory_adjustment", entry.is_inventory_adjustment || false);
 
-      // Set payment_type based on is_debt and use_supplier_balance
+      // Set payment_type based on is_debt, use_supplier_balance, and is_inventory_adjustment
       if (entry.is_debt) {
         commonForm.setValue("payment_type", "debt");
       } else if (entry.use_supplier_balance) {
         commonForm.setValue("payment_type", "supplier_balance");
+      } else if (entry.is_inventory_adjustment) {
+        commonForm.setValue("payment_type", "inventory_adjustment");
       } else {
         commonForm.setValue("payment_type", "payment");
       }
@@ -397,7 +399,6 @@ export default function EditStockEntry() {
 
         // Extract exchange_rate ID and rate value
         let exchangeRateValue: any = "";
-        let exchangeRateAmount: number = 0;
         if (stock.exchange_rate) {
           if (
               typeof stock.exchange_rate === "object" &&
@@ -406,94 +407,11 @@ export default function EditStockEntry() {
             // Check if it has an 'id' property
             if ("id" in stock.exchange_rate) {
               exchangeRateValue = (stock.exchange_rate as any).id;
-              exchangeRateAmount = Number((stock.exchange_rate as any).rate) || 0;
             }
           } else {
             exchangeRateValue = stock.exchange_rate;
-            exchangeRateAmount = Number(stock.exchange_rate) || 0;
           }
         }
-
-        console.log("Loading stock data:", stock);
-        console.log(
-            "Exchange rate:",
-            stock.exchange_rate,
-            "Extracted:",
-            exchangeRateValue,
-        );
-        console.log("Form values:", {
-          purchase_unit_quantity: stock.purchase_unit_quantity,
-          quantity: stock.quantity,
-          price_per_unit_currency: stock.price_per_unit_currency,
-          total_price_in_currency: stock.total_price_in_currency,
-          price_per_unit_uz: stock.price_per_unit_uz,
-          total_price_in_uz: stock.total_price_in_uz,
-          base_unit_in_uzs: stock.base_unit_in_uzs,
-          base_unit_in_currency: stock.base_unit_in_currency,
-          exchange_rate: exchangeRateValue,
-        });
-
-        // Calculate conversion factor from purchase_unit_quantity and quantity
-        const conversionFactor = Number(stock.quantity) && Number(stock.purchase_unit_quantity)
-          ? Number(stock.quantity) / Number(stock.purchase_unit_quantity)
-          : 1;
-
-        // Create dynamic fields to display based on currency type
-        const isBaseCurrency = stock.currency?.is_base || false;
-        const dynamicFields: { [key: string]: DynamicField } = {
-          purchase_unit_quantity: {
-            label: "Количество закупок",
-            value: stock.purchase_unit_quantity,
-            editable: true,
-            show: true,
-          },
-          quantity: {
-            label: "Количество",
-            value: stock.quantity,
-            editable: false,
-            show: true,
-          },
-          exchange_rate: {
-            label: "Курс обмена",
-            value: exchangeRateAmount,
-            editable: false,
-            show: !isBaseCurrency,
-          },
-        };
-
-        if (!isBaseCurrency) {
-          dynamicFields.price_per_unit_currency = {
-            label: `Цена за единицу (${stock.currency?.short_name || 'USD'})`,
-            value: stock.price_per_unit_currency,
-            editable: true,
-            show: true,
-          };
-          dynamicFields.total_price_in_currency = {
-            label: `Общая цена (${stock.currency?.short_name || 'USD'})`,
-            value: stock.total_price_in_currency,
-            editable: true,
-            show: true,
-          };
-        }
-
-        dynamicFields.price_per_unit_uz = {
-          label: `Цена за единицу (UZS)`,
-          value: stock.price_per_unit_uz,
-          editable: isBaseCurrency,
-          show: true,
-        };
-        dynamicFields.total_price_in_uz = {
-          label: `Общая цена (UZS)`,
-          value: stock.total_price_in_uz,
-          editable: isBaseCurrency,
-          show: true,
-        };
-
-        const fieldOrder = !isBaseCurrency
-          ? ['purchase_unit_quantity', 'quantity', 'exchange_rate', 'price_per_unit_currency',
-             'total_price_in_currency', 'price_per_unit_uz', 'total_price_in_uz']
-          : ['purchase_unit_quantity', 'quantity', 'price_per_unit_uz',
-             'total_price_in_uz'];
 
         return {
           id: `item-${index + 1}`,
@@ -514,16 +432,12 @@ export default function EditStockEntry() {
             stock_name: stock.stock_name || "",
             calculation_input: "",
           },
-          dynamicFields: dynamicFields,
-          dynamicFieldsOrder: fieldOrder,
-          calculationMetadata: {
-            conversion_factor: conversionFactor,
-            exchange_rate: exchangeRateAmount,
-            is_base_currency: isBaseCurrency,
-          },
+          dynamicFields: {},
+          dynamicFieldsOrder: [],
+          calculationMetadata: null,
           selectedProduct: stock.product || null,
-          isCalculated: true, // Mark as calculated since we have all data from API
-          isExpanded: true, // All items expanded by default
+          isCalculated: false, // Will be set to true after fetching from API
+          isExpanded: true,
           isCalculating: false,
           isEditable,
           quantityMismatch,
@@ -532,6 +446,10 @@ export default function EditStockEntry() {
 
       if (items.length > 0) {
         setStockItems(items);
+        // Trigger calculation for each item to get dynamic fields from API
+        items.forEach((item) => {
+          getFieldConfigurationWithOriginalValues(item.id, item.form);
+        });
       }
 
       setIsLoading(false);
@@ -731,43 +649,53 @@ export default function EditStockEntry() {
       field: keyof StockItemFormValues,
       value: any,
   ) => {
+    // Check if this is a field that requires API recalculation
+    const needsAPIRecalculation = [
+      "currency",
+      "purchase_unit",
+    ].includes(field);
+
     setStockItems((items) =>
         items.map((item) => {
           if (item.id === itemId) {
-            // If changing product, currency, or purchase_unit, need to recalculate
-            const needsRecalculation = [
-              "product",
-              "currency",
-              "purchase_unit",
-            ].includes(field);
             return {
               ...item,
               form: {
                 ...item.form,
                 [field]: value,
               },
-              ...(needsRecalculation && { isCalculated: false }), // Force recalculation
+              // For currency/purchase_unit changes: keep isCalculated=true so fields show,
+              // but set isCalculating=true to show loading state while API recalculates
+              ...(needsAPIRecalculation && { isCalculating: true }),
             };
           }
           return item;
         }),
     );
 
-    const item = stockItems.find((i) => i.id === itemId);
-
-    // Trigger calculation for numeric fields if item is already calculated
-    if (item?.isCalculated && [
-      "purchase_unit_quantity",
-      "quantity",
-      "price_per_unit_currency",
-      "total_price_in_currency",
-      "price_per_unit_uz",
-      "total_price_in_uz"
-    ].includes(field)) {
-      setTimeout(() => calculateItemFields(itemId, field, value), 0);
+    // For currency or purchase_unit changes, trigger API request to recalculate
+    if (needsAPIRecalculation) {
+      // Directly trigger the API call without waiting for state update
+      // Pass itemId to getFieldConfiguration which will read the updated state
+      console.log(`Triggering API recalculation for ${field} change to:`, value);
+      setTimeout(() => {
+        getFieldConfiguration(itemId);
+      }, 0);
     }
-    // For currency, product, and purchase_unit changes, rely on the useEffect
-    // to trigger recalculation through isCalculated: false flag
+    // Trigger calculation for numeric fields if item is already calculated
+    else {
+      const item = stockItems.find((i) => i.id === itemId);
+      if (item?.isCalculated && [
+        "purchase_unit_quantity",
+        "quantity",
+        "price_per_unit_currency",
+        "total_price_in_currency",
+        "price_per_unit_uz",
+        "total_price_in_uz"
+      ].includes(field)) {
+        setTimeout(() => calculateItemFields(itemId, field, value), 0);
+      }
+    }
   };
 
   // Get field configuration for a stock item (for new items or recalculation)
@@ -792,6 +720,18 @@ export default function EditStockEntry() {
             !commonValues.supplier ||
             !commonValues.date_of_arrived
         ) {
+          console.log("Missing required fields for calculation:", {
+            store: commonValues.store,
+            product: form.product,
+            currency: form.currency,
+            purchase_unit: form.purchase_unit,
+            supplier: commonValues.supplier,
+            date_of_arrived: commonValues.date_of_arrived,
+          });
+          // Reset calculating state if validation fails
+          setStockItems((items) =>
+              items.map((i) => (i.id === itemId ? { ...i, isCalculating: false } : i)),
+          );
           return;
         }
 
@@ -1014,25 +954,43 @@ export default function EditStockEntry() {
   const handleProductChange = (itemId: string, productId: string) => {
     const product = allProducts.find((p) => p.id === Number(productId));
     console.log("Product changed:", productId, product);
+
+    // Update the item with new product while keeping quantity values
     setStockItems((items) =>
         items.map((item) => {
           if (item.id === itemId) {
             const updatedForm = {
               ...item.form,
               product: productId,
-              purchase_unit: "", // Reset purchase unit
+              purchase_unit: "", // Reset purchase unit for new product
+              // Keep quantity values but clear prices - they'll be recalculated
+              total_price_in_currency: "",
+              price_per_unit_currency: "",
+              price_per_unit_uz: "",
+              total_price_in_uz: "",
+              base_unit_in_uzs: "",
+              base_unit_in_currency: "",
             };
 
             return {
               ...item,
               selectedProduct: product,
               form: updatedForm,
-              isCalculated: false, // Reset calculation status
+              dynamicFields: {}, // Clear old fields
+              calculationMetadata: null,
+              isCalculated: false, // Will be set to true after API call
+              isCalculating: true, // Show loading state
             };
           }
           return item;
         }),
     );
+
+    // Trigger API request to recalculate with new product
+    // getFieldConfiguration will fetch fresh dynamic fields and update the form
+    setTimeout(() => {
+      getFieldConfiguration(itemId);
+    }, 0);
   };
 
   // Calculate fields based on user input
