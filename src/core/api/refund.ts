@@ -5,6 +5,7 @@ export interface RefundItem {
   id?: number;
   sale_item: number;
   quantity: number;
+  return_price?: string | number;
 }
 
 export interface Refund {

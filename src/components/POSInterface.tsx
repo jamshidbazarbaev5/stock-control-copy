@@ -64,6 +64,21 @@ interface ProductInCart {
   } | null;
   stock?: Stock;
   stockId?: number;
+  attribute_values?: Array<{
+    id?: number;
+    attribute_id?: number;
+    attribute?: {
+      id: number;
+      name: string;
+      field_type: string;
+      choices: any[];
+      formula: string;
+      translations: { [key: string]: string };
+      related_model: string;
+      related_objects: any[] | null;
+    };
+    value: any;
+  }>;
 }
 
 interface ExtendedUser extends User {
@@ -563,22 +578,24 @@ const POSInterfaceCore = () => {
 
               // Add product with each available stock
               for (const stock of stocks) {
-                const stockQuantity = stock.quantity
-                  ? parseFloat(String(stock.quantity))
-                  : 0;
-                if (stockQuantity > 0) {
+                const stockQuantity = parseFloat(String(stock.quantity || 0));
+                const extraQuantity = parseFloat(String(stock.extra_quantity || 0));
+                const totalQuantity = stockQuantity + extraQuantity;
+
+                if (totalQuantity > 0) {
                   const newProduct: ProductInCart = {
                     id: generateCartItemId(),
                     productId: product.id!,
                     name: product.product_name,
                     price: price,
-                    quantity: stockQuantity,
-                    total: price * stockQuantity,
+                    quantity: totalQuantity,
+                    total: price * totalQuantity,
                     product: product,
                     barcode: product.barcode,
                     selectedUnit: defaultUnit || null,
                     stock: stock,
                     stockId: stock.id,
+                    attribute_values: stock.product?.attribute_values || product.attribute_values,
                   };
                   setCartProducts((prev) => [...prev, newProduct]);
                   actualAddedCount++;
@@ -3681,8 +3698,8 @@ const POSInterfaceCore = () => {
                         // "С баланса" + insufficient + "Оплатить разницу": use_client_balance=true, on_credit=false, NO sale_debt, with sale_payments
                         // "В долг": use_client_balance=true, on_credit=true, with sale_debt
 
-                        // use_client_balance is ALWAYS true when client is selected
-                        const isUseClientBalance = Boolean(selectedClient);
+                        // use_client_balance is true when client is selected AND not in debt mode
+                        const isUseClientBalance = Boolean(selectedClient) && paymentMode !== "debt";
                         // on_credit is ONLY true when "В долг" mode (paymentMode === "debt")
                         const isOnCredit: boolean = paymentMode === "debt";
 

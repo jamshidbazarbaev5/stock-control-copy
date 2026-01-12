@@ -675,6 +675,7 @@ function MassPaymentDialog({ clientId, isOpen, onClose, client }: MassPaymentDia
 export default function ClientsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [page, setPage] = useState(1);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [cashOutClientId, setCashOutClientId] = useState<number | null>(null);
@@ -684,7 +685,10 @@ export default function ClientsPage() {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number; flip?: boolean } | null>(null);
   const { data: clientsData, isLoading } = useGetClients({
-    params: selectedType === "all" ? {} : { type: selectedType },
+    params: {
+      page,
+      ...(selectedType === "all" ? {} : { type: selectedType }),
+    },
   });
   const deleteClient = useDeleteClientCustom();
   const { data: currentUser } = useCurrentUser();
@@ -694,6 +698,11 @@ export default function ClientsPage() {
   const totalCount = Array.isArray(clientsData)
       ? clients.length
       : clientsData?.count || 0;
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedType]);
 
   const columns :any = [
     {
@@ -763,6 +772,9 @@ export default function ClientsPage() {
             onEdit={(client) => navigate(`/edit-client/${client.id}`)}
             onDelete={handleDelete}
             totalCount={totalCount}
+            pageSize={30}
+            currentPage={page}
+            onPageChange={(newPage) => setPage(newPage)}
             actions={(client: Client) => (
                 <div className="relative" style={{ position: 'static' }}>
                   <Button

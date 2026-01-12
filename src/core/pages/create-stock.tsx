@@ -1450,75 +1450,71 @@ export default function CreateStock() {
 
           {/* Debt fields */}
           {commonForm.watch("payment_type") === "debt" && (
-            <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount_of_debt_uzs">
-                    {t("common.amount_of_debt")} (UZS)
-                  </Label>
-                  <Input
-                    id="amount_of_debt_uzs"
-                    type="number"
-                    step="0.01"
-                    value={(() => {
-                      return stockItems.reduce((sum, item) => {
-                        if (item.isCalculated && item.form.currency) {
-                          const currency = currencies.find(c => c.id === Number(item.form.currency));
-                          if (currency?.is_base) {
-                            return sum + (Number(item.form.total_price_in_uz) || 0);
-                          }
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount_of_debt_uzs">
+                  {t("common.amount_of_debt")} (UZS)
+                </Label>
+                <Input
+                  id="amount_of_debt_uzs"
+                  type="number"
+                  step="0.01"
+                  value={(() => {
+                    return stockItems.reduce((sum, item) => {
+                      if (item.isCalculated && item.form.currency) {
+                        const currency = currencies.find(c => c.id === Number(item.form.currency));
+                        if (currency?.is_base) {
+                          return sum + (Number(item.form.total_price_in_uz) || 0);
                         }
-                        return sum;
-                      }, 0).toFixed(2);
-                    })()}
-                    readOnly
-                    className="bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount_of_debt_usd">
-                    {t("common.amount_of_debt")} (USD)
-                  </Label>
-                  <Input
-                    id="amount_of_debt_usd"
-                    type="number"
-                    step="0.01"
-                    value={(() => {
-                      return stockItems.reduce((sum, item) => {
-                        if (item.isCalculated && item.form.currency) {
-                          const currency = currencies.find(c => c.id === Number(item.form.currency));
-                          if (!currency?.is_base) {
-                            return sum + (Number(item.form.total_price_in_currency) || 0);
-                          }
-                        }
-                        return sum;
-                      }, 0).toFixed(2);
-                    })()}
-                    readOnly
-                    className="bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
+                      }
+                      return sum;
+                    }, 0).toFixed(2);
+                  })()}
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
+                />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="advance_of_debt">
-                    {t("common.advance_of_debt")}
-                  </Label>
-                  <Input
-                    id="advance_of_debt"
-                    type="number"
-                    step="0.01"
-                    {...commonForm.register("advance_of_debt")}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount_of_debt_usd">
+                  {t("common.amount_of_debt")} (USD)
+                </Label>
+                <Input
+                  id="amount_of_debt_usd"
+                  type="number"
+                  step="0.01"
+                  value={(() => {
+                    return stockItems.reduce((sum, item) => {
+                      if (item.isCalculated && item.form.currency) {
+                        const currency = currencies.find(c => c.id === Number(item.form.currency));
+                        if (!currency?.is_base) {
+                          return sum + (Number(item.form.total_price_in_currency) || 0);
+                        }
+                      }
+                      return sum;
+                    }, 0).toFixed(2);
+                  })()}
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="advance_of_debt">
+                  {t("common.advance_of_debt")}
+                </Label>
+                <Input
+                  id="advance_of_debt"
+                  type="number"
+                  step="0.01"
+                  {...commonForm.register("advance_of_debt")}
+                />
               </div>
 
               {/* Deposit Payment Method - show when debt and NOT using supplier balance */}
-              {commonForm.watch("payment_type") === "debt" && !commonForm.watch("use_supplier_balance") && (
+              {!commonForm.watch("use_supplier_balance") && (
                 <div className="space-y-2">
                   <Label htmlFor="deposit_payment_method">
                     {t("common.deposit_payment_method") ||
-                      "Deposit Payment Method"}
+                      "Payment Method"}
                   </Label>
                   <Select
                     value={commonForm.watch("deposit_payment_method") || ""}
@@ -1530,7 +1526,7 @@ export default function CreateStock() {
                       <SelectValue
                         placeholder={
                           t("common.select_payment_method") ||
-                          "Select payment method"
+                          "Select method"
                         }
                       />
                     </SelectTrigger>

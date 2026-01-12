@@ -105,6 +105,7 @@ interface StockItem {
   isCalculating: boolean;
   isEditable: boolean; // Whether this stock can be edited
   quantityMismatch?: boolean; // Whether quantity != quantity_for_history
+  quantityForHistory?: number; // Store quantity_for_history for display
 }
 
 interface CreateProductForm {
@@ -347,7 +348,7 @@ export default function EditStockEntry() {
   // Load existing stock entry data
   useEffect(() => {
     if (stockEntryData && stocksData && !stockEntryLoading && !stocksLoading) {
-      const entry = stockEntryData;
+      const entry : any  = stockEntryData;
       const stocks = Array.isArray(stocksData)
           ? stocksData
           : stocksData?.results || [];
@@ -378,6 +379,14 @@ export default function EditStockEntry() {
       // Set is_inventory_adjustment
       commonForm.setValue("is_inventory_adjustment", entry.is_inventory_adjustment || false);
 
+      // Load payments from entry if they exist
+      if (entry.payments && Array.isArray(entry.payments) && entry.payments.length > 0) {
+        commonForm.setValue("payments", entry.payments.map((p: any) => ({
+          amount: p.amount,
+          payment_type: p.payment_type,
+        })));
+      }
+
       // Set payment_type based on is_debt, use_supplier_balance, and is_inventory_adjustment
       if (entry.is_debt) {
         commonForm.setValue("payment_type", "debt");
@@ -391,11 +400,11 @@ export default function EditStockEntry() {
 
       // Create stock items from existing stocks
       const items: StockItem[] = stocks.map((stock, index) => {
-        // Check if stock can be edited (quantity == quantity_for_history)
+        // Check if stock has quantity mismatch (for display warning only)
         const quantity = Number(stock.quantity) || 0;
         const quantityForHistory = Number(stock.quantity_for_history) || 0;
-        const isEditable = quantity === quantityForHistory;
-        const quantityMismatch = !isEditable;
+        const quantityMismatch = quantity !== quantityForHistory;
+        const isEditable = true; // Always allow editing
 
         // Extract exchange_rate ID and rate value
         let exchangeRateValue: any = "";
@@ -441,6 +450,7 @@ export default function EditStockEntry() {
           isCalculating: false,
           isEditable,
           quantityMismatch,
+          quantityForHistory,
         };
       });
 
@@ -1917,68 +1927,64 @@ export default function EditStockEntry() {
 
             {/* Debt fields */}
             {commonForm.watch("payment_type") === "debt" && (
-                <div className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="amount_of_debt_uzs">
-                        {t("common.amount_of_debt")} (UZS)
-                      </Label>
-                      <Input
-                          id="amount_of_debt_uzs"
-                          type="number"
-                          step="0.01"
-                          value={(() => {
-                            return stockItems.reduce((sum, item) => {
-                              if (item.isCalculated && item.form.currency) {
-                                const currency = currencies.find(c => c.id === Number(item.form.currency));
-                                if (currency?.is_base) {
-                                  return sum + (Number(item.form.total_price_in_uz) || 0);
-                                }
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount_of_debt_uzs">
+                      {t("common.amount_of_debt")} (UZS)
+                    </Label>
+                    <Input
+                        id="amount_of_debt_uzs"
+                        type="number"
+                        step="0.01"
+                        value={(() => {
+                          return stockItems.reduce((sum, item) => {
+                            if (item.isCalculated && item.form.currency) {
+                              const currency = currencies.find(c => c.id === Number(item.form.currency));
+                              if (currency?.is_base) {
+                                return sum + (Number(item.form.total_price_in_uz) || 0);
                               }
-                              return sum;
-                            }, 0).toFixed(2);
-                          })()}
-                          readOnly
-                          className="bg-gray-100 cursor-not-allowed"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="amount_of_debt_usd">
-                        {t("common.amount_of_debt")} (USD)
-                      </Label>
-                      <Input
-                          id="amount_of_debt_usd"
-                          type="number"
-                          step="0.01"
-                          value={(() => {
-                            return stockItems.reduce((sum, item) => {
-                              if (item.isCalculated && item.form.currency) {
-                                const currency = currencies.find(c => c.id === Number(item.form.currency));
-                                if (!currency?.is_base) {
-                                  return sum + (Number(item.form.total_price_in_currency) || 0);
-                                }
-                              }
-                              return sum;
-                            }, 0).toFixed(2);
-                          })()}
-                          readOnly
-                          className="bg-gray-100 cursor-not-allowed"
-                      />
-                    </div>
+                            }
+                            return sum;
+                          }, 0).toFixed(2);
+                        })()}
+                        readOnly
+                        className="bg-gray-100 cursor-not-allowed"
+                    />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="advance_of_debt">
-                        {t("common.advance_of_debt") || "Advance Payment"}
-                      </Label>
-                      <Input
-                          id="advance_of_debt"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...commonForm.register("advance_of_debt")}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount_of_debt_usd">
+                      {t("common.amount_of_debt")} (USD)
+                    </Label>
+                    <Input
+                        id="amount_of_debt_usd"
+                        type="number"
+                        step="0.01"
+                        value={(() => {
+                          return stockItems.reduce((sum, item) => {
+                            if (item.isCalculated && item.form.currency) {
+                              const currency = currencies.find(c => c.id === Number(item.form.currency));
+                              if (!currency?.is_base) {
+                                return sum + (Number(item.form.total_price_in_currency) || 0);
+                              }
+                            }
+                            return sum;
+                          }, 0).toFixed(2);
+                        })()}
+                        readOnly
+                        className="bg-gray-100 cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="advance_of_debt">
+                      {t("common.advance_of_debt")}
+                    </Label>
+                    <Input
+                        id="advance_of_debt"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...commonForm.register("advance_of_debt")}
+                    />
                   </div>
 
                   {/* Deposit Payment Method - show when debt and NOT using supplier balance */}
@@ -1986,7 +1992,7 @@ export default function EditStockEntry() {
                       <div className="space-y-2">
                         <Label htmlFor="deposit_payment_method">
                           {t("common.deposit_payment_method") ||
-                              "Advance Payment Method"}
+                              "Payment Method"}
                         </Label>
                         <Select
                             value={commonForm.watch("deposit_payment_method") || ""}
@@ -1998,7 +2004,7 @@ export default function EditStockEntry() {
                             <SelectValue
                                 placeholder={
                                     t("common.select_payment_method") ||
-                                    "Select payment method"
+                                    "Select method"
                                 }
                             />
                           </SelectTrigger>
@@ -2458,6 +2464,9 @@ export default function EditStockEntry() {
                     {/* Item Content */}
                     {item.isExpanded && (
                         <div className="p-4 space-y-4">
+                          {/* Warning for items with quantity mismatch */}
+                         
+
                           {/* Product Selection Fields */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Product */}
@@ -2656,6 +2665,9 @@ export default function EditStockEntry() {
                                       let displayValue: string;
                                       if (fieldName === 'exchange_rate' && item.calculationMetadata) {
                                         displayValue = item.calculationMetadata.exchange_rate.toString();
+                                      } else if (fieldName === 'quantity' && item.quantityMismatch && item.quantityForHistory) {
+                                        // For quantity field with mismatch, show quantity_for_history
+                                        displayValue = item.quantityForHistory.toString();
                                       } else {
                                         displayValue = (item.form[fieldName as keyof StockItemFormValues] || "").toString();
                                       }

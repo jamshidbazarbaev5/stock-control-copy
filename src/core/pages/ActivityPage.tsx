@@ -175,7 +175,7 @@ const SummaryCard = ({
                 </h3>
                 {debtTotal !== undefined && debtTotal > 0 && (
                     <div className={`
-                  mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border
+                  mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md text-[14px] font-bold uppercase tracking-wide border
                   ${theme.badge}
                 `}>
                       Долг: {formatCurrency(debtTotal)}

@@ -19,6 +19,7 @@ export interface SaleDebt {
 export interface SaleItem {
   stock_read?: any;
   price_per_unit?: string;
+  price_with_discount?: string;
   id?: number;
   stock_write?: number;
   stock_name?: string | null;
@@ -222,6 +223,19 @@ export const useGetSale = (id: number) => {
       return response.data;
     },
     enabled: !!id,
+  });
+};
+
+export const useGetSaleDebt = (saleId: number) => {
+  return useQuery({
+    queryKey: ["sales", saleId, "debt"],
+    queryFn: async () => {
+      const response = await api.get<{ remaining_debt_amount: number }>(
+        `${SALE_LIST_URL}${saleId}/debt`
+      );
+      return response.data;
+    },
+    enabled: !!saleId,
   });
 };
 

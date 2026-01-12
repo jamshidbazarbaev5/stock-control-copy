@@ -9,6 +9,7 @@ import {
   useGetSales,
   useDeleteSale,
   type SalesResponse,
+  useGetSaleDebt,
 } from "../api/sale";
 import { type Refund, type RefundItem, useCreateRefund } from "../api/refund";
 // import { useGetProducts } from '../api/product';
@@ -124,11 +125,15 @@ export default function SalesPage() {
   const [refundQuantities, setRefundQuantities] = useState<
     Record<number, string>
   >({});
+  const [refundPrices, setRefundPrices] = useState<Record<number, string>>({});
   const [refundNotes, setRefundNotes] = useState("");
   const [refundPayments, setRefundPayments] = useState<
     Array<{ payment_method: string; amount: string }>
   >([]);
   const createRefund = useCreateRefund();
+
+  // Fetch debt info for the selected sale
+  const { data: debtData } = useGetSaleDebt(selectedSaleForRefund?.id || 0);
 
   // Save column visibility to localStorage
   useEffect(() => {
@@ -247,9 +252,9 @@ export default function SalesPage() {
     ? (salesData as SalesResponse)
     : null;
   const totalSumAll = totalsData?.total_sum_all || 0;
-  const totalSumPage = totalsData?.total_sum_page || 0;
+  // const totalSumPage = totalsData?.total_sum_page || 0;
   const totalPaymentsAll = totalsData?.total_payments_all || {};
-  const totalPaymentsPage = totalsData?.total_payments_page || {};
+  // const totalPaymentsPage = totalsData?.total_payments_page || {};
   const totalDebtSum = totalsData?.total_debt_sum || 0;
 
   // Fetch recycling data
@@ -421,67 +426,45 @@ export default function SalesPage() {
   const handleOpenRefundModal = (sale: Sale) => {
     setSelectedSaleForRefund(sale);
     setRefundQuantities({});
+    // Initialize prices with price_with_discount
+    const initialPrices: Record<number, string> = {};
+    sale.sale_items?.forEach((item) => {
+      initialPrices[item.id!] = item.price_with_discount || item.price_per_unit || "0";
+    });
+    setRefundPrices(initialPrices);
     setRefundNotes("");
-    setRefundPayments([{ payment_method: "Наличные", amount: "" }]);
+
+    // For non-debt sales, start with empty payment (will be calculated when user enters quantities)
+    // For debt sales, also start empty (will be calculated when user enters quantities)
+    setRefundPayments([{
+      payment_method: "Наличные",
+      amount: ""
+    }]);
     setIsRefundModalOpen(true);
   };
 
   const handleRefundSubmit = async () => {
-    if (!selectedSaleForRefund?.id) {
-      toast.error(t("errors.no_sale_selected"));
-      return;
-    }
-
     // Prepare refund items
     const refundItems: RefundItem[] = [];
 
     Object.entries(refundQuantities).forEach(([saleItemId, quantity]) => {
       const parsedQuantity = parseFloat(quantity);
       if (parsedQuantity > 0) {
+        // Find the item to get the return price
+        const saleItem = selectedSaleForRefund?.sale_items?.find((si) => si.id?.toString() === saleItemId);
+        const returnPrice = refundPrices[parseInt(saleItemId)] || saleItem?.price_with_discount || saleItem?.price_per_unit;
+
         refundItems.push({
           sale_item: parseInt(saleItemId),
           quantity: parsedQuantity,
+          return_price: returnPrice,
         });
       }
     });
 
-    if (refundItems.length === 0) {
-      toast.error(t("errors.no_items_selected_for_refund"));
-      return;
-    }
-
-    if (!refundNotes.trim()) {
-      toast.error(t("errors.refund_notes_required"));
-      return;
-    }
-
-    // Validate refund payments
-    if (refundPayments.length === 0) {
-      toast.error(
-        t(
-          "errors.refund_payments_required",
-          "Добавьте хотя бы один способ возврата",
-        ),
-      );
-      return;
-    }
-
-    const invalidPayments = refundPayments.some(
-      (p) => !p.amount || parseFloat(p.amount) <= 0,
-    );
-    if (invalidPayments) {
-      toast.error(
-        t(
-          "errors.invalid_payment_amounts",
-          "Укажите корректные суммы для всех способов возврата",
-        ),
-      );
-      return;
-    }
-
     const refundData = {
-      sale: selectedSaleForRefund.id,
-      notes: refundNotes,
+      sale: selectedSaleForRefund?.id,
+      notes: refundNotes.trim() || undefined,
       refund_items: refundItems,
       refund_payments: refundPayments,
     } as Refund;
@@ -494,10 +477,55 @@ export default function SalesPage() {
       setIsRefundModalOpen(false);
       setSelectedSaleForRefund(null);
       setRefundQuantities({});
+      setRefundPrices({});
       setRefundNotes("");
       setRefundPayments([]);
     } catch (error: any) {
     }
+  };
+
+  // Helper function to update refund payments based on current quantities and prices
+  const updateRefundPayments = (updatedQtys?: Record<number, string>, updatedPrices?: Record<number, string>) => {
+    setRefundPayments((prev) => {
+      const updated = [...prev];
+
+      // Calculate total from all refund items: price_with_discount × quantity
+      let totalRefundAmount = 0;
+      const remainingDebt = debtData?.remaining_debt_amount || 0;
+
+      // Use passed quantities/prices or fall back to state
+      const qtysToUse = updatedQtys || refundQuantities;
+      const pricesToUse = updatedPrices || refundPrices;
+
+      selectedSaleForRefund?.sale_items?.forEach((item) => {
+        const qty = parseFloat(qtysToUse[item.id!] || "0");
+        // Use the price_with_discount from the input field, or fallback to price_with_discount/price_per_unit from item
+        const price = parseFloat(pricesToUse[item.id!] || item.price_with_discount || item.price_per_unit || "0");
+
+        if (qty > 0 && price > 0) {
+          const itemAmount = price * qty;
+          totalRefundAmount += itemAmount;
+        }
+      });
+
+      // For debt sales, calculate: refund_total - remaining_debt
+      // If negative (customer still owes), clamp to 0
+      if (selectedSaleForRefund?.on_credit && remainingDebt > 0) {
+        totalRefundAmount = totalRefundAmount - remainingDebt;
+        // Clamp to 0 - if negative, customer still owes (no refund)
+        totalRefundAmount = Math.max(0, totalRefundAmount);
+      }
+
+      if (updated.length === 0) {
+        updated.push({
+          payment_method: "Наличные",
+          amount: totalRefundAmount.toFixed(2),
+        });
+      } else {
+        updated[0].amount = totalRefundAmount.toFixed(2);
+      }
+      return updated;
+    });
   };
 
   const handleRowClick = (row: Sale) => {
@@ -1324,7 +1352,7 @@ export default function SalesPage() {
                   ? handleOpenRefundModal
                   : undefined
               }
-              canRefund={(sale: Sale) => !sale.on_credit}
+              canRefund={() => true}
               pageSize={30}
               currentPage={page}
               onPageChange={(newPage) => setPage(newPage)}
@@ -1341,7 +1369,7 @@ export default function SalesPage() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Итоги</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Total Sum All */}
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
@@ -1356,17 +1384,7 @@ export default function SalesPage() {
               </div>
 
               {/* Total Sum Page */}
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  <span className="text-sm font-medium text-gray-600">
-                    Сумма на странице
-                  </span>
-                </div>
-                <p className="text-2xl font-bold text-emerald-700">
-                  {formatCurrency(totalSumPage)} UZS
-                </p>
-              </div>
+              
 
               {/* Total Debt */}
               <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
@@ -1400,7 +1418,7 @@ export default function SalesPage() {
               <h4 className="text-md font-semibold text-gray-700 mb-3">
                 Способы оплаты (все страницы)
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {Object.entries(totalPaymentsAll).map(([method, amount]) => (
                   <div
                     key={method}
@@ -1432,40 +1450,7 @@ export default function SalesPage() {
             </div>
 
             {/* Payment Methods - Current Page */}
-            <div className="mt-4">
-              <h4 className="text-md font-semibold text-gray-700 mb-3">
-                Способы оплаты (текущая страница)
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.entries(totalPaymentsPage).map(([method, amount]) => (
-                  <div
-                    key={method}
-                    className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-2">
-                      {method === "Наличные" && (
-                        <Wallet className="h-5 w-5 text-green-600" />
-                      )}
-                      {method === "Карта" && (
-                        <CreditCard className="h-5 w-5 text-blue-600" />
-                      )}
-                      {method === "Click" && (
-                        <SmartphoneNfc className="h-5 w-5 text-purple-600" />
-                      )}
-                      {!["Наличные", "Карта", "Click"].includes(method) && (
-                        <Landmark className="h-5 w-5 text-gray-600" />
-                      )}
-                      <span className="font-medium text-gray-700">
-                        {method}
-                      </span>
-                    </div>
-                    <span className="font-bold text-gray-900">
-                      {formatCurrency(amount)} {method === "Валюта" ? "$" : "UZS"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            
           </div>
         </Card>
       )}
@@ -1698,18 +1683,47 @@ export default function SalesPage() {
                   <h3 className="font-medium text-gray-700 mb-3">
                     {t("common.select_items_for_refund")}
                   </h3>
+                  {selectedSaleForRefund.on_credit && (
+                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                     
+                      {debtData && (
+                        <p className="text-sm text-amber-700 mt-1">
+                          Оставшийся долг: <strong>{formatCurrency(debtData.remaining_debt_amount)} UZS</strong>
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {selectedSaleForRefund.sale_items?.map((item) => {
                       const product = item.product_read;
                       const maxQuantity = parseFloat(item.quantity);
+                      const refundQty = parseFloat(refundQuantities[item.id!] || "0");
+                      const refundPrice = parseFloat(refundPrices[item.id!] || item.price_with_discount || item.price_per_unit || "0");
+                      // const remainingDebt = debtData?.remaining_debt_amount || 0;
+
+                      // Calculate item amount (without debt deduction)
+                      const itemRefundAmount = refundQty * refundPrice;
+
+                      // For debt sales: show total calculation only (debt is deducted from total, not per item)
+                      // Calculate total from all items for display purposes
+                      let totalBeforeDebt = 0;
+                      selectedSaleForRefund.sale_items?.forEach((si) => {
+                        const qty = parseFloat(refundQuantities[si.id!] || "0");
+                        const price = parseFloat(refundPrices[si.id!] || si.price_with_discount || si.price_per_unit || "0");
+                        if (qty > 0) {
+                          totalBeforeDebt += qty * price;
+                        }
+                      });
+                      // const debtCalculation = totalBeforeDebt - remainingDebt;
+                      // const finalAmount = Math.abs(debtCalculation);
 
                       return (
                         <div
                           key={item.id}
                           className="bg-white border rounded-lg p-4 hover:border-blue-300 transition-colors"
                         >
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                            <div className="md:col-span-2">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                            <div className="md:col-span-1">
                               <div className="font-medium">
                                 {product?.product_name || "-"}
                               </div>
@@ -1723,15 +1737,42 @@ export default function SalesPage() {
 
                             <div>
                               <div className="text-sm text-gray-500">
-                                Цена за единицу
+                               Исходная цена
                               </div>
-                              <div className="font-medium text-green-600">
+                              <div className="font-medium text-gray-600">
                                 {formatCurrency(item?.price_per_unit || "0")}{" "}
                                 UZS
                               </div>
                             </div>
 
-                          
+                            <div>
+                              <label className="text-sm text-gray-600 mb-1 block">
+                                Цена с учётом скидки
+                              </label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={refundPrices[item.id!] || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  const updatedPrices = {
+                                    ...refundPrices,
+                                    [item.id!]: value,
+                                  };
+
+                                  setRefundPrices(updatedPrices);
+
+                                  // Auto-calculate refund payments
+                                  const qty = parseFloat(refundQuantities[item.id!] || "0");
+                                  if (qty > 0) {
+                                    updateRefundPayments(refundQuantities, updatedPrices);
+                                  }
+                                }}
+                                placeholder="0.00"
+                                className="w-full"
+                              />
+                            </div>
 
                             <div>
                               <label className="text-sm text-gray-600 mb-1 block">
@@ -1740,68 +1781,45 @@ export default function SalesPage() {
                               <Input
                                 type="number"
                                 min="0"
-                                max={maxQuantity}
                                 step="0.01"
                                 value={refundQuantities[item.id!] || ""}
                                 onChange={(e) => {
                                   const value = e.target.value;
-                                  const numValue = parseFloat(value);
-
-                                  if (numValue > maxQuantity) {
-                                    toast.error(
-                                      `${t("errors.max_quantity")}: ${maxQuantity}`,
-                                    );
-                                    return;
-                                  }
-
-                                  // Update refund quantities
-                                  setRefundQuantities((prev) => ({
-                                    ...prev,
+                                  const updatedQtys = {
+                                    ...refundQuantities,
                                     [item.id!]: value,
-                                  }));
+                                  };
 
-                                  // Auto-calculate and update refund payment amount
-                                  if (numValue > 0) {
-                                    setRefundPayments((prev) => {
-                                      const updated = [...prev];
-                                      // Calculate total from all refund items including the current one
-                                      let totalRefundAmount = 0;
-                                      const updatedRefundQuantities = {
-                                        ...refundQuantities,
-                                        [item.id!]: value,
-                                      };
-                                      Object.entries(updatedRefundQuantities).forEach(
-                                        ([saleItemId, qty]) => {
-                                          const foundItem =
-                                            selectedSaleForRefund.sale_items?.find(
-                                              (si) =>
-                                                si.id?.toString() === saleItemId,
-                                            );
-                                          if (foundItem && qty) {
-                                            totalRefundAmount +=
-                                              parseFloat(
-                                                foundItem.price_per_unit || "0",
-                                              ) * parseFloat(qty as string);
-                                          }
-                                        },
-                                      );
-                                      if (updated.length === 0) {
-                                        updated.push({
-                                          payment_method: "Наличные",
-                                          amount: totalRefundAmount.toFixed(2),
-                                        });
-                                      } else {
-                                        updated[0].amount =
-                                          totalRefundAmount.toFixed(2);
-                                      }
-                                      return updated;
-                                    });
-                                  }
+                                  setRefundQuantities(updatedQtys);
+
+                                  // Calculate payment immediately with new quantities
+                                  updateRefundPayments(updatedQtys, refundPrices);
                                 }}
                                 placeholder={`0 - ${maxQuantity}`}
                                 className="w-full"
                               />
                             </div>
+
+                            {refundQty > 0 && (
+                              <div className="md:col-span-4 bg-blue-50 p-2 rounded border border-blue-200">
+                                <div className="text-sm">
+                                  {selectedSaleForRefund.on_credit ? (
+                                    <>
+                                      <div className="flex justify-between mb-1">
+                                        <span className="text-gray-700">Данный товар:</span>
+                                        <span className="font-medium">{formatCurrency(itemRefundAmount.toFixed(2))} UZS</span>
+                                      </div>
+                                      
+                                    </>
+                                  ) : (
+                                    <div className="flex justify-between">
+                                      <span className="font-semibold">Сумма возврата:</span>
+                                      <span className="font-bold text-green-700">{formatCurrency(itemRefundAmount.toFixed(2))} UZS</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1814,18 +1832,39 @@ export default function SalesPage() {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-gray-700">
                       {t("common.refund_payments", "Методы возврата")}
-                      <span className="text-red-500">*</span>
                     </h3>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        // Calculate remaining amount to pay
+                        let totalCalculated = 0;
+                        const remainingDebt = debtData?.remaining_debt_amount || 0;
+
+                        selectedSaleForRefund?.sale_items?.forEach((item) => {
+                          const qty = parseFloat(refundQuantities[item.id!] || "0");
+                          const price = parseFloat(refundPrices[item.id!] || "0");
+                          if (qty > 0 && price > 0) {
+                            totalCalculated += price * qty;
+                          }
+                        });
+
+                        // For debt sales
+                        if (selectedSaleForRefund?.on_credit && remainingDebt > 0) {
+                          totalCalculated = totalCalculated - remainingDebt;
+                          totalCalculated = Math.max(0, totalCalculated);
+                        }
+
+                        // Calculate already paid amounts
+                        const alreadyPaid = refundPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
+                        const remainingToAdd = Math.max(0, totalCalculated - alreadyPaid);
+
                         setRefundPayments([
                           ...refundPayments,
-                          { payment_method: "Наличные", amount: "" },
-                        ])
-                      }
+                          { payment_method: "Наличные", amount: remainingToAdd.toFixed(2) },
+                        ]);
+                      }}
                     >
                       + Добавить платёж
                     </Button>
@@ -1906,7 +1945,7 @@ export default function SalesPage() {
                 {/* Notes */}
                 <div>
                   <label className="font-medium text-gray-700 mb-2 block">
-                    {t("common.notes")} <span className="text-red-500">*</span>
+                    {t("common.notes")}
                   </label>
                   <Textarea
                     value={refundNotes}
@@ -1914,7 +1953,6 @@ export default function SalesPage() {
                     placeholder={t("placeholders.refund_notes")}
                     rows={3}
                     className="w-full"
-                    required
                   />
                 </div>
               </div>
@@ -1928,6 +1966,7 @@ export default function SalesPage() {
                 setIsRefundModalOpen(false);
                 setSelectedSaleForRefund(null);
                 setRefundQuantities({});
+                setRefundPrices({});
                 setRefundNotes("");
                 setRefundPayments([]);
               }}
@@ -1936,7 +1975,7 @@ export default function SalesPage() {
             </Button>
             <Button
               onClick={handleRefundSubmit}
-              disabled={createRefund.isPending || !refundNotes.trim()}
+              disabled={createRefund.isPending}
               className="bg-red-600 hover:bg-red-700"
             >
               {createRefund.isPending ? (

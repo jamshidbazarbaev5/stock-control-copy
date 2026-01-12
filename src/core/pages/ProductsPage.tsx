@@ -6,6 +6,7 @@ import { type Product, useGetProducts, useDeleteProduct } from "../api/product";
 import { useGetCategories } from "../api/category";
 import { useTranslation } from "react-i18next";
 import { useGetMeasurements } from "../api/measurement";
+import { useGetStores } from "../api/store";
 import {
   Select,
   SelectContent,
@@ -250,6 +251,7 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>(() => localStorage.getItem("products_selectedCategory") || "");
   const [selectedMeasurement, setSelectedMeasurement] = useState<string>(() => localStorage.getItem("products_selectedMeasurement") || "");
   const [hasPrice, setHasPrice] = useState<string>(() => localStorage.getItem("products_hasPrice") || "all");
+  const [selectedStore, setSelectedStore] = useState<string>(() => localStorage.getItem("products_selectedStore") || "");
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [isRevaluationDialogOpen, setIsRevaluationDialogOpen] = useState(false);
   const [priceEdits, setPriceEdits] = useState<Record<number, PriceEdit>>({});
@@ -303,13 +305,17 @@ export default function ProductsPage() {
   }, [hasPrice]);
 
   useEffect(() => {
+    localStorage.setItem("products_selectedStore", selectedStore);
+  }, [selectedStore]);
+
+  useEffect(() => {
     localStorage.setItem("products_productTab", productTab);
   }, [productTab]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, selectedCategory, selectedMeasurement, productTab, hasPrice]);
+  }, [searchTerm, selectedCategory, selectedMeasurement, productTab, hasPrice, selectedStore]);
 
   // Barcode scanner functionality
   useEffect(() => {
@@ -435,14 +441,15 @@ export default function ProductsPage() {
   const { data: productsData, isLoading } = useGetProducts({
     params: {
       page,
-      ...(productTab === "imported" ? { is_imported: true } : { 
+      ...(productTab === "imported" ? { is_imported: true } : {
         non_zero: productTab === "with_quantity" ? 1 : 0,
-        is_imported: false 
+        is_imported: false
       }),
       ...(searchTerm && { product_name: searchTerm }),
       ...(selectedCategory && { category: selectedCategory }),
       ...(selectedMeasurement && { measurement: selectedMeasurement }),
       ...(hasPrice !== "all" && { has_price: hasPrice === "true" }),
+      ...(selectedStore && { store_id: selectedStore }),
     },
   });
 
@@ -461,17 +468,21 @@ export default function ProductsPage() {
 
   const { mutate: deleteProduct } = useDeleteProduct();
 
-  // Fetch categories and measurements for the select dropdowns
+  // Fetch categories, measurements, and stores for the select dropdowns
   const { data: categoriesData } = useGetCategories({});
   const { data: measurementsData } = useGetMeasurements({});
+  const { data: storesData } = useGetStores({});
 
-  // Get the categories and measurements arrays
+  // Get the categories, measurements, and stores arrays
   const categories = Array.isArray(categoriesData)
     ? categoriesData
     : categoriesData?.results || [];
   const measurementsList = Array.isArray(measurementsData)
     ? measurementsData
     : measurementsData?.results || [];
+  const stores = Array.isArray(storesData)
+    ? storesData
+    : storesData?.results || [];
 
   const handleEdit = (product: Product) => {
     navigate(`/edit-product/${product?.id}`);
@@ -652,6 +663,7 @@ export default function ProductsPage() {
           new_min_price: newMinPrice,
           new_selling_price_in_currency: newSellingPriceInCurrency,
           product_ids: [edit.productId],
+          ...(selectedStore && { store_id: parseInt(selectedStore) }),
         });
 
         return { success: true, productId: edit.productId };
@@ -808,7 +820,22 @@ export default function ProductsPage() {
   return (
     <div className="container mx-auto py-3">
       <div className="flex justify-between items-center mb-3">
-        <h1 className="text-2xl font-bold">{t("navigation.products")}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">{t("navigation.products")}</h1>
+          <Select value={selectedStore || "all"} onValueChange={(value) => setSelectedStore(value === "all" ? "" : value)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Выбрать магазин" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все магазины</SelectItem>
+              {stores.map((store) => (
+                <SelectItem key={store.id} value={String(store.id)}>
+                  {store.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -1043,10 +1070,12 @@ export default function ProductsPage() {
             setSelectedCategory("");
             setSelectedMeasurement("");
             setHasPrice("all");
+            setSelectedStore("");
             localStorage.removeItem("products_searchTerm");
             localStorage.removeItem("products_selectedCategory");
             localStorage.removeItem("products_selectedMeasurement");
             localStorage.removeItem("products_hasPrice");
+            localStorage.removeItem("products_selectedStore");
           }}
         >
           {t("buttons.clear_filters") || "Очистить"}
