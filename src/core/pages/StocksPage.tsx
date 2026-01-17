@@ -283,7 +283,7 @@ export default function StocksPage() {
                         {t("common.edit")}
                       </DropdownMenuItem>
                     )}
-                    {currentUser?.is_superuser && !row.is_recycled && (
+                    {currentUser?.is_superuser && !row.is_recycled && Number(row.quantity) === Number(row.quantity_for_history) && (
                       <DropdownMenuItem
                         onClick={() => {
                           setStockToDelete(row);
@@ -529,8 +529,8 @@ export default function StocksPage() {
                     {t("common.edit")}
                   </DropdownMenuItem>
                 )}
-                {/* Only show remove if superuser and stock is not recycled */}
-                {currentUser?.is_superuser && !row.is_recycled ? (
+                {/* Only show remove if superuser and stock is not recycled and quantity matches history */}
+                {currentUser?.is_superuser && !row.is_recycled && Number(row.quantity) === Number(row.quantity_for_history) ? (
                     <DropdownMenuItem
                         onClick={() => {
                           setStockToDelete(row);
