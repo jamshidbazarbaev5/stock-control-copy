@@ -180,6 +180,7 @@ export default function SalesPage() {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [productName, setProductName] = useState<string>("");
   const [saleId, setSaleId] = useState<string>("");
+  const [stockId, setStockId] = useState<string>("");
   const [selectedShift, setSelectedShift] = useState<string>("all");
   const [selectedSoldBy, setSelectedSoldBy] = useState<string>("all");
 
@@ -193,6 +194,7 @@ export default function SalesPage() {
     selectedStore,
     productName,
     saleId,
+    stockId,
     selectedShift,
     selectedSoldBy,
   ]);
@@ -224,6 +226,7 @@ export default function SalesPage() {
       end_date: endDate || undefined,
       on_credit: creditStatus !== "all" ? creditStatus === "true" : undefined,
       sale_id: saleId || undefined,
+      stock_id: stockId || undefined,
       shift_id: selectedShift === "all" ? undefined : selectedShift,
       sold_by: selectedSoldBy === "all" ? undefined : selectedSoldBy,
     },
@@ -418,6 +421,7 @@ export default function SalesPage() {
     setSelectedStore("all");
     setProductName("");
     setSaleId("");
+    setStockId("");
     setSelectedShift("all");
     setSelectedSoldBy("all");
     setPage(1);
@@ -614,27 +618,78 @@ export default function SalesPage() {
         {/* Sale Items Section */}
         {hasItems && (
           <div>
-            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2 text-sm">
+            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-sm">
               {t("common.sale_items")}
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                 {row.sale_items.length}
               </span>
             </h3>
-            <div className="space-y-1">
-              {row.sale_items.map((item, index) => (
+
+            {/* Table-like header for desktop */}
+            <div className="hidden md:grid md:grid-cols-12 gap-2 mb-2 px-3 py-2 bg-blue-100 rounded-t-lg border-b border-blue-300">
+              <div className="md:col-span-1 text-xs font-semibold text-blue-900">ID</div>
+              <div className="md:col-span-3 text-xs font-semibold text-blue-900">Товар</div>
+              <div className="md:col-span-1 text-xs font-semibold text-blue-900">Кол-во</div>
+              <div className="md:col-span-2 text-xs font-semibold text-blue-900">Цена</div>
+              <div className="md:col-span-2 text-xs font-semibold text-blue-900">Сумма</div>
+              <div className="md:col-span-3 text-xs font-semibold text-blue-900">Прибыль</div>
+            </div>
+
+            <div className="space-y-2">
+              {row.sale_items.map((item:any, index) => (
                 <div
                   key={index}
-                  className="dark:bg-expanded-row-dark bg-gray-50 p-2 rounded border-l-4 border-blue-400 transition-all duration-200"
+                  className="dark:bg-expanded-row-dark bg-white border border-blue-200 rounded hover:shadow-md transition-all duration-200"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 text-xs">
-                    <div className="sm:col-span-1">
-                      <span className="text-gray-500 font-medium text-xs">
-                        #{item.id}
-                      </span>
+                  {/* Mobile view */}
+                  <div className="md:hidden p-3 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-500 font-medium mb-1">#{item.id}</div>
+                        <span
+                          className="font-medium text-gray-800 line-clamp-2 text-sm break-words block"
+                          title={
+                            item.stock_name
+                              ? `${item.product_read?.product_name} (${item.stock_name})`
+                              : item.product_read?.product_name || "-"
+                          }
+                        >
+                          {item.stock_name
+                            ? `${item.product_read?.product_name} (${item.stock_name})`
+                            : item.product_read?.product_name || "-"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="sm:col-span-1 md:col-span-2">
+                    <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-gray-200">
+                      <div>
+                        <span className="text-gray-500">Кол-во:</span>
+                        <p className="font-medium">{parseFloat(item.quantity).toString()} {item.selling_unit_name}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Цена:</span>
+                        <p className="font-semibold text-emerald-600">{formatCurrency(item?.price_per_unit)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Сумма:</span>
+                        <p className="font-semibold text-emerald-600">{formatCurrency(item?.subtotal)}</p>
+                      </div>
+                    </div>
+                    {item.pure_revenue && (
+                      <div className="pt-2 border-t border-gray-200">
+                        <span className="text-gray-500 text-xs">Прибыль:</span>
+                        <p className="font-bold text-blue-600">{formatCurrency(item?.pure_revenue)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop view - Table format */}
+                  <div className="hidden md:grid md:grid-cols-12 gap-2 p-3 items-center border-b border-blue-100 last:border-b-0">
+                    <div className="md:col-span-1">
+                      <span className="text-xs text-gray-600 font-medium">#{item.id}</span>
+                    </div>
+                    <div className="md:col-span-3">
                       <span
-                        className="font-medium text-gray-800 line-clamp-2 text-xs sm:text-sm break-words"
+                        className="font-medium text-gray-800 line-clamp-2 text-sm break-words"
                         title={
                           item.stock_name
                             ? `${item.product_read?.product_name} (${item.stock_name})`
@@ -646,48 +701,52 @@ export default function SalesPage() {
                           : item.product_read?.product_name || "-"}
                       </span>
                     </div>
-                    <div className="sm:col-span-1">
-                      <span className="font-medium text-gray-700 text-xs">
-                        {parseFloat(item.quantity).toString()}{" "}
-                        <span className="text-gray-500">
-                          {item.product_read?.base_unit
-                            ? item.product_read.available_units?.find(
-                                (u: any) => u.id === item.selling_unit,
-                              )?.short_name || ""
-                            : ""}
-                        </span>
+                    <div className="md:col-span-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {parseFloat(item.quantity).toString()} {item.selling_unit_name}
                       </span>
                     </div>
-                    <div className="sm:col-span-1">
-                      <span className="font-semibold text-emerald-600 text-xs sm:text-sm">
+                    <div className="md:col-span-2">
+                      <span className="font-semibold text-emerald-600 text-sm">
                         {formatCurrency(item?.price_per_unit)}
                       </span>
                     </div>
+                    <div className="md:col-span-2">
+                      <span className="font-semibold text-emerald-600 text-sm">
+                        {formatCurrency(item?.subtotal)}
+                      </span>
+                    </div>
+                    <div className="md:col-span-3">
+                      <span className="font-bold text-blue-600 text-sm">
+                        {item.pure_revenue ? formatCurrency(item?.pure_revenue) : "-"}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Client info section - shown below all item details */}
                   {row.sale_debt?.client_read && (
-                    <div className="mt-1 pt-1 border-t border-gray-200">
-                      <div className="flex gap-3 text-xs">
-                        <span
-                          className="hover:underline cursor-pointer text-blue-600"
-                          onClick={() => {
-                            navigate(
-                              `/debts/${row.sale_debt?.client_read?.id}`,
-                            );
-                          }}
-                        >
-                          {row.sale_debt.client_read.name}
-                        </span>
-                        <span
-                          className="hover:underline cursor-pointer text-gray-600"
-                          onClick={() => {
-                            navigate(
-                              `/debts/${row.sale_debt?.client_read?.id}`,
-                            );
-                          }}
-                        >
-                          {row.sale_debt.client_read.phone_number}
-                        </span>
-                      </div>
+                    <div className="px-3 py-2 bg-blue-50 border-t border-blue-200 flex gap-3 text-xs rounded-b">
+                      <span className="text-gray-600">Клиент:</span>
+                      <span
+                        className="hover:underline cursor-pointer text-blue-600 font-medium"
+                        onClick={() => {
+                          navigate(
+                            `/debts/${row.sale_debt?.client_read?.id}`,
+                          );
+                        }}
+                      >
+                        {row.sale_debt.client_read.name}
+                      </span>
+                      <span
+                        className="hover:underline cursor-pointer text-blue-600"
+                        onClick={() => {
+                          navigate(
+                            `/debts/${row.sale_debt?.client_read?.id}`,
+                          );
+                        }}
+                      >
+                        {row.sale_debt.client_read.phone_number}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1220,6 +1279,16 @@ export default function SalesPage() {
             value={saleId}
             onChange={(e) => setSaleId(e.target.value)}
             placeholder="Введите ID продажи"
+            className="w-full"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Приход ИД</label>
+          <Input
+            type="text"
+            value={stockId}
+            onChange={(e) => setStockId(e.target.value)}
+            placeholder="Введите приход ID"
             className="w-full"
           />
         </div>

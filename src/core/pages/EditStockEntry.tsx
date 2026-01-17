@@ -659,53 +659,22 @@ export default function EditStockEntry() {
       field: keyof StockItemFormValues,
       value: any,
   ) => {
-    // Check if this is a field that requires API recalculation
-    const needsAPIRecalculation = [
-      "currency",
-      "purchase_unit",
-    ].includes(field);
-
     setStockItems((items) =>
         items.map((item) => {
           if (item.id === itemId) {
+            const needsRecalculation = ['currency', 'purchase_unit', 'product'].includes(field);
             return {
               ...item,
               form: {
                 ...item.form,
                 [field]: value,
               },
-              // For currency/purchase_unit changes: keep isCalculated=true so fields show,
-              // but set isCalculating=true to show loading state while API recalculates
-              ...(needsAPIRecalculation && { isCalculating: true }),
+              ...(needsRecalculation && { isCalculated: false }),
             };
           }
           return item;
         }),
     );
-
-    // For currency or purchase_unit changes, trigger API request to recalculate
-    if (needsAPIRecalculation) {
-      // Directly trigger the API call without waiting for state update
-      // Pass itemId to getFieldConfiguration which will read the updated state
-      console.log(`Triggering API recalculation for ${field} change to:`, value);
-      setTimeout(() => {
-        getFieldConfiguration(itemId);
-      }, 0);
-    }
-    // Trigger calculation for numeric fields if item is already calculated
-    else {
-      const item = stockItems.find((i) => i.id === itemId);
-      if (item?.isCalculated && [
-        "purchase_unit_quantity",
-        "quantity",
-        "price_per_unit_currency",
-        "total_price_in_currency",
-        "price_per_unit_uz",
-        "total_price_in_uz"
-      ].includes(field)) {
-        setTimeout(() => calculateItemFields(itemId, field, value), 0);
-      }
-    }
   };
 
   // Get field configuration for a stock item (for new items or recalculation)
@@ -785,10 +754,20 @@ export default function EditStockEntry() {
                 if (i.id === itemId) {
                   const updatedForm = { ...i.form };
 
-                  // Populate form with calculated values
+                  // Only update exchange_rate from API response
+                  // Keep all user-entered values intact
+                  if (response.dynamic_fields.exchange_rate?.value !== null &&
+                      response.dynamic_fields.exchange_rate?.value !== undefined) {
+                    const rawValue = formatFieldValue(response.dynamic_fields.exchange_rate.value);
+                    const displayValue = formatNumberDisplay(rawValue);
+                    updatedForm.exchange_rate = displayValue;
+                  }
+
+                  // Also populate read-only calculated fields from API response
                   Object.entries(response.dynamic_fields).forEach(
                       ([fieldName, fieldData]) => {
                         if (
+                            !fieldData.editable &&
                             fieldData.value !== null &&
                             fieldData.value !== undefined
                         ) {
@@ -801,6 +780,54 @@ export default function EditStockEntry() {
                         }
                       },
                   );
+
+                  // Recalculate dependent fields (quantity, base_unit_in_currency, etc)
+                  // based on the new exchange_rate and conversion_factor
+                  const { conversion_factor, exchange_rate, is_base_currency } = metadata;
+                  const currentQty = Number(updatedForm.purchase_unit_quantity) || 0;
+
+                  // Calculate quantity from purchase_unit_quantity * conversion_factor
+                  if (currentQty && conversion_factor) {
+                    updatedForm.quantity = formatNumberDisplay(currentQty * conversion_factor);
+                  }
+
+                  // Recalculate UZ prices based on new exchange rate
+                  if (!is_base_currency && currentQty) {
+                    const pricePerUnitCurrency = Number(updatedForm.price_per_unit_currency) || 0;
+                    if (pricePerUnitCurrency) {
+                      updatedForm.total_price_in_currency = formatNumberDisplay(
+                          pricePerUnitCurrency * currentQty,
+                      );
+                      updatedForm.price_per_unit_uz = formatNumberDisplay(
+                          pricePerUnitCurrency * exchange_rate,
+                      );
+                      updatedForm.total_price_in_uz = formatNumberDisplay(
+                          (pricePerUnitCurrency * currentQty) * exchange_rate,
+                      );
+                    }
+                  } else if (is_base_currency && currentQty) {
+                    const pricePerUnitUz = Number(updatedForm.price_per_unit_uz) || 0;
+                    if (pricePerUnitUz) {
+                      updatedForm.total_price_in_uz = formatNumberDisplay(
+                          pricePerUnitUz * currentQty,
+                      );
+                    }
+                  }
+
+                  // Calculate base_unit costs
+                  const finalQuantity = Number(updatedForm.quantity) || 0;
+                  if (finalQuantity) {
+                    updatedForm.base_unit_in_currency = formatNumberDisplay(
+                        (Number(updatedForm.total_price_in_currency) || 0) / finalQuantity,
+                    );
+                    updatedForm.base_unit_in_uzs = formatNumberDisplay(
+                        (Number(updatedForm.total_price_in_uz) || 0) / finalQuantity,
+                    );
+                  }
+
+                  // DEBUG: Log values to check what's happening
+                  console.log('DEBUG - Original form:', i.form);
+                  console.log('DEBUG - Final calculated form:', updatedForm);
 
                   return {
                     ...i,
@@ -819,7 +846,7 @@ export default function EditStockEntry() {
           console.error("Field configuration error:", error);
           toast.error("Failed to calculate stock values");
           // Reset calculating state on error
-          setStockItems((items) =>
+          setStockItems((items) =>  
               items.map((i) =>
                   i.id === itemId ? { ...i, isCalculating: false } : i,
               ),
@@ -916,14 +943,32 @@ export default function EditStockEntry() {
                     }
                   }
 
+                  // Also populate read-only calculated fields from API response
+                  Object.entries(response.dynamic_fields).forEach(
+                      ([fieldName, fieldData]) => {
+                        if (
+                            !fieldData.editable &&
+                            fieldData.value !== null &&
+                            fieldData.value !== undefined
+                        ) {
+                          const rawValue = formatFieldValue(fieldData.value);
+                          const displayValue = fieldName === 'purchase_unit_quantity'
+                              ? formatPurchaseUnitQuantity(rawValue)
+                              : formatNumberDisplay(rawValue);
+                          finalForm[fieldName as keyof StockItemFormValues] =
+                              displayValue;
+                        }
+                      },
+                  );
+
                   console.log(
-                      "Final form with exchange_rate:",
-                      finalForm.exchange_rate,
+                      "Final form with exchange_rate and calculated fields:",
+                      finalForm,
                   );
 
                   return {
                     ...i,
-                    form: finalForm, // Keep the original loaded values with fixed exchange_rate
+                    form: finalForm, // Keep the original loaded values and add calculated read-only fields
                     dynamicFields: response.dynamic_fields,
                     dynamicFieldsOrder: fieldOrder,
                     calculationMetadata: metadata,
@@ -997,9 +1042,13 @@ export default function EditStockEntry() {
     );
 
     // Trigger API request to recalculate with new product
-    // getFieldConfiguration will fetch fresh dynamic fields and update the form
+    // Use getFieldConfigurationWithOriginalValues to fetch fresh dynamic fields while preserving quantities
     setTimeout(() => {
-      getFieldConfiguration(itemId);
+      const item = stockItems.find((i) => i.id === itemId);
+      if (item) {
+        // Preserve the original form values (especially quantities) but refresh dynamic fields
+        getFieldConfigurationWithOriginalValues(itemId, item.form);
+      }
     }, 0);
   };
 
@@ -1534,7 +1583,9 @@ export default function EditStockEntry() {
           purchase_unit: Number(item.form.purchase_unit),
           currency: Number(item.form.currency),
           exchange_rate: exchangeRateId,
-          quantity: formatNumberForAPI(item.form.quantity) || 0,
+          quantity: item.quantityMismatch && item.quantityForHistory
+            ? formatNumberForAPI(item.quantityForHistory) || 0
+            : formatNumberForAPI(item.form.quantity) || 0,
           purchase_unit_quantity:
               formatPurchaseUnitQuantityForAPI(item.form.purchase_unit_quantity) || 0,
           price_per_unit_uz:
@@ -1636,22 +1687,9 @@ export default function EditStockEntry() {
 
   // Auto-trigger calculation when all required fields are filled
   useEffect(() => {
-    console.log("Auto-trigger effect running, stockItems:", stockItems.length);
     const commonValues = commonForm.getValues();
-    console.log("Common values:", commonValues);
 
     stockItems.forEach((item) => {
-      console.log(`Item ${item.id}:`, {
-        hasStore: !!commonValues.store,
-        hasSupplier: !!commonValues.supplier,
-        hasDate: !!commonValues.date_of_arrived,
-        hasProduct: !!item.form.product,
-        hasCurrency: !!item.form.currency,
-        hasPurchaseUnit: !!item.form.purchase_unit,
-        isCalculated: item.isCalculated,
-        stockId: item.stockId,
-      });
-
       if (
           commonValues.store &&
           commonValues.supplier &&
@@ -1662,18 +1700,8 @@ export default function EditStockEntry() {
           !item.isCalculated &&
           !item.isCalculating
       ) {
-        console.log(
-            `Triggering configuration for item ${item.id}, has stockId:`,
-            !!item.stockId,
-        );
-        // For existing stocks (with stockId), preserve values
-        if (item.stockId) {
-          const originalForm = { ...item.form }; // Capture current values
-          getFieldConfigurationWithOriginalValues(item.id, originalForm);
-        } else {
-          // For new stocks, calculate normally
-          getFieldConfiguration(item.id);
-        }
+        console.log(`Auto-triggering getFieldConfiguration for item ${item.id}`);
+        getFieldConfiguration(item.id);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2403,7 +2431,7 @@ export default function EditStockEntry() {
                           <div className="flex items-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-md">
                             <AlertCircle className="h-4 w-4 text-red-600" />
                             <span className="text-sm font-medium text-red-700">
-                              Редактирование запрещено (товар продан)
+                              Товар уже продается
                             </span>
                           </div>
                         )}
@@ -2411,7 +2439,7 @@ export default function EditStockEntry() {
                             <div className="flex items-center gap-2 text-sm">
                               <CheckCircle2 className="h-4 w-4 text-green-600"/>
                               <span className="text-green-700 font-medium">
-                          {item.form.quantity}{" "}
+                          {item.quantityMismatch && item.quantityForHistory ? item.quantityForHistory : item.form.quantity}{" "}
                                 {
                                   item.selectedProduct?.available_units?.[0]
                                       ?.short_name
@@ -2669,7 +2697,19 @@ export default function EditStockEntry() {
                                         // For quantity field with mismatch, show quantity_for_history
                                         displayValue = item.quantityForHistory.toString();
                                       } else {
-                                        displayValue = (item.form[fieldName as keyof StockItemFormValues] || "").toString();
+                                        // First check if value exists in item.form (from our calculations)
+                                        const formValue = item.form[fieldName as keyof StockItemFormValues];
+                                        if (formValue !== null && formValue !== undefined && formValue !== "") {
+                                          displayValue = formValue.toString();
+                                        } else if (!fieldData.editable && fieldData.value !== null && fieldData.value !== undefined) {
+                                          // For read-only calculated fields, display the value from API response as fallback
+                                          const rawValue = formatFieldValue(fieldData.value);
+                                          displayValue = fieldName === 'purchase_unit_quantity'
+                                            ? formatPurchaseUnitQuantity(rawValue)
+                                            : formatNumberDisplay(rawValue);
+                                        } else {
+                                          displayValue = formValue === null || formValue === undefined ? "" : formValue.toString();
+                                        }
                                       }
 
                                       return (

@@ -1840,9 +1840,11 @@ export default function CreateStock() {
         {/* Stock Items List */}
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">
-              {t("common.stock_items")} ({stockItems.length})
-            </h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-lg font-semibold">
+                {t("common.stock_items")} ({stockItems.length})
+              </h2>
+            </div>
             <div className="flex gap-2">
               {selectedItems.size > 0 && (
                 <Button
@@ -2016,6 +2018,9 @@ export default function CreateStock() {
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
                                 autoFocus
+                                ref={(input) => {
+                                  setTimeout(() => input?.focus(), 0);
+                                }}
                               />
                             </div>
                             <div 
@@ -2258,15 +2263,34 @@ export default function CreateStock() {
           </div>
         </div>
 
+        {/* Sticky Price Summary - Premium Style */}
+
         {/* Submit Buttons */}
-        <div className="p-6 border-t bg-gray-50 flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate("/stock")}
-          >
-            {t("common.cancel")}
-          </Button>
+        <div className="p-6 border-t bg-gray-50 flex items-center justify-between">
+          <div className="flex items-baseline gap-2">
+            {stockItems.some(item => item.isCalculated) && (
+              <div className="flex items-baseline gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                <span className="text-gray-600 text-sm font-medium">Сумма:</span>
+                <span className="text-blue-700 font-bold text-lg">
+                  {formatPrice(stockItems.reduce((sum, item) => {
+                    if (item.isCalculated) {
+                      return sum + (Number(item.form.total_price_in_uz) || 0);
+                    }
+                    return sum;
+                  }, 0))}
+                </span>
+                <span className="text-gray-500 text-xs font-medium">UZS</span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/stock")}
+            >
+              {t("common.cancel")}
+            </Button>
           <Button
             type="button"
             onClick={handleSubmit}
@@ -2302,6 +2326,7 @@ export default function CreateStock() {
           >
             {isSubmitting ? t("common.submitting") : t("common.submit")}
           </Button>
+          </div>
         </div>
       </div>
 
