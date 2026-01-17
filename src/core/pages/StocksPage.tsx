@@ -1053,38 +1053,8 @@ export default function StocksPage() {
                   </div>
                 </div>
 
-                {/* Current Page Totals */}
-                <div className="mt-6">
-                  <h4 className="text-md font-semibold text-foreground mb-3">
-                    Сумма по текущей странице
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="h-5 w-5 text-blue-600" />
-                        <span className="text-sm font-medium text-muted-foreground">
-                      Общая стоимость (валюта)
-                    </span>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-700">
-                        {formatCurrency(
-                            stocksData.total_price_in_currency_page || 0,
-                        )}
-                      </p>
-                    </div>
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Landmark className="h-5 w-5 text-emerald-600" />
-                        <span className="text-sm font-medium text-muted-foreground">
-                      Общая стоимость (UZS)
-                    </span>
-                      </div>
-                      <p className="text-2xl font-bold text-emerald-700">
-                        {formatCurrency(stocksData.total_price_in_uz_page || 0)} UZS
-                      </p>
-                    </div>
-                  </div>
-                </div>
+
+
 
                 {/* All Records Totals */}
                 <div className="mt-4">
