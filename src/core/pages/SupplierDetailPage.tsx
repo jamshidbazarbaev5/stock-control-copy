@@ -736,7 +736,7 @@ function StockDetailsAccordion({ stockEntryId }: { stockEntryId: number }) {
                   {stock.product?.product_name || 'N/A'}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatNumber(stock.quantity_for_history || 0)} {stock.purchase_unit?.short_name || ''}
+                  {formatNumber(stock.quantity_for_history || 0)} {stock.product?.base_unit_name || ''}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                   {stock.currency?.short_name || 'UZS'}
