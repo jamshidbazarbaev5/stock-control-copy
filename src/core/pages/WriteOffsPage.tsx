@@ -68,8 +68,7 @@ interface WriteOff {
 export default function WriteOffsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
-  
+
   // Filter states
   const [selectedStore, setSelectedStore] = useState<string>("");
   const [selectedReason, setSelectedReason] = useState<string>("");
@@ -152,58 +151,6 @@ export default function WriteOffsPage() {
     },
   ];
 
-  const renderExpandedRow = (writeoff: WriteOff) => {
-    return (
-      <div className="p-4 sm:p-6 bg-gray-50">
-        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Товары в списании</h3>
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[600px] bg-white rounded-lg border border-gray-200">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                  Товар
-                </th>
-                <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                  Поставщик
-                </th>
-                <th className="text-right p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                  Количество
-                </th>
-                <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                  Ед. изм.
-                </th>
-                <th className="text-left p-2 sm:p-3 font-semibold text-gray-700 text-xs sm:text-sm">
-                  Дата поступления
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {writeoff.items.map((item) => (
-                <tr key={item.id} className="border-t border-gray-200 hover:bg-gray-50">
-                  <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                    <div className="font-medium">{item.stock_read.product.product_name}</div>
-                  </td>
-                  <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                    {item.stock_read.supplier.name}
-                  </td>
-                  <td className="p-2 sm:p-3 text-right font-semibold text-xs sm:text-sm">
-                    {parseFloat(item.quantity).toFixed(2)}
-                  </td>
-                  <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                    {item.stock_read.purchase_unit.short_name}
-                  </td>
-                  <td className="p-2 sm:p-3 text-xs sm:text-sm text-gray-600">
-                    {new Date(item.stock_read.date_of_arrived).toLocaleDateString("ru-RU")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -273,9 +220,8 @@ export default function WriteOffsPage() {
           columns={columns}
           isLoading={isLoading}
           onRowClick={(writeoff) => {
-            setExpandedRowId(expandedRowId === writeoff.id ? null : writeoff.id ?? null);
+            navigate(`/writeoffs/${writeoff.id}`);
           }}
-          expandedRowRenderer={expandedRowId !== null ? renderExpandedRow : undefined}
         />
       </Card>
     </div>
