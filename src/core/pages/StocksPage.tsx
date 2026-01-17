@@ -278,7 +278,7 @@ export default function StocksPage() {
                         {t("navigation.history")}
                       </span>
                     </DropdownMenuItem>
-                    {(row.stock_entry?.supplier?.id || row.supplier_read?.id) && Number(row.quantity) === Number(row.quantity_for_history) && (
+                    {(row.stock_entry?.supplier?.id || row.supplier_read?.id) && (
                       <DropdownMenuItem onClick={() => handleEdit(row)}>
                         {t("common.edit")}
                       </DropdownMenuItem>
