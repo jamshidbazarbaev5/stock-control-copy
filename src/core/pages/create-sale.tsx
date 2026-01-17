@@ -2142,7 +2142,7 @@ function CreateSale() {
 
                   {/* Client Balance Display */}
                   {field.value &&
-                    (paymentMode === "balance" || paymentMode === "debt") && (
+                    paymentMode === "balance" && (
                       <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         {(() => {
                           const client = clients.find(
@@ -2181,15 +2181,9 @@ function CreateSale() {
                                 <div className="text-sm font-medium text-blue-700">
                                   Клиент: {client?.name}
                                 </div>
-                                {paymentMode === "debt" ? (
-                                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
-                                    В долг
-                                  </span>
-                                ) : paymentMode === "balance" ? (
-                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                                    С баланса
-                                  </span>
-                                ) : null}
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                  С баланса
+                                </span>
                               </div>
                               <div className="text-xs text-blue-600">
                                 Баланс UZS: {balanceUzs.toLocaleString()} сум
