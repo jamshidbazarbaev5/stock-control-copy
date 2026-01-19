@@ -724,7 +724,7 @@ export default function CreateStock() {
         !item.dynamicFields.purchase_unit_quantity?.editable
       ) {
         currentForm.purchase_unit_quantity = formatPurchaseUnitQuantity(
-          quantity * conversion_factor,
+          quantity / conversion_factor,
         );
       }
 

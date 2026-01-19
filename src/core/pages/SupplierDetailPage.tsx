@@ -727,7 +727,7 @@ function StockDetailsAccordion({ stockEntryId }: { stockEntryId: number }) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {stocks.map((stock, index) => (
+            {stocks.map((stock:any, index) => (
               <tr key={stock.id} className="hover:bg-gray-50">
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600">
                   {index + 1}

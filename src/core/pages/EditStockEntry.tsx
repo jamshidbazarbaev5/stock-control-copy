@@ -890,7 +890,21 @@ export default function EditStockEntry() {
 
           const response = await calculateStock(configRequest);
 
+          // Ensure purchase_unit_quantity is always in the field order
           const fieldOrder = Object.keys(response.dynamic_fields);
+          if (!fieldOrder.includes('purchase_unit_quantity')) {
+            fieldOrder.push('purchase_unit_quantity');
+            // Add default field data for purchase_unit_quantity if not in response
+            if (!response.dynamic_fields.purchase_unit_quantity) {
+              response.dynamic_fields.purchase_unit_quantity = {
+                label: 'Quantity (Purchase Unit)',
+                editable: true,
+                show: true,
+                value: originalForm.purchase_unit_quantity || '',
+              };
+            }
+          }
+
           const exchangeRateValue = response.dynamic_fields.exchange_rate?.value;
           const exchangeRate =
               typeof exchangeRateValue === "object" &&
@@ -1081,20 +1095,30 @@ export default function EditStockEntry() {
         const qty = Number(currentForm.purchase_unit_quantity) || 0;
         const quantity = Number(currentForm.quantity) || 0;
 
+        // Debug: Log the condition check
+        console.log("Checking quantity calculation condition:", {
+          changedField,
+          qty,
+          quantity_editable: item.dynamicFields.quantity?.editable,
+          purchase_unit_quantity_editable: item.dynamicFields.purchase_unit_quantity?.editable,
+        });
+
         // Update quantity based on purchase_unit_quantity
         if (
             changedField === "purchase_unit_quantity" &&
             qty &&
             !item.dynamicFields.quantity?.editable
         ) {
+          console.log("Calculating quantity:", qty, "*", conversion_factor, "=", qty * conversion_factor);
           currentForm.quantity = formatNumberDisplay(qty * conversion_factor);
         } else if (
             changedField === "quantity" &&
             quantity &&
             !item.dynamicFields.purchase_unit_quantity?.editable
         ) {
+          console.log("Calculating purchase_unit_quantity:", quantity, "/", conversion_factor, "=", quantity / conversion_factor);
           currentForm.purchase_unit_quantity = formatPurchaseUnitQuantity(
-              quantity * conversion_factor,
+              quantity / conversion_factor,
           );
         }
 
@@ -2693,14 +2717,19 @@ export default function EditStockEntry() {
                                       let displayValue: string;
                                       if (fieldName === 'exchange_rate' && item.calculationMetadata) {
                                         displayValue = item.calculationMetadata.exchange_rate.toString();
-                                      } else if (fieldName === 'quantity' && item.quantityMismatch && item.quantityForHistory) {
-                                        // For quantity field with mismatch, show quantity_for_history
-                                        displayValue = item.quantityForHistory.toString();
                                       } else {
                                         // First check if value exists in item.form (from our calculations)
                                         const formValue = item.form[fieldName as keyof StockItemFormValues];
                                         if (formValue !== null && formValue !== undefined && formValue !== "") {
-                                          displayValue = formValue.toString();
+                                          // Format the value according to field type
+                                          if (fieldName === 'purchase_unit_quantity') {
+                                            displayValue = formatPurchaseUnitQuantity(formValue);
+                                          } else {
+                                            displayValue = formatNumberDisplay(formValue);
+                                          }
+                                        } else if (fieldName === 'quantity' && item.quantityMismatch && item.quantityForHistory) {
+                                          // For quantity field with mismatch and no calculated form value, show quantity_for_history
+                                          displayValue = item.quantityForHistory.toString();
                                         } else if (!fieldData.editable && fieldData.value !== null && fieldData.value !== undefined) {
                                           // For read-only calculated fields, display the value from API response as fallback
                                           const rawValue = formatFieldValue(fieldData.value);
