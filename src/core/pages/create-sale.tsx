@@ -4,6 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+
+// Helper function to format currency like in POSInterface
+const formatCurrency = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? '0' : num.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
 import {
   Form,
   FormControl,
@@ -174,6 +180,7 @@ function CreateSale() {
   const [searchTerm, setSearchTerm] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
   const [selectedClientCache, setSelectedClientCache] = useState<any>(null);
+  const [clientsCache, setClientsCache] = useState<any[]>([]);
   const [fetchedProducts, setFetchedProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(
@@ -294,9 +301,27 @@ function CreateSale() {
 
   const createSale = useCreateSale();
   // Extract clients from response
-  const clients: any[] = Array.isArray(clientsData)
+  let clientsFromSearch: any[] = Array.isArray(clientsData)
     ? clientsData
     : clientsData?.results || [];
+  
+  // Update cache when search results change
+  useEffect(() => {
+    if (clientsFromSearch.length > 0) {
+      setClientsCache(clientsFromSearch);
+    }
+  }, [clientsFromSearch]);
+
+  // Get selected client from cache if available
+  const selectedClientId = form.watch("sale_debt.client");
+  const selectedClient = selectedClientId
+    ? clientsCache.find(c => c.id === selectedClientId)
+    : null;
+
+  // Use combined clients: selected client + cached clients from search
+  const clients: any[] = selectedClient
+    ? [selectedClient, ...clientsCache.filter(c => c.id !== selectedClient.id)]
+    : clientsCache;
 
   // Prepare data arrays
   const stores = Array.isArray(storesData)
@@ -1794,12 +1819,7 @@ function CreateSale() {
                       <FormItem className="flex-1">
                         <FormLabel className="text-blue-600">Сдача</FormLabel>
                         <div className="text-lg font-bold text-blue-600 mt-2">
-                          {(
-                            form.watch(
-                              `sale_payments.${index}.change_amount`
-                            ) || 0
-                          ).toLocaleString()}{" "}
-                          UZS
+                          {formatCurrency(form.watch(`sale_payments.${index}.change_amount`) || 0)} UZS
                         </div>
                       </FormItem>
                     )}
@@ -1817,7 +1837,7 @@ function CreateSale() {
                               type="text"
                               value={
                                 value !== undefined && value !== null
-                                  ? Number(value).toLocaleString()
+                                  ? formatCurrency(value)
                                   : ""
                               }
                               onChange={(e) => {
@@ -2186,21 +2206,13 @@ function CreateSale() {
                                 </span>
                               </div>
                               <div className="text-xs text-blue-600">
-                                Баланс UZS: {balanceUzs.toLocaleString()} сум
+                                Баланс UZS: {formatCurrency(balanceUzs)} сум
                               </div>
                               <div className="text-xs text-blue-600">
-                                Баланс USD: {balanceUsd.toLocaleString()} $ (x
-                                {exchangeRate.toLocaleString()} ={" "}
-                                {(balanceUsd * exchangeRate).toLocaleString()}{" "}
-                                сум)
+                                Баланс USD: {formatCurrency(balanceUsd)} $ (x{formatCurrency(exchangeRate)} = {formatCurrency(balanceUsd * exchangeRate)} сум)
                               </div>
                               <div className="text-xs font-semibold text-blue-700">
-                                Общий баланс:{" "}
-                                {(
-                                  balanceUzs +
-                                  balanceUsd * exchangeRate
-                                ).toLocaleString()}{" "}
-                                сум
+                                Общий баланс: {formatCurrency(balanceUzs + balanceUsd * exchangeRate)} сум
                               </div>
                               <div className="text-xs pt-1 border-t border-blue-200">
                                 <span
@@ -2210,17 +2222,12 @@ function CreateSale() {
                                       : "text-green-600 font-semibold"
                                   }
                                 >
-                                  Новый баланс:{" "}
-                                  {newTotalBalanceUzs.toLocaleString()} сум
+                                  Новый баланс: {formatCurrency(newTotalBalanceUzs)} сум
                                 </span>
                                 {!form.getValues("on_credit") &&
                                   newTotalBalanceUzs < 0 && (
                                     <span className="text-red-600 font-medium ml-2">
-                                      Осталось оплатить:{" "}
-                                      {Math.abs(
-                                        newTotalBalanceUzs
-                                      ).toLocaleString()}{" "}
-                                      сум
+                                      Осталось оплатить: {formatCurrency(Math.abs(newTotalBalanceUzs))} сум
                                     </span>
                                   )}
                               </div>
@@ -2240,8 +2247,7 @@ function CreateSale() {
                                       }}
                                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-xs font-medium transition-colors"
                                     >
-                                      Оплатить разницу (
-                                      {remainingToPay.toLocaleString()} сум)
+                                      Оплатить разницу ({formatCurrency(remainingToPay)} сум)
                                     </button>
                                     <button
                                       type="button"
@@ -2268,8 +2274,7 @@ function CreateSale() {
                               {insufficientBalanceChoice === "pay" && (
                                 <div className="mt-2 p-2 bg-blue-100 rounded-lg">
                                   <span className="text-xs font-medium text-blue-800">
-                                    ✓ Оплата разницы:{" "}
-                                    {remainingToPay.toLocaleString()} сум
+                                    ✓ Оплата разницы: {formatCurrency(remainingToPay)} сум
                                   </span>
                                   <button
                                     type="button"
@@ -2862,16 +2867,13 @@ function CreateSale() {
                   <div className="bg-blue-50 rounded-lg p-4 mb-6">
                     <div className="text-sm text-blue-700 space-y-1">
                       <p>
-                        <strong>Баланс клиента:</strong>{" "}
-                        {totalBalanceUzs.toLocaleString()} сум
+                        <strong>Баланс клиента:</strong> {formatCurrency(totalBalanceUzs)} сум
                       </p>
                       <p>
-                        <strong>Сумма покупки:</strong>{" "}
-                        {finalTotal.toLocaleString()} сум
+                        <strong>Сумма покупки:</strong> {formatCurrency(finalTotal)} сум
                       </p>
                       <p className="text-red-600 font-semibold">
-                        <strong>Не хватает:</strong>{" "}
-                        {remaining.toLocaleString()} сум
+                        <strong>Не хватает:</strong> {formatCurrency(remaining)} сум
                       </p>
                     </div>
                   </div>
@@ -2933,10 +2935,10 @@ function CreateSale() {
                   const discountAmount = parseFloat(
                     form.getValues("discount_amount") || "0"
                   );
-                  return Math.max(
+                  return formatCurrency(Math.max(
                     0,
                     totalAmount - discountAmount - totalBalanceUzs
-                  ).toLocaleString();
+                  ));
                 })()}{" "}
                 сум)
               </button>
