@@ -764,6 +764,7 @@ export default function EditStockEntry() {
                   }
 
                   // Also populate read-only calculated fields from API response
+                  // Keep existing form values, only update if empty
                   Object.entries(response.dynamic_fields).forEach(
                       ([fieldName, fieldData]) => {
                         if (
@@ -771,12 +772,12 @@ export default function EditStockEntry() {
                             fieldData.value !== null &&
                             fieldData.value !== undefined
                         ) {
-                          const rawValue = formatFieldValue(fieldData.value);
-                          const displayValue = fieldName === 'purchase_unit_quantity'
-                              ? formatPurchaseUnitQuantity(rawValue)
-                              : formatNumberDisplay(rawValue);
-                          updatedForm[fieldName as keyof StockItemFormValues] =
-                              displayValue;
+                          const existingValue = updatedForm[fieldName as keyof StockItemFormValues];
+                          // Only update if existing value is empty
+                          if (!existingValue || existingValue === "" || existingValue === "0") {
+                            const rawValue = formatFieldValue(fieldData.value);
+                            updatedForm[fieldName as keyof StockItemFormValues] = String(rawValue);
+                          }
                         }
                       },
                   );
@@ -837,6 +838,9 @@ export default function EditStockEntry() {
                     calculationMetadata: metadata,
                     isCalculated: true,
                     isCalculating: false,
+                    // Explicitly preserve quantityMismatch and quantityForHistory
+                    quantityMismatch: i.quantityMismatch,
+                    quantityForHistory: i.quantityForHistory,
                   };
                 }
                 return i;
@@ -958,6 +962,7 @@ export default function EditStockEntry() {
                   }
 
                   // Also populate read-only calculated fields from API response
+                  // BUT only if the original form doesn't already have a value
                   Object.entries(response.dynamic_fields).forEach(
                       ([fieldName, fieldData]) => {
                         if (
@@ -965,12 +970,12 @@ export default function EditStockEntry() {
                             fieldData.value !== null &&
                             fieldData.value !== undefined
                         ) {
-                          const rawValue = formatFieldValue(fieldData.value);
-                          const displayValue = fieldName === 'purchase_unit_quantity'
-                              ? formatPurchaseUnitQuantity(rawValue)
-                              : formatNumberDisplay(rawValue);
-                          finalForm[fieldName as keyof StockItemFormValues] =
-                              displayValue;
+                          // Only update if original form value is empty
+                          const originalValue = finalForm[fieldName as keyof StockItemFormValues];
+                          if (!originalValue || originalValue === "" || originalValue === "0") {
+                            const rawValue = formatFieldValue(fieldData.value);
+                            finalForm[fieldName as keyof StockItemFormValues] = String(rawValue);
+                          }
                         }
                       },
                   );
@@ -987,6 +992,9 @@ export default function EditStockEntry() {
                     dynamicFieldsOrder: fieldOrder,
                     calculationMetadata: metadata,
                     isCalculated: true, // Mark as calculated to prevent auto-recalculation
+                    // Explicitly preserve quantityMismatch and quantityForHistory
+                    quantityMismatch: i.quantityMismatch,
+                    quantityForHistory: i.quantityForHistory,
                   };
                 }
                 return i;
@@ -2463,7 +2471,7 @@ export default function EditStockEntry() {
                             <div className="flex items-center gap-2 text-sm">
                               <CheckCircle2 className="h-4 w-4 text-green-600"/>
                               <span className="text-green-700 font-medium">
-                          {item.quantityMismatch && item.quantityForHistory ? item.quantityForHistory : item.form.quantity}{" "}
+                          {item.quantityForHistory || item.form.quantity}{" "}
                                 {
                                   item.selectedProduct?.available_units?.[0]
                                       ?.short_name
@@ -2717,25 +2725,19 @@ export default function EditStockEntry() {
                                       let displayValue: string;
                                       if (fieldName === 'exchange_rate' && item.calculationMetadata) {
                                         displayValue = item.calculationMetadata.exchange_rate.toString();
+                                      } else if (fieldName === 'quantity' && item.quantityForHistory) {
+                                        // ALWAYS prioritize quantity_for_history for quantity field when it exists
+                                        displayValue = String(item.quantityForHistory);
                                       } else {
                                         // First check if value exists in item.form (from our calculations)
                                         const formValue = item.form[fieldName as keyof StockItemFormValues];
                                         if (formValue !== null && formValue !== undefined && formValue !== "") {
-                                          // Format the value according to field type
-                                          if (fieldName === 'purchase_unit_quantity') {
-                                            displayValue = formatPurchaseUnitQuantity(formValue);
-                                          } else {
-                                            displayValue = formatNumberDisplay(formValue);
-                                          }
-                                        } else if (fieldName === 'quantity' && item.quantityMismatch && item.quantityForHistory) {
-                                          // For quantity field with mismatch and no calculated form value, show quantity_for_history
-                                          displayValue = item.quantityForHistory.toString();
+                                          // Keep the raw value as-is for all fields
+                                          displayValue = String(formValue);
                                         } else if (!fieldData.editable && fieldData.value !== null && fieldData.value !== undefined) {
                                           // For read-only calculated fields, display the value from API response as fallback
                                           const rawValue = formatFieldValue(fieldData.value);
-                                          displayValue = fieldName === 'purchase_unit_quantity'
-                                            ? formatPurchaseUnitQuantity(rawValue)
-                                            : formatNumberDisplay(rawValue);
+                                          displayValue = String(rawValue);
                                         } else {
                                           displayValue = formValue === null || formValue === undefined ? "" : formValue.toString();
                                         }
