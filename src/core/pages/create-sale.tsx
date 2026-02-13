@@ -740,10 +740,12 @@ function CreateSale() {
     const currentProduct = cartProducts[index];
     if (!currentProduct) return;
 
+    // Use stock quantity if stock is selected, otherwise use product quantity
+    const quantitySource = currentProduct.stock?.quantity ?? currentProduct.product.quantity;
     const maxQuantity =
-      typeof currentProduct.product.quantity === "string"
-        ? parseFloat(currentProduct.product.quantity)
-        : currentProduct.product.quantity || 0;
+      typeof quantitySource === "string"
+        ? parseFloat(quantitySource)
+        : quantitySource || 0;
 
     if (value > maxQuantity) {
       toast.error(t("messages.error.insufficient_quantity"));

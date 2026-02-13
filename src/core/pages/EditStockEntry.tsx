@@ -422,6 +422,13 @@ export default function EditStockEntry() {
           }
         }
 
+        // DEBUG: Log what we're loading
+        console.log(`Stock ${stock.id}:`, {
+          quantity: stock.quantity,
+          quantity_for_history: stock.quantity_for_history,
+          will_use: stock.quantity_for_history || stock.quantity
+        });
+
         return {
           id: `item-${index + 1}`,
           stockId: stock.id, // Store the database ID
@@ -434,7 +441,7 @@ export default function EditStockEntry() {
             price_per_unit_currency: stock.price_per_unit_currency || "",
             price_per_unit_uz: stock.price_per_unit_uz || "",
             exchange_rate: exchangeRateValue || "",
-            quantity: stock.quantity || "",
+            quantity: stock.quantity_for_history || stock.quantity || "",
             total_price_in_uz: stock.total_price_in_uz || "",
             base_unit_in_uzs: stock.base_unit_in_uzs || "",
             base_unit_in_currency: stock.base_unit_in_currency || "",
@@ -782,49 +789,10 @@ export default function EditStockEntry() {
                       },
                   );
 
-                  // Recalculate dependent fields (quantity, base_unit_in_currency, etc)
-                  // based on the new exchange_rate and conversion_factor
-                  const { conversion_factor, exchange_rate, is_base_currency } = metadata;
-                  const currentQty = Number(updatedForm.purchase_unit_quantity) || 0;
-
-                  // Calculate quantity from purchase_unit_quantity * conversion_factor
-                  if (currentQty && conversion_factor) {
-                    updatedForm.quantity = formatNumberDisplay(currentQty * conversion_factor);
-                  }
-
-                  // Recalculate UZ prices based on new exchange rate
-                  if (!is_base_currency && currentQty) {
-                    const pricePerUnitCurrency = Number(updatedForm.price_per_unit_currency) || 0;
-                    if (pricePerUnitCurrency) {
-                      updatedForm.total_price_in_currency = formatNumberDisplay(
-                          pricePerUnitCurrency * currentQty,
-                      );
-                      updatedForm.price_per_unit_uz = formatNumberDisplay(
-                          pricePerUnitCurrency * exchange_rate,
-                      );
-                      updatedForm.total_price_in_uz = formatNumberDisplay(
-                          (pricePerUnitCurrency * currentQty) * exchange_rate,
-                      );
-                    }
-                  } else if (is_base_currency && currentQty) {
-                    const pricePerUnitUz = Number(updatedForm.price_per_unit_uz) || 0;
-                    if (pricePerUnitUz) {
-                      updatedForm.total_price_in_uz = formatNumberDisplay(
-                          pricePerUnitUz * currentQty,
-                      );
-                    }
-                  }
-
-                  // Calculate base_unit costs
-                  const finalQuantity = Number(updatedForm.quantity) || 0;
-                  if (finalQuantity) {
-                    updatedForm.base_unit_in_currency = formatNumberDisplay(
-                        (Number(updatedForm.total_price_in_currency) || 0) / finalQuantity,
-                    );
-                    updatedForm.base_unit_in_uzs = formatNumberDisplay(
-                        (Number(updatedForm.total_price_in_uz) || 0) / finalQuantity,
-                    );
-                  }
+                  // DO NOT recalculate quantity - keep the original loaded value!
+                  // This is the getFieldConfiguration function which is called for NEW items
+                  // or when fields change. For existing items with quantity_for_history,
+                  // we want to preserve those values, not recalculate them.
 
                   // DEBUG: Log values to check what's happening
                   console.log('DEBUG - Original form:', i.form);
@@ -1112,21 +1080,26 @@ export default function EditStockEntry() {
         });
 
         // Update quantity based on purchase_unit_quantity
+        // The API's conversion_factor is INVERTED (0.0132 instead of 75.76)
+        // So we need to use: purchase_unit_quantity * (1/conversion_factor) = quantity
+        // Or: quantity * conversion_factor = purchase_unit_quantity
+        const actualConversionFactor = conversion_factor > 1 ? conversion_factor : (1 / conversion_factor);
+
         if (
             changedField === "purchase_unit_quantity" &&
             qty &&
             !item.dynamicFields.quantity?.editable
         ) {
-          console.log("Calculating quantity:", qty, "*", conversion_factor, "=", qty * conversion_factor);
-          currentForm.quantity = formatNumberDisplay(qty * conversion_factor);
+          console.log("Calculating quantity:", qty, "*", actualConversionFactor, "=", qty * actualConversionFactor);
+          currentForm.quantity = formatNumberDisplay(qty * actualConversionFactor);
         } else if (
             changedField === "quantity" &&
             quantity &&
             !item.dynamicFields.purchase_unit_quantity?.editable
         ) {
-          console.log("Calculating purchase_unit_quantity:", quantity, "/", conversion_factor, "=", quantity / conversion_factor);
+          console.log("Calculating purchase_unit_quantity:", quantity, "/", actualConversionFactor, "=", quantity / actualConversionFactor);
           currentForm.purchase_unit_quantity = formatPurchaseUnitQuantity(
-              quantity / conversion_factor,
+              quantity / actualConversionFactor,
           );
         }
 
@@ -1615,9 +1588,7 @@ export default function EditStockEntry() {
           purchase_unit: Number(item.form.purchase_unit),
           currency: Number(item.form.currency),
           exchange_rate: exchangeRateId,
-          quantity: item.quantityMismatch && item.quantityForHistory
-            ? formatNumberForAPI(item.quantityForHistory) || 0
-            : formatNumberForAPI(item.form.quantity) || 0,
+          quantity: formatNumberForAPI(item.form.quantity) || 0,  // ALWAYS use the form value (edited value)
           purchase_unit_quantity:
               formatPurchaseUnitQuantityForAPI(item.form.purchase_unit_quantity) || 0,
           price_per_unit_uz:
@@ -2672,7 +2643,7 @@ export default function EditStockEntry() {
                           </div>
 
                           {/* Stock Name Field - Show only for category Лист (id: 3) */}
-                          {item.selectedProduct?.category_read?.cateroy_name === 'Лист' && (
+                          {item.selectedProduct?.category_read?.category_name === 'Лист' && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                   <Label htmlFor={`stock_name-${item.id}`}>
@@ -2725,12 +2696,19 @@ export default function EditStockEntry() {
                                       let displayValue: string;
                                       if (fieldName === 'exchange_rate' && item.calculationMetadata) {
                                         displayValue = item.calculationMetadata.exchange_rate.toString();
-                                      } else if (fieldName === 'quantity' && item.quantityForHistory) {
-                                        // ALWAYS prioritize quantity_for_history for quantity field when it exists
-                                        displayValue = String(item.quantityForHistory);
                                       } else {
-                                        // First check if value exists in item.form (from our calculations)
+                                        // Always use form values for input fields (to allow editing)
                                         const formValue = item.form[fieldName as keyof StockItemFormValues];
+
+                                        // DEBUG: Log quantity field
+                                        if (fieldName === 'quantity') {
+                                          console.log('Quantity field display:', {
+                                            formValue,
+                                            quantityForHistory: item.quantityForHistory,
+                                            editable: fieldData.editable
+                                          });
+                                        }
+
                                         if (formValue !== null && formValue !== undefined && formValue !== "") {
                                           // Keep the raw value as-is for all fields
                                           displayValue = String(formValue);

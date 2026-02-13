@@ -7,7 +7,7 @@ interface PrivateRouteProps {
   allowedRoles?: string[];
 }
 
-export function PrivateRoute({ children, allowedRoles }: PrivateRouteProps) {
+export function  PrivateRoute({ children, allowedRoles }: PrivateRouteProps) {
   const { currentUser, isLoading, isAuthenticated } = useAuth();
   const location = useLocation();
   const componentId = useRef(Math.random().toString(36).substring(7));

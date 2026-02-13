@@ -10,4 +10,4 @@ export const formatDate = (date: Date | string): string => {
     hour12: false, // This forces 24-hour format
     timeZone: 'UTC'  // This ensures we display the time in UTC
   }).format(dateObject);
-};
+}

@@ -57,7 +57,9 @@ export interface SaleData {
     };
     quantity: string;
     selling_unit: number;
+    selling_unit_name?: string;
     subtotal: string;
+    price_per_unit?: string;
   }>;
   sale_debt: {
     client_read: {
@@ -265,6 +267,22 @@ class SaleReceiptService {
         lastComponent: templateWithSpacing.style.components[templateWithSpacing.style.components.length - 1]
       });
 
+      console.log("📤 Sending print request to thermal printer service...");
+      console.log("   URL: " + `${this.PRINT_SERVICE_URL}/print-sale-receipt`);
+      console.log("   Request body:", {
+        saleData: {
+          id: saleData.id,
+          sale_id: saleData.sale_id,
+          store: saleData.store_read?.name,
+          items_count: saleData.sale_items?.length,
+        },
+        template: {
+          id: templateWithSpacing.id,
+          name: templateWithSpacing.name,
+          components_count: templateWithSpacing.style.components.length,
+        },
+      });
+
       const response = await fetch(
         `${this.PRINT_SERVICE_URL}/print-sale-receipt`,
         {
@@ -313,6 +331,13 @@ class SaleReceiptService {
     try {
       // Use thermal printer service directly (like shift closure)
       console.log("🖨 Printing sale receipt via Node.js thermal service...");
+      console.log("📋 Sale data being sent:", {
+        sale_id: saleData.sale_id,
+        store: saleData.store_read?.name,
+        items_count: saleData.sale_items?.length,
+        total: saleData.total_amount,
+      });
+      
       await this.printSaleReceipt(saleData);
       return {
         success: true,
@@ -321,14 +346,15 @@ class SaleReceiptService {
       };
     } catch (thermalError) {
       console.error("❌ Thermal printing failed:", thermalError);
+      const errorMessage = thermalError instanceof Error 
+        ? thermalError.message 
+        : String(thermalError);
+      console.error("📋 Error details:", errorMessage);
       return {
         success: false,
         method: "failed",
         message: "Ошибка печати на термопринтере",
-        error:
-          thermalError instanceof Error
-            ? thermalError.message
-            : "Unknown error",
+        error: errorMessage,
       };
     }
   }
