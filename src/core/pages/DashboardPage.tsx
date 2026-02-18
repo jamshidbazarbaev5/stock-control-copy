@@ -707,23 +707,77 @@ const DashboardPage = () => {
         <Card className="bg-white shadow-md hover:shadow-lg transition-shadow dark:bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t("dashboard.pure_revenue")}
+              {t("dashboard.pure_revenue") || "Прибыль"}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div
-              className={`text-xl font-bold ${
-                (salesProfit?.total_pure_revenue || 0) >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}
-            >
-              {new Intl.NumberFormat("uz-UZ", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              }).format(salesProfit?.total_pure_revenue || 0)}{" "}
-              <span className="text-base font-normal text-gray-500">UZS</span>
+            <div className="space-y-2">
+              {/* 1. Прибыль полностью (нак+долг) */}
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Общая прибыль
+</span>
+                <span
+                  className={`text-sm font-bold ${
+                    (salesProfit?.total_pure_revenue || 0) >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {new Intl.NumberFormat("uz-UZ", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  }).format(salesProfit?.total_pure_revenue || 0)}
+                </span>
+              </div>
+              {/* 2. Прибыль без долгов (нак) */}
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Чистая прибыль (без долгов)</span>
+                <span
+                  className={`text-sm font-bold ${
+                    (salesProfit?.non_debt_pure_revenue || 0) >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {new Intl.NumberFormat("uz-UZ", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  }).format(salesProfit?.non_debt_pure_revenue || 0)}
+                </span>
+              </div>
+              {/* 3. Прибыль долгов */}
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Прибыль по долгам</span>
+                <span
+                  className={`text-sm font-bold ${
+                    (salesProfit?.debt_pure_revenue || 0) >= 0
+                      ? "text-blue-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {new Intl.NumberFormat("uz-UZ", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  }).format(salesProfit?.debt_pure_revenue || 0)}
+                </span>
+              </div>
+              {/* 4. Прибыль после расхода */}
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="text-xs font-medium text-muted-foreground">Прибыль после расходов</span>
+                <span
+                  className={`text-sm font-bold ${
+                    (salesProfit?.pure_revenue_after_expenses || 0) >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {new Intl.NumberFormat("uz-UZ", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  }).format(salesProfit?.pure_revenue_after_expenses || 0)}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>

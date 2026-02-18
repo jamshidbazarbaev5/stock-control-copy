@@ -63,6 +63,7 @@ export interface MassPaymentPayload {
   amount: number;
   payment_method: "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта";
   usd_rate_at_payment: number;
+  target_debt_currency?: "UZS" | "USD";
 }
 
 // API endpoints

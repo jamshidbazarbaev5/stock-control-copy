@@ -740,12 +740,18 @@ function CreateSale() {
     const currentProduct = cartProducts[index];
     if (!currentProduct) return;
 
-    // Use stock quantity if stock is selected, otherwise use product quantity
+    // Use stock quantity + extra_quantity if stock is selected, otherwise use product quantity
     const quantitySource = currentProduct.stock?.quantity ?? currentProduct.product.quantity;
-    const maxQuantity =
+    const baseQuantity =
       typeof quantitySource === "string"
         ? parseFloat(quantitySource)
         : quantitySource || 0;
+    const extraQuantity = currentProduct.stock?.extra_quantity
+      ? (typeof currentProduct.stock.extra_quantity === "string"
+          ? parseFloat(currentProduct.stock.extra_quantity)
+          : currentProduct.stock.extra_quantity || 0)
+      : 0;
+    const maxQuantity = baseQuantity + extraQuantity;
 
     if (value > maxQuantity) {
       toast.error(t("messages.error.insufficient_quantity"));

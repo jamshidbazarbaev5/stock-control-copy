@@ -1177,7 +1177,7 @@ export default function SalesPage() {
               {t("common.print")}
             </Button>
           )}
-          {currentUser?.is_superuser && (
+          {(currentUser?.is_superuser || (currentUser?.role === "Продавец" && currentUser?.has_active_shift)) && (
             <Button
               variant="destructive"
               size="sm"
@@ -1407,7 +1407,7 @@ export default function SalesPage() {
               isLoading={isLoading}
               onDelete={
                 currentUser?.is_mobile_user === false &&
-                currentUser?.role !== "Продавец"
+                (currentUser?.role !== "Продавец" || currentUser?.has_active_shift)
                   ? handleDelete
                   : undefined
               }

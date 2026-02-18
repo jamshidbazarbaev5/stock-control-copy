@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGetDebtsHistory, useCreateDebtPayment } from "../api/debt";
+import { useGetDebtsHistory, useCreateDebtPayment, useGetDebtPayments, useDeleteDebtPayment, type DebtsTotals } from "../api/debt";
 import { Card } from "@/components/ui/card";
 import {
   Dialog,
@@ -19,6 +19,10 @@ import {
   MoreVertical,
   CheckCircle2,
   AlertCircle,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -38,6 +42,7 @@ interface PaymentFormData {
   amount: number;
   payment_method: string;
   usd_rate_at_payment?: number;
+  target_debt_currency?: "UZS" | "USD";
 }
 
 export default function DebtDetailsPage() {
@@ -65,6 +70,7 @@ export default function DebtDetailsPage() {
 
   const debts = debtsData?.results || [];
   const totalCount = (debtsData as any)?.count || 0;
+  const totals: DebtsTotals | undefined = (debtsData as any)?.totals;
 
   // Fetch store data when debts are loaded
   useEffect(() => {
@@ -171,6 +177,17 @@ export default function DebtDetailsPage() {
 
   const paymentFields = [
     {
+      name: "target_debt_currency",
+      label: t("forms.target_debt_currency") || "Валюта долга",
+      type: "select",
+      placeholder: t("placeholders.select_currency") || "Выберите валюту",
+      required: true,
+      options: [
+        { value: "UZS", label: "UZS" },
+        { value: "USD", label: "USD" },
+      ],
+    },
+    {
       name: "amount",
       label:
         selectedPaymentMethod === "Валюта"
@@ -204,14 +221,196 @@ export default function DebtDetailsPage() {
     },
   ];
 
+  const PaymentHistorySection = ({ debtId }: { debtId: number }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const { data: payments, isLoading } = useGetDebtPayments(debtId);
+    const deletePayment = useDeleteDebtPayment();
+
+    const paymentCount = payments?.length || 0;
+
+    const handleDeletePayment = async (paymentId: number) => {
+      if (!confirm(t("messages.confirm_delete_payment") || "Вы уверены, что хотите удалить этот платеж?")) {
+        return;
+      }
+      try {
+        await deletePayment.mutateAsync({ debtId, paymentId });
+        toast.success(t("messages.success.payment_deleted") || "Платеж успешно удален");
+      } catch (error) {
+        toast.error(t("messages.error.payment_delete_failed") || "Ошибка при удалении платежа");
+      }
+    };
+
+    return (
+      <div className="bg-card rounded-lg border overflow-hidden">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          className="w-full bg-muted/50 px-4 py-2 border-b flex items-center justify-between hover:bg-muted/70 transition-colors"
+        >
+          <h4 className="text-sm font-semibold flex items-center gap-2 text-blue-700">
+            <Receipt className="w-4 h-4" />
+            {t("forms.payment_history") || "История платежей"}
+            {paymentCount > 0 && (
+              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">
+                {paymentCount}
+              </span>
+            )}
+          </h4>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+
+        {isOpen && (
+          <>
+            {isLoading ? (
+              <div className="p-4">
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : !payments || payments.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                {t("messages.no_payments_yet") || "Нет платежей"}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/30">
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
+                        {t("forms.payment_date") || "Дата"}
+                      </th>
+                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">
+                        {t("forms.amount") || "Сумма"}
+                      </th>
+                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
+                        {t("forms.payment_method") || "Способ оплаты"}
+                      </th>
+                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">
+                        {t("forms.usd_rate") || "Курс USD"}
+                      </th>
+                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
+                        {t("forms.worker") || "Сотрудник"}
+                      </th>
+                      <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16">
+                        {t("common.actions") || ""}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((payment: any) => (
+                      <tr key={payment.id} className="border-b hover:bg-muted/20">
+                        <td className="py-2 px-4">
+                          {new Date(payment.paid_at).toLocaleDateString("ru-RU")}
+                        </td>
+                        <td className="text-right py-2 px-4 font-semibold text-emerald-600">
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td className="py-2 px-4">{payment.payment_method}</td>
+                        <td className="text-right py-2 px-4">
+                          {payment.usd_rate_at_payment ? formatCurrency(payment.usd_rate_at_payment) : "-"}
+                        </td>
+                        <td className="py-2 px-4">{payment.worker_read?.name || "-"}</td>
+                        <td className="text-center py-2 px-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePayment(payment.id);
+                            }}
+                            disabled={deletePayment.isPending}
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
   const renderExpandedRow = (debt: any) => {
     return (
       <div className="bg-muted/30 border-t">
-       
-      
+        {/* Payment Summary - 3x3 Grid */}
+        <div className="p-4">
+          <div className="grid grid-cols-3 gap-3">
+            {/* Row 1 */}
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.total_amount_uzs") || "Общая сумма (UZS)"}
+              </div>
+              <div className="font-semibold text-emerald-600">
+                {formatCurrency(debt.total_amount_uzs)} UZS
+              </div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.total_amount_usd") || "Общая сумма (USD)"}
+              </div>
+              <div className="font-semibold text-blue-600">
+                {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0
+                  ? `${formatCurrency((debt as any).total_amount_usd)} $`
+                  : "-"}
+              </div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.usd_rate_at_creation") || "Курс USD при создании"}
+              </div>
+              <div className="font-semibold">
+                {debt.usd_rate_at_creation ? `${formatCurrency(debt.usd_rate_at_creation)} UZS` : "-"}
+              </div>
+            </div>
+            {/* Row 2 */}
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.deposit") || "Задаток"}
+              </div>
+              <div className="font-semibold">{formatCurrency(debt.deposit)}</div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.remainder_uzs") || "Остаток (UZS)"}
+              </div>
+              <div
+                className={`font-semibold ${
+                  Number(debt.remainder_uzs) <= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {formatCurrency(debt.remainder_uzs)} UZS
+              </div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("forms.remainder_usd") || "Остаток (USD)"}
+              </div>
+              <div
+                className={`font-semibold ${
+                  Number((debt as any).remainder_usd) <= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0
+                  ? `${formatCurrency((debt as any).remainder_usd)} $`
+                  : "-"}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Sale Items Table */}
-        <div className="p-4 pt-2">
+        <div className="p-4 pt-0">
           <div className="bg-card rounded-lg border overflow-hidden">
             <div className="bg-muted/50 px-4 py-2 border-b">
               <h4 className="text-sm font-semibold flex items-center gap-2 text-emerald-700">
@@ -274,68 +473,9 @@ export default function DebtDetailsPage() {
           </div>
         </div>
 
-        {/* Payment Summary */}
+        {/* Payment History */}
         <div className="p-4 pt-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.total_amount_uzs")}
-              </div>
-              <div className="font-semibold text-emerald-600">
-                {formatCurrency(debt.total_amount_uzs)} UZS
-              </div>
-            </div>
-            {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0 && (
-              <div className="bg-card rounded-lg p-3 border">
-                <div className="text-xs text-muted-foreground mb-1">
-                  {t("forms.total_amount_usd") || "Сумма (USD)"}
-                </div>
-                <div className="font-semibold text-blue-600">
-                  {formatCurrency((debt as any).total_amount_usd)} $
-                </div>
-              </div>
-            )}
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">{t("forms.deposit")}</div>
-              <div className="font-semibold">{formatCurrency(debt.deposit)}</div>
-            </div>
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">{t("forms.remainder_uzs")}</div>
-              <div
-                className={`font-semibold ${
-                  Number(debt.remainder_uzs) < 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {formatCurrency(debt.remainder_uzs)}
-              </div>
-            </div>
-            {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0 && (
-              <div className="bg-card rounded-lg p-3 border">
-                <div className="text-xs text-muted-foreground mb-1">
-                  {t("forms.remainder_usd") || "Остаток (USD)"}
-                </div>
-                <div
-                  className={`font-semibold ${
-                    Number((debt as any).remainder_usd) < 0
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {formatCurrency((debt as any).remainder_usd)} $
-                </div>
-              </div>
-            )}
-            {debt.usd_rate_at_creation && (
-              <div className="bg-card rounded-lg p-3 border">
-                <div className="text-xs text-muted-foreground mb-1">
-                  {t("forms.usd_rate_at_creation")}
-                </div>
-                <div className="font-semibold">
-                  {formatCurrency(debt.usd_rate_at_creation)} UZS
-                </div>
-              </div>
-            )}
-          </div>
+          <PaymentHistorySection debtId={debt.id} />
         </div>
       </div>
     );
@@ -530,21 +670,23 @@ export default function DebtDetailsPage() {
             {t("common.total_debt")} (UZS)
           </div>
           <div className="text-xl font-bold text-emerald-600">
-            {formatCurrency(
-              debts.reduce((sum, d) => sum + Number(d.total_amount_uzs || 0), 0)
-            )}{" "}
-            UZS
+            {formatCurrency(totals?.total_amount_uzs || 0)} UZS
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground mb-1">
-            {t("common.total_deposit")} (UZS)
+            {t("common.total_debt")} (USD)
+          </div>
+          <div className="text-xl font-bold text-blue-600">
+            {formatCurrency(totals?.total_amount_usd || 0)} $
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("common.total_deposit")}
           </div>
           <div className="text-xl font-bold">
-            {formatCurrency(
-              debts.reduce((sum, d) => sum + Number(d.deposit || 0), 0)
-            )}{" "}
-            UZS
+            {formatCurrency(totals?.deposit || 0)} UZS
           </div>
         </Card>
         <Card className="p-4">
@@ -552,10 +694,15 @@ export default function DebtDetailsPage() {
             {t("dashboard.remaining_debt")} (UZS)
           </div>
           <div className="text-xl font-bold text-red-600">
-            {formatCurrency(
-              debts.reduce((sum, d) => sum + Number(d.remainder_uzs || 0), 0)
-            )}{" "}
-            UZS
+            {formatCurrency(totals?.remainder_uzs || 0)} UZS
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground mb-1">
+            {t("dashboard.remaining_debt")} (USD)
+          </div>
+          <div className="text-xl font-bold text-red-600">
+            {formatCurrency(totals?.remainder_usd || 0)} $
           </div>
         </Card>
         <Card className="p-4">
@@ -563,7 +710,7 @@ export default function DebtDetailsPage() {
             {t("common.paid_debts")}
           </div>
           <div className="text-xl font-bold text-emerald-600">
-            {debts.filter((d) => d.is_paid).length} / {debts.length}
+            {totals?.paid_debts || 0} / {totals?.total_debts || 0}
           </div>
         </Card>
       </div>

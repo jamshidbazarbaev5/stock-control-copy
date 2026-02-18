@@ -47,6 +47,7 @@ import CreateStaff from "./core/pages/create-staff";
 import IncomeDetailsPage from "./core/pages/IncomeDetailsPage";
 // import EditSale from "÷./core/pages/edit-sale";
 import DebtDetailsPage from "./core/pages/DebtDetailsPage";
+import DeletedPaymentsPage from "./core/pages/DeletedPaymentsPage";
 import CreateSale from "./core/pages/create-sale";
 import ExpenseNamesPage from "./core/pages/ExpenseNamesPage";
 import CreateExpenseName from "./core/pages/create-expense-name";
@@ -416,6 +417,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <DebtDetailsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/deleted-payments"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <DeletedPaymentsPage />
                   </PrivateRoute>
                 }
               />

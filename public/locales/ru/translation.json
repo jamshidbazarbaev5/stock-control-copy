@@ -575,7 +575,9 @@
   },
 
   "forms": {
+    "target_debt_currency":"Тип Долга",
     "per":"Перечисление",
+    "usd_rate":"Курс USD",
     "available_balance":"Баланс",
     "balance_uzs":"Баланс в УЗС",
     "balance_usd":"Баланс в USD",
@@ -814,6 +816,7 @@
     "seller": "Продавец"
   },
   "messages": {
+    "no_payments_yet":"Нет платежей",
     "create": "Создать",
     "no_payments_found": "Платежи не найдены",
     "created_successfully": "Успешно создано",
@@ -881,7 +884,7 @@
     "select_sponsor": "Выберите спонсора",
     "quantity_of_parts": "Введите количество частей",
     "search_loansponsor": "Пишите спонсора",
-    "select_currency": "Выберите валюту",
+    "select_currency": "Выберите тип долга",
     "refund_notes": "Укажите причину возврата",
     "enter_length": "Введите толщину",
     "enter_static_weight": "Введите метр",
@@ -1075,6 +1078,7 @@
     "recycled": "Переработан"
   },
   "messages": {
+      "no_payments_yet":"Нет платежей",
     "no_payments_found": "Нет платежи",
     "create": "Создать",
     "no_data_to_display": "Нет данных для отображения",

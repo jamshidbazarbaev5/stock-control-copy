@@ -10,6 +10,7 @@ export interface PaginatedResponse<T> {
     next: string | null;
     previous: string | null;
   };
+  count: number;
   total_pages: number;
   current_page: number;
   page_range: number[];
@@ -181,6 +182,7 @@ export interface DebtPayment {
   paid_at?: string;
   payment_method: string;
   usd_rate_at_payment?: number;
+  target_debt_currency?: "UZS" | "USD";
   worker_read?: {
     id: number;
     name: string;
@@ -255,13 +257,63 @@ export const useGetDebtPayments = (debtId: number) => {
   });
 };
 
+export const useDeleteDebtPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ debtId, paymentId }: { debtId: number; paymentId: number }) => {
+      const response = await api.delete(`debts/${debtId}/payments/${paymentId}/`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["debts"] });
+      queryClient.invalidateQueries({ queryKey: ["debtPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["debtsHistory"] });
+    },
+  });
+};
+
+export interface DebtsTotals {
+  total_amount_uzs: number;
+  total_amount_usd: number;
+  remainder_uzs: number;
+  remainder_usd: number;
+  deposit: number;
+  paid_debts: number;
+  total_debts: number;
+}
+
 export const useGetDebtsHistory = (clientId: number, page: number = 1) => {
   return useQuery({
     queryKey: ["debtsHistory", clientId, page],
     queryFn: async () => {
-      const response = await api.get<PaginatedResponse<Debt>>(
+      const response = await api.get<PaginatedResponse<Debt> & { totals: DebtsTotals }>(
         `debts?client=${clientId}&page=${page}`,
       );
+      return response.data;
+    },
+  });
+};
+
+export interface DeletedPayment {
+  id: number;
+  debt_id: number;
+  client_name: string;
+  store_name: string;
+  amount: string;
+  payment_method: string;
+  target_debt_currency: string;
+  usd_rate_at_payment: string;
+  paid_at: string;
+  paid_by: string;
+  deleted_by: string;
+  deleted_at: string;
+}
+
+export const useGetDeletedPayments = (page: number = 1) => {
+  return useQuery<PaginatedResponse<DeletedPayment>>({
+    queryKey: ["deletedPayments", page],
+    queryFn: async () => {
+      const response = await api.get(`debts/deleted-payments/?page=${page}`);
       return response.data;
     },
   });

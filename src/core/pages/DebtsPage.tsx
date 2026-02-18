@@ -32,6 +32,7 @@ interface PaymentFormData {
   amount: number;
   payment_method: "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта";
   usd_rate_at_payment?: number;
+  target_debt_currency?: "UZS" | "USD";
 }
 
 export default function DebtsPage() {
@@ -47,9 +48,13 @@ export default function DebtsPage() {
     useState<DebtByClient | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [storeData, setStoreData] = useState<any>(null);
-  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин">(
-    "Физ.лицо",
-  );
+  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин">(() => {
+    const saved = localStorage.getItem("debtsPageTab");
+    if (saved === "Физ.лицо" || saved === "Юр.лицо" || saved === "Магазин") {
+      return saved;
+    }
+    return "Физ.лицо";
+  });
   const [searchName, setSearchName] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 30;
@@ -148,6 +153,7 @@ export default function DebtsPage() {
         amount: data.amount,
         payment_method: data.payment_method as "Наличные" | "Карта" | "Click" | "Перечисление" | "Валюта",
         usd_rate_at_payment: data.usd_rate_at_payment || usdRate,
+        target_debt_currency: data.target_debt_currency,
       });
       toast.success(t("common.mass_payment_successful", "Mass payment successful"));
       setIsMassPaymentOpen(false);
@@ -191,6 +197,17 @@ export default function DebtsPage() {
   ];
 
   const massPaymentFields = [
+    {
+      name: "target_debt_currency",
+      label: t("forms.target_debt_currency") || "Валюта долга",
+      type: "select",
+      placeholder: t("placeholders.select_currency") || "Выберите валюту",
+      required: true,
+      options: [
+        { value: "UZS", label: "UZS" },
+        { value: "USD", label: "USD" },
+      ],
+    },
     {
       name: "amount",
       label: t("forms.amount"),
@@ -315,7 +332,7 @@ export default function DebtsPage() {
               onClick={() => navigate(`/clients/${client.id}/history`)}
               className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white"
             >
-              {t("forms.history")}
+              История баланса
             </button>
           )}
           <button
@@ -341,13 +358,23 @@ export default function DebtsPage() {
             onChange={(e) => setSearchName(e.target.value)}
             placeholder={t("forms.search_by_name")}
           />
-       
+          <div className="flex justify-end">
+            <button
+              onClick={() => navigate("/deleted-payments")}
+              className="px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white"
+            >
+              Удаленные платежи
+            </button>
+          </div>
         </div>
       </Card>
 
       <Tabs
         value={selectedTab}
-        onValueChange={setSelectedTab as (value: string) => void}
+        onValueChange={(value: string) => {
+          setSelectedTab(value as "Физ.лицо" | "Юр.лицо" | "Магазин");
+          localStorage.setItem("debtsPageTab", value);
+        }}
         className="mb-6"
       >
         <TabsList className="grid w-full grid-cols-4">
@@ -405,6 +432,22 @@ export default function DebtsPage() {
               {selectedMassPaymentClient?.name}
             </DialogDescription>
           </DialogHeader>
+          {selectedMassPaymentClient && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <div className="text-xs text-emerald-700 mb-1">{t("forms.total_remainder_uzs") || "Остаток (UZS)"}</div>
+                <div className="text-lg font-bold text-emerald-800">
+                  {Number(selectedMassPaymentClient.total_remainder_uzs || 0).toLocaleString()} UZS
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="text-xs text-blue-700 mb-1">{t("forms.total_remainder_usd") || "Остаток (USD)"}</div>
+                <div className="text-lg font-bold text-blue-800">
+                  {Number(selectedMassPaymentClient.total_remainder_usd || 0).toLocaleString()} $
+                </div>
+              </div>
+            </div>
+          )}
           {selectedMassPaymentClient?.type === "Магазин" && selectedPaymentMethod && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <div className="text-sm text-blue-700">
@@ -420,7 +463,6 @@ export default function DebtsPage() {
             fields={massPaymentFields}
             onSubmit={handleMassPaymentSubmit}
             isSubmitting={massPayment.isPending}
-            title={t("common.mass_payment", "Mass Payment")}
           />
         </DialogContent>
       </Dialog>
