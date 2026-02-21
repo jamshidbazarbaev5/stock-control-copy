@@ -188,7 +188,7 @@ const POSInterfaceCore = () => {
           selectedSeller: null,
           selectedClient: null,
           clientSearchTerm: "",
-          paymentMode: "balance",
+          paymentMode: "none",
           debtDeposit: "",
           debtDueDate: "",
           depositPaymentMethod: "Наличные",
@@ -235,9 +235,8 @@ const POSInterfaceCore = () => {
       currentSession.clientSearchTerm,
   );
   // Payment mode: "none" = no client action, "balance" = use client balance, "debt" = on credit/debt
-  const [paymentMode, setPaymentMode] = useState<"none" | "balance" | "debt">(
-      currentSession.paymentMode || "none",
-  );
+  // Always start with "none" - user must explicitly select balance/debt mode
+  const [paymentMode, setPaymentMode] = useState<"none" | "balance" | "debt">("none");
   // For debt mode - deposit and due date
   const [debtDeposit, setDebtDeposit] = useState(currentSession.debtDeposit || "");
   const [debtDueDate, setDebtDueDate] = useState(currentSession.debtDueDate || "");

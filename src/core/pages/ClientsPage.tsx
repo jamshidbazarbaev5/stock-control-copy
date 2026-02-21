@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { MoreHorizontal, Wallet, History, DollarSign, Plus, CreditCard } from "lucide-react";
+import { MoreHorizontal, Wallet, History, DollarSign, Plus, CreditCard, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,7 @@ import { api } from "../api/client";
 
 const formSchema = z.object({
   amount: z.number().min(0.01, "Amount must be greater than 0"),
-  store: z.number().min(1, "Store is required"),
+  store: z.number().optional(),
   payment_method: z.enum(["Наличные", "Карта", "Click", "Перечисление"]),
 });
 
@@ -77,10 +77,11 @@ function BalanceIncrementDialog({
 
   const onSubmit = async (data: FormData) => {
     try {
+      const storeId = currentUser?.is_superuser ? data.store : currentUser?.store_read?.id;
       await incrementBalance.mutateAsync({
         id: clientId,
         amount: data.amount,
-        store: data.store,
+        store: storeId!,
         payment_method: data.payment_method,
       });
       toast.success(t("messages.success.balance_incremented"));
@@ -95,8 +96,8 @@ function BalanceIncrementDialog({
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+      <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+        <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-50">
           <DialogHeader>
             <DialogTitle>{t("forms.increment_balance")}</DialogTitle>
           </DialogHeader>
@@ -117,7 +118,7 @@ function BalanceIncrementDialog({
                                 <SelectTrigger>
                                   <SelectValue placeholder={t("placeholders.select_store")} />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent position="popper">
                                   {stores.map((store) => (
                                       <SelectItem key={store.id} value={store.id!.toString()}>
                                         {store.name}
@@ -160,7 +161,7 @@ function BalanceIncrementDialog({
                             <SelectTrigger>
                               <SelectValue placeholder={t("placeholders.select_payment_method")} />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               <SelectItem value="Наличные">{t("payment_types.cash")}</SelectItem>
                               <SelectItem value="Карта">{t("payment_types.card")}</SelectItem>
                               <SelectItem value="Click">{t("payment_types.click")}</SelectItem>
@@ -270,8 +271,8 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+      <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+        <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-50">
           <DialogHeader>
             <DialogTitle>{t("common.create_debt", "Create Debt")}</DialogTitle>
           </DialogHeader>
@@ -292,7 +293,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
                                 <SelectTrigger>
                                   <SelectValue placeholder={t("placeholders.select_store")} />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent position="popper">
                                   {stores.map((store) => (
                                       <SelectItem key={store.id} value={store.id!.toString()}>
                                         {store.name}
@@ -345,7 +346,7 @@ function CreateDebtDialog({ clientId, isOpen, onClose }: CreateDebtDialogProps) 
                             <SelectTrigger>
                               <SelectValue placeholder={t("placeholders.select_debt_type", "Выберите тип")} />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               <SelectItem value="UZS">UZS</SelectItem>
                               <SelectItem value="USD">USD</SelectItem>
                             </SelectContent>
@@ -400,8 +401,8 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+      <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+        <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-50">
           <DialogHeader>
             <DialogTitle>Обналичичка</DialogTitle>
           </DialogHeader>
@@ -422,7 +423,7 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
                                 <SelectTrigger>
                                   <SelectValue placeholder={t("placeholders.select_store")} />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent position="popper">
                                   {stores.map((store) => (
                                       <SelectItem key={store.id} value={store.id!.toString()}>
                                         {store.name}
@@ -463,7 +464,7 @@ function CashOutDialog({ clientId, isOpen, onClose }: CashOutDialogProps) {
                             <SelectTrigger>
                               <SelectValue placeholder={t("placeholders.select_payment_method")} />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               <SelectItem value="Наличные">{t("payment_types.cash")}</SelectItem>
                               <SelectItem value="Карта">{t("payment_types.card")}</SelectItem>
                               <SelectItem value="Click">{t("payment_types.click")}</SelectItem>
@@ -576,8 +577,8 @@ function MassPaymentDialog({ clientId, isOpen, onClose, client }: MassPaymentDia
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+      <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+        <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-50">
           <DialogHeader>
             <DialogTitle>{t("common.mass_payment", "Массовая оплата")}</DialogTitle>
           </DialogHeader>
@@ -625,7 +626,7 @@ function MassPaymentDialog({ clientId, isOpen, onClose, client }: MassPaymentDia
                             <SelectTrigger>
                               <SelectValue placeholder={t("placeholders.select_payment_method")} />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               <SelectItem value="Наличные">{t("payment_types.cash")}</SelectItem>
                               <SelectItem value="Карта">{t("payment_types.card")}</SelectItem>
                               <SelectItem value="Click">{t("payment_types.click")}</SelectItem>
@@ -676,6 +677,7 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [cashOutClientId, setCashOutClientId] = useState<number | null>(null);
@@ -688,6 +690,7 @@ export default function ClientsPage() {
     params: {
       page,
       ...(selectedType === "all" ? {} : { type: selectedType }),
+      ...(searchQuery ? { name: searchQuery } : {}),
     },
   });
   const deleteClient = useDeleteClientCustom();
@@ -702,7 +705,7 @@ export default function ClientsPage() {
   // Reset to page 1 when filter changes
   useEffect(() => {
     setPage(1);
-  }, [selectedType]);
+  }, [selectedType, searchQuery]);
 
   const columns :any = [
     {
@@ -751,9 +754,18 @@ export default function ClientsPage() {
 
   return (
       <div className="container py-8 px-4">
-        <div className="mb-4">
+        <div className="mb-4 flex gap-4">
+          <div className="relative w-1/2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t("common.search", "Поиск по имени...")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger>
+            <SelectTrigger className="w-1/2">
               <SelectValue placeholder={t("forms.select_client_type")} />
             </SelectTrigger>
             <SelectContent>
@@ -865,7 +877,7 @@ export default function ClientsPage() {
                             <CreditCard className="h-4 w-4 mr-2" />
                             {t("common.mass_payment", "Массовая оплата")}
                           </button>
-                          {currentUser?.is_superuser && (
+                          {currentUser && (
                               <>
                                 <button
                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-gray-100"
