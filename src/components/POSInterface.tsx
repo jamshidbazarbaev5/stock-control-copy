@@ -740,6 +740,14 @@ const POSInterfaceCore = () => {
 
           if (existingProductIndex >= 0) {
             // Product already in cart - increment quantity by 1 without showing modal
+            const existing = cartProducts[existingProductIndex];
+            const baseQty = existing.product.quantity ? parseFloat(String(existing.product.quantity)) : 0;
+            const factor = existing.selectedUnit?.factor || 1;
+            const availableInUnit = baseQty * factor;
+            if (existing.quantity + 1 > availableInUnit) {
+              toast.error(`Недостаточно товара "${existing.name}". Доступно: ${availableInUnit.toFixed(2)} ${existing.selectedUnit?.short_name || "шт"}`);
+              return;
+            }
             const updatedProducts = cartProducts.map((p, idx) =>
                 idx === existingProductIndex
                     ? {
@@ -1297,13 +1305,15 @@ const POSInterfaceCore = () => {
         setCartProducts((prev) =>
             prev.map((p, idx) => {
               if ((atIndex ?? -1) === idx || p.id === productId) {
-                // Check available quantity
-                const availableQuantity = p.product.quantity
+                // Check available quantity converted to current unit
+                const baseQuantity = p.product.quantity
                     ? parseFloat(String(p.product.quantity))
                     : 0;
-                if (newQuantity > availableQuantity) {
+                const factor = p.selectedUnit?.factor || 1;
+                const availableInUnit = baseQuantity * factor;
+                if (newQuantity > availableInUnit) {
                   toast.error(
-                      `Недостаточно товара "${p.name}". Доступно: ${availableQuantity}`,
+                      `Недостаточно товара "${p.name}". Доступно: ${availableInUnit.toFixed(2)} ${p.selectedUnit?.short_name || "шт"}`,
                   );
                   return p; // Don't update if exceeds available quantity
                 }
@@ -2086,9 +2096,9 @@ const POSInterfaceCore = () => {
                                     )}
                                     <div className="text-xs text-green-600 font-medium leading-tight">
                                       В наличии:{" "}
-                                      {parseFloat(
+                                      {(parseFloat(
                                           String(product.product.quantity),
-                                      ).toFixed(2)}{" "}
+                                      ) * (product.selectedUnit?.factor || 1)).toFixed(2)}{" "}
                                       {product.selectedUnit?.short_name || "шт"}
                                     </div>
                                   </div>
@@ -2120,10 +2130,22 @@ const POSInterfaceCore = () => {
                                                     (u) => u.id === unitId,
                                                 );
                                             if (selectedUnit) {
+                                              // Recalculate price based on unit factor: base_price / factor
+                                              const basePrice = product.product.selling_price
+                                                  ? parseFloat(String(product.product.selling_price))
+                                                  : product.product.min_price
+                                                      ? parseFloat(String(product.product.min_price))
+                                                      : 10000;
+                                              const newPrice = basePrice / selectedUnit.factor;
+                                              // Set quantity to max available in the new unit
+                                              const baseQuantity = product.product.quantity
+                                                  ? parseFloat(String(product.product.quantity))
+                                                  : 0;
+                                              const newQuantity = baseQuantity * selectedUnit.factor;
                                               const updatedProducts = cartProducts.map(
                                                   (p) =>
                                                       p.id === product.id
-                                                          ? { ...p, selectedUnit }
+                                                          ? { ...p, selectedUnit, price: newPrice, quantity: newQuantity, total: newPrice * newQuantity }
                                                           : p,
                                               );
                                               setCartProducts(updatedProducts);
@@ -2195,13 +2217,13 @@ const POSInterfaceCore = () => {
                                         }
                                         disabled={
                                             product.quantity >=
-                                            parseFloat(String(product.product.quantity))
+                                            parseFloat(String(product.product.quantity)) * (product.selectedUnit?.factor || 1)
                                         }
                                         className={`w-6 h-6 rounded-full ${
                                             index === focusedProductIndex
                                                 ? "bg-blue-200 hover:bg-blue-300 text-blue-800"
                                                 : "bg-gray-200 hover:bg-gray-300"
-                                        } ${product.quantity >= parseFloat(String(product.product.quantity)) ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-xs font-bold transition-colors`}
+                                        } ${product.quantity >= parseFloat(String(product.product.quantity)) * (product.selectedUnit?.factor || 1) ? "opacity-50 cursor-not-allowed" : ""} flex items-center justify-center text-xs font-bold transition-colors`}
                                     >
                                       +
                                     </button>
@@ -3419,12 +3441,14 @@ const POSInterfaceCore = () => {
                     {/* Preset Quantity Cards */}
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       {[5, 10, 15, 20, 25, 30].map((qty) => {
-                        const availableQty = selectedProductForQuantity?.product
+                        const baseQty = selectedProductForQuantity?.product
                             .quantity
                             ? parseFloat(
                                 String(selectedProductForQuantity.product.quantity),
                             )
                             : 0;
+                        const factor = selectedProductForQuantity?.selectedUnit?.factor || 1;
+                        const availableQty = baseQty * factor;
                         const isDisabled = qty > availableQty;
                         return (
                             <button
@@ -3514,7 +3538,7 @@ const POSInterfaceCore = () => {
                                   String(
                                       selectedProductForQuantity?.product.quantity || 0,
                                   ),
-                              )
+                              ) * (selectedProductForQuantity?.selectedUnit?.factor || 1)
                                   ? "border-red-500 focus:border-red-600"
                                   : "border-gray-300 focus:border-blue-500"
                           }`}
@@ -3529,7 +3553,7 @@ const POSInterfaceCore = () => {
                               String(
                                   selectedProductForQuantity?.product.quantity || 0,
                               ),
-                          ) && (
+                          ) * (selectedProductForQuantity?.selectedUnit?.factor || 1) && (
                               <p className="text-red-500 text-sm mt-2 text-center">
                                 Превышает доступное количество
                               </p>
@@ -3537,9 +3561,9 @@ const POSInterfaceCore = () => {
                       {selectedProductForQuantity && (
                           <p className="text-gray-500 text-sm mt-2 text-center">
                             Доступно:{" "}
-                            {parseFloat(
+                            {(parseFloat(
                                 String(selectedProductForQuantity.product.quantity),
-                            ).toFixed(2)}{" "}
+                            ) * (selectedProductForQuantity.selectedUnit?.factor || 1)).toFixed(2)}{" "}
                             {selectedProductForQuantity.selectedUnit?.short_name ||
                                 "шт"}
                           </p>
@@ -3786,10 +3810,10 @@ const POSInterfaceCore = () => {
                           ...(selectedClient && { client: selectedClient }),
                           sale_items: cartProducts.map((item) => ({
                             product_write: item.productId,
-                            quantity: item.quantity,
+                            quantity: parseFloat(item.quantity.toFixed(4)),
                             selling_unit:
                                 item.selectedUnit?.id || item.product.base_unit || 1,
-                            price_per_unit: item.price,
+                            price_per_unit: parseFloat(item.price.toFixed(2)),
                           })),
                           // For sufficient balance, no sale_payments (use balance)
                           // For insufficient balance + payment, include sale_payments (pay the difference)
@@ -3818,8 +3842,8 @@ const POSInterfaceCore = () => {
                           sale_items: cartProducts.map((item) => ({
                             product_write: item.productId,
                             selling_unit: item?.selectedUnit?.id,
-                            quantity: item.quantity.toString(),
-                            price_per_unit: item.price.toString(),
+                            quantity: parseFloat(item.quantity.toFixed(4)).toString(),
+                            price_per_unit: parseFloat(item.price.toFixed(2)).toString(),
                             ...(item.stockId && { stock: item.stockId }),
                           })),
                           on_credit: isOnCredit,
