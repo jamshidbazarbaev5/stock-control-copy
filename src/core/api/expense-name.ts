@@ -4,6 +4,7 @@ import { createResourceApiHooks } from '../helpers/createResourceApi';
 export interface ExpenseName {
   id?: number;
   name: string;
+  reduce_from_budget?: boolean;
 }
 
 // API endpoints

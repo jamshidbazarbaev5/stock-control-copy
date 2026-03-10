@@ -94,6 +94,7 @@ export default function SuppliersPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [searchName, setSearchName] = useState("");
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
   const [selectedSupplierForBalance, setSelectedSupplierForBalance] =
@@ -130,7 +131,10 @@ export default function SuppliersPage() {
 
   // Queries and Mutations
   const { data: suppliersData, isLoading } = useGetSuppliers({
-    params: { page },
+    params: { 
+      page,
+      ...(searchName && { name: searchName }),
+    },
   });
   const { data: storesData } = useGetStores({});
   const deleteSupplier = useDeleteSupplier();
@@ -404,6 +408,17 @@ export default function SuppliersPage() {
       <div className="container mx-auto py-6 relative">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t("navigation.suppliers")}</h1>
+        </div>
+        <div className="mb-4">
+          <Input
+            placeholder={t("placeholders.search_by_name") || "Search by name..."}
+            value={searchName}
+            onChange={(e) => {
+              setSearchName(e.target.value);
+              setPage(1);
+            }}
+            className="max-w-sm"
+          />
         </div>
         <ResourceTable
             data={suppliers}

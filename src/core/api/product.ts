@@ -43,6 +43,7 @@ export interface Product {
     sell_from_stock?: boolean;
   };
   min_price?: number;
+  min_stock?: number;
   selling_price?: number;
   selling_price_in_currency?: number | string;
   sell_in_currency_unit?: {

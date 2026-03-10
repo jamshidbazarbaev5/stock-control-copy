@@ -75,6 +75,8 @@ import SponsorLoansPage from "./core/pages/SponsorLoansPage";
 import LoanPaymentsPage from "./core/pages/LoanPaymentsPage";
 import LabelSizesPage from "./core/pages/LabelSizesPage";
 import CreateLabelSize from "./core/pages/create-label-size";
+import ChargeTypesPage from "./core/pages/ChargeTypesPage";
+import CreateChargeType from "./core/pages/CreateChargeType";
 import PrintBarcodePage from "./core/pages/PrintBarcodePage";
 import POSPage from "./core/pages/POSPage";
 import ProtectedRoute from "@/components/ProtectedRoute.tsx";
@@ -782,6 +784,22 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <CreateLabelSize />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/charge-types"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <ChargeTypesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/create-charge-type"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <CreateChargeType />
                   </PrivateRoute>
                 }
               />

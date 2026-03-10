@@ -475,6 +475,47 @@ export default function DebtDetailsPage() {
 
         {/* Payment History */}
         <div className="p-4 pt-0">
+          {/* Sale Charges Section */}
+          {debt.sale_read?.sale_charges?.length > 0 && (
+            <div className="bg-card rounded-lg border overflow-hidden mb-4">
+              <div className="bg-muted/50 px-4 py-2 border-b">
+                <h4 className="text-sm font-semibold flex items-center gap-2 text-orange-700">
+                  <Package className="w-4 h-4" />
+                  {t("forms.sale_charges") || "Доп. начисления"}
+                </h4>
+              </div>
+              <div className="p-4">
+                <div className="space-y-2">
+                  {debt.sale_read.sale_charges.map((charge: any) => (
+                    <div
+                      key={charge.id}
+                      className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded px-3 py-2"
+                    >
+                      <span className="text-sm text-gray-700">
+                        {charge.charge_type_name || `Тип #${charge.charge_type}`}
+                      </span>
+                      <span className="font-semibold text-orange-700">
+                        {formatCurrency(charge.amount)} UZS
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center bg-orange-100 rounded px-3 py-2 font-semibold text-orange-800 border-t-2 border-orange-300 mt-2">
+                    <span>Итого начислений:</span>
+                    <span>
+                      {formatCurrency(
+                        debt.sale_read.sale_charges.reduce(
+                          (sum: number, c: any) => sum + parseFloat(c.amount || 0),
+                          0
+                        )
+                      )}{" "}
+                      UZS
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <PaymentHistorySection debtId={debt.id} />
         </div>
       </div>

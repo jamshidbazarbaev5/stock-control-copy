@@ -74,3 +74,17 @@ export const useUpdateWriteoff = () => {
     },
   });
 };
+
+export const useDeleteWriteoff = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await api.delete(`/writeoffs/${id}/delete/`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['writeoffs'] });
+    },
+  });
+};

@@ -33,6 +33,7 @@ import type { Product } from "@/core/api/product";
 import { useCurrentUser } from "@/core/hooks/useCurrentUser";
 import { useGetUsers } from "@/core/api/user";
 import { useGetClients, useCreateClient } from "@/core/api/client";
+import { useGetChargeTypes } from "@/core/api/charge-type";
 import type { User } from "@/core/api/user";
 import { OpenShiftForm } from "./OpenShiftForm";
 import { useCreateSale, type Sale } from "@/core/api/sale";
@@ -243,6 +244,8 @@ const POSInterfaceCore = () => {
   const [depositPaymentMethod, setDepositPaymentMethod] = useState(
       currentSession.depositPaymentMethod || "Наличные",
   );
+  const [debtCurrency, setDebtCurrency] = useState<"UZS" | "USD">("UZS");
+  const [debtUsdRate, setDebtUsdRate] = useState<string>("");
   // Insufficient balance modal state
   const [isInsufficientBalanceModalOpen, setIsInsufficientBalanceModalOpen] = useState(false);
   const [_insufficientBalanceChoice, setInsufficientBalanceChoice] = useState<"pay" | "debt" | null>(null);
@@ -282,6 +285,7 @@ const POSInterfaceCore = () => {
     { amount: 0, payment_method: "Наличные" },
   ]);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [saleCharges, setSaleCharges] = useState<{ charge_type: number; amount: string }[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(12200);
   const [_loadingExchangeRate, setLoadingExchangeRate] = useState(false);
 
@@ -391,6 +395,7 @@ const POSInterfaceCore = () => {
     params: { name: clientSearchTerm },
   });
   const { data: storesData } = useGetStores({});
+  const { data: chargeTypesData } = useGetChargeTypes({});
 
   const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
   const clients = Array.isArray(clientsData)
@@ -399,6 +404,9 @@ const POSInterfaceCore = () => {
   const stores = Array.isArray(storesData)
       ? storesData
       : storesData?.results || [];
+  const chargeTypes = Array.isArray(chargeTypesData)
+      ? chargeTypesData
+      : (chargeTypesData as any)?.results || [];
 
   // Save current session state whenever it changes
   useEffect(() => {
@@ -490,7 +498,9 @@ const POSInterfaceCore = () => {
   }, [currentUser?.id, isAdmin, isSuperUser]);
 
   // Calculate totals
-  const total = cartProducts.reduce((sum, product) => sum + product.total, 0);
+  const cartTotal = cartProducts.reduce((sum, product) => sum + product.total, 0);
+  const chargesTotal = saleCharges.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+  const total = cartTotal + chargesTotal;
 
   // Function to load all products and add them to cart with max quantity
   const handleLoadAllProducts = async () => {
@@ -738,13 +748,17 @@ const POSInterfaceCore = () => {
               (p) => p.productId === product.id && p.stockId === stock?.id,
           );
 
+          // Default quantity: 1 if available >= 1, otherwise the actual available amount
+          const defaultQty = availableQuantity >= 1 ? 1 : availableQuantity;
+
           if (existingProductIndex >= 0) {
-            // Product already in cart - increment quantity by 1 without showing modal
+            // Product already in cart - increment by defaultQty
             const existing = cartProducts[existingProductIndex];
             const baseQty = existing.product.quantity ? parseFloat(String(existing.product.quantity)) : 0;
             const factor = existing.selectedUnit?.factor || 1;
             const availableInUnit = baseQty * factor;
-            if (existing.quantity + 1 > availableInUnit) {
+            const increment = availableInUnit >= 1 ? 1 : availableInUnit;
+            if (existing.quantity + increment > availableInUnit) {
               toast.error(`Недостаточно товара "${existing.name}". Доступно: ${availableInUnit.toFixed(2)} ${existing.selectedUnit?.short_name || "шт"}`);
               return;
             }
@@ -752,21 +766,21 @@ const POSInterfaceCore = () => {
                 idx === existingProductIndex
                     ? {
                       ...p,
-                      quantity: p.quantity + 1,
-                      total: p.price * (p.quantity + 1),
+                      quantity: p.quantity + increment,
+                      total: p.price * (p.quantity + increment),
                     }
                     : p,
             );
             setCartProducts(updatedProducts);
           } else {
-            // Add new product to cart with quantity 1
+            // Add new product to cart
             const newProduct: ProductInCart = {
               id: generateCartItemId(),
               productId: product.id,
               name: product.product_name,
               price: price,
-              quantity: 1,
-              total: price,
+              quantity: defaultQty,
+              total: price * defaultQty,
               product: product,
               barcode: product.barcode,
               selectedUnit: defaultUnit || null,
@@ -1845,6 +1859,8 @@ const POSInterfaceCore = () => {
                             setDebtDeposit("");
                             setDebtDueDate("");
                             setDepositPaymentMethod("Наличные");
+                            setDebtCurrency("UZS");
+                            setDebtUsdRate("");
                           }}
                           className="text-gray-400 hover:text-gray-600 transition-colors ml-2"
                           title="Очистить выбор"
@@ -2137,11 +2153,12 @@ const POSInterfaceCore = () => {
                                                       ? parseFloat(String(product.product.min_price))
                                                       : 10000;
                                               const newPrice = basePrice / selectedUnit.factor;
-                                              // Set quantity to max available in the new unit
+                                              // Set quantity: 1 if available >= 1, otherwise max available in unit
                                               const baseQuantity = product.product.quantity
                                                   ? parseFloat(String(product.product.quantity))
                                                   : 0;
-                                              const newQuantity = baseQuantity * selectedUnit.factor;
+                                              const maxInUnit = baseQuantity * selectedUnit.factor;
+                                              const newQuantity = maxInUnit >= 1 ? 1 : maxInUnit;
                                               const updatedProducts = cartProducts.map(
                                                   (p) =>
                                                       p.id === product.id
@@ -3151,6 +3168,91 @@ const POSInterfaceCore = () => {
                 </div>
               </div>
 
+              {/* Charge Types */}
+              {chargeTypes.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Доп. начисления
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        const firstUnused = chargeTypes.find(
+                          (ct: any) => !saleCharges.some((c) => c.charge_type === ct.id)
+                        );
+                        if (firstUnused) {
+                          setSaleCharges((prev) => [
+                            ...prev,
+                            { charge_type: firstUnused.id, amount: "" },
+                          ]);
+                        }
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Добавить
+                    </Button>
+                  </div>
+                  {saleCharges.length > 0 && (
+                    <div className="space-y-2">
+                      {saleCharges.map((charge, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <select
+                            value={charge.charge_type}
+                            onChange={(e) => {
+                              const newId = Number(e.target.value);
+                              setSaleCharges((prev) =>
+                                prev.map((c, i) =>
+                                  i === idx ? { ...c, charge_type: newId } : c
+                                )
+                              );
+                            }}
+                            className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            {chargeTypes.map((ct: any) => (
+                              <option key={ct.id} value={ct.id}>
+                                {ct.name}
+                              </option>
+                            ))}
+                          </select>
+                          <Input
+                            type="number"
+                            placeholder="Сумма"
+                            value={charge.amount}
+                            onChange={(e) =>
+                              setSaleCharges((prev) =>
+                                prev.map((c, i) =>
+                                  i === idx ? { ...c, amount: e.target.value } : c
+                                )
+                              )
+                            }
+                            className="w-32 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSaleCharges((prev) => prev.filter((_, i) => i !== idx))
+                            }
+                            className="text-red-500 hover:text-red-700 text-lg font-bold leading-none"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <div className="text-xs text-gray-500 text-right mt-1">
+                        Итого начислений:{" "}
+                        <span className="font-semibold text-gray-700">
+                          {chargesTotal.toLocaleString()} сум
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Debt specific fields - shown only when paymentMode === "debt" */}
               {paymentMode === "debt" && (
                   <>
@@ -3211,6 +3313,61 @@ const POSInterfaceCore = () => {
                         <option value="Перечисление">Перечисление</option>
                       </select>
                     </div>
+
+                    {/* Debt currency */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Валюта долга
+                      </label>
+                      <div className="flex gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="debtCurrency"
+                            value="UZS"
+                            checked={debtCurrency === "UZS"}
+                            onChange={() => {
+                              setDebtCurrency("UZS");
+                              setDebtUsdRate("");
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm font-medium">UZS</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="debtCurrency"
+                            value="USD"
+                            checked={debtCurrency === "USD"}
+                            onChange={() => {
+                              setDebtCurrency("USD");
+                              setDebtUsdRate(exchangeRate.toFixed(2));
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm font-medium">USD</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* USD rate input - only shown when USD selected */}
+                    {debtCurrency === "USD" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Курс USD
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="Введите курс..."
+                          value={debtUsdRate}
+                          onChange={(e) => setDebtUsdRate(e.target.value)}
+                          onFocus={(e) => e.stopPropagation()}
+                          onBlur={(e) => e.stopPropagation()}
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
                   </>
               )}
 
@@ -3314,6 +3471,8 @@ const POSInterfaceCore = () => {
                       setDebtDeposit("");
                       setDebtDueDate("");
                       setDepositPaymentMethod("Наличные");
+                      setDebtCurrency("UZS");
+                      setDebtUsdRate("");
                     }}
                     variant="outline"
                     className="flex-1"
@@ -3828,6 +3987,12 @@ const POSInterfaceCore = () => {
                               deposit_payment_method: depositPaymentMethod || "Наличные",
                             },
                           }),
+                          ...(isOnCredit && paymentMode === "debt" && {
+                            debt_currency: debtCurrency,
+                            ...(debtCurrency === "USD" && {
+                              debt_usd_rate: parseFloat(debtUsdRate) || exchangeRate,
+                            }),
+                          }),
                         };
 
                         // Also create API-compatible payload for backend
@@ -3884,6 +4049,17 @@ const POSInterfaceCore = () => {
                               due_date: debtDueDate || addDays(new Date(), 30).toISOString().split("T")[0],
                               deposit_payment_method: depositPaymentMethod || "Наличные",
                             },
+                          }),
+                          ...(isOnCredit && paymentMode === "debt" && {
+                            debt_currency: debtCurrency,
+                            ...(debtCurrency === "USD" && {
+                              debt_usd_rate: parseFloat(debtUsdRate) || exchangeRate,
+                            }),
+                          }),
+                          ...(saleCharges.length > 0 && {
+                            sale_charges: saleCharges
+                              .filter((c) => parseFloat(c.amount) > 0)
+                              .map((c) => ({ charge_type: c.charge_type, amount: parseFloat(c.amount) })),
                           }),
                         };
 
@@ -3944,6 +4120,9 @@ const POSInterfaceCore = () => {
                         setDebtDueDate("");
                         setDepositPaymentMethod("Наличные");
                         setIsFromInsufficientBalanceModal(false);
+                        setSaleCharges([]);
+                        setDebtCurrency("UZS");
+                        setDebtUsdRate("");
 
                         // Clear persisted state after successful sale
                         clearPersistedState();

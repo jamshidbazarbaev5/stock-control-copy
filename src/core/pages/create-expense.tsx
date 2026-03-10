@@ -85,7 +85,11 @@ export default function CreateExpense() {
 
   // Fetch stores and expense names for select inputs
   const { data: storesData } = useGetStores({});
-  const { data: expenseNamesData } = useGetExpenseNames({});
+  const { data: expenseNamesData } = useGetExpenseNames({
+    params: {
+      page_size: 1000, // Fetch all expense names for dropdown
+    },
+  });
 
   // Prepare options for select inputs
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];

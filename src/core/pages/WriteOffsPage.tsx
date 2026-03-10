@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useGetWriteoffs, WRITEOFF_REASONS } from "../api/writeoff";
+import { useGetWriteoffs, useDeleteWriteoff, WRITEOFF_REASONS } from "../api/writeoff";
 import { ResourceTable } from "../helpers/ResourseTable";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Eye } from "lucide-react";
 import { useGetStores } from "../api/store";
+import { toast } from "sonner";
 
 interface WriteOffItem {
   id: number;
@@ -83,9 +84,23 @@ export default function WriteOffsPage() {
   });
   
   const { data: storesData } = useGetStores({});
+  const deleteWriteoff = useDeleteWriteoff();
 
   const writeoffs = Array.isArray(writeoffsData) ? writeoffsData : writeoffsData?.results || [];
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm(t("messages.confirm_delete") || "Вы уверены, что хотите удалить это списание?")) {
+      return;
+    }
+
+    try {
+      await deleteWriteoff.mutateAsync(id);
+      toast.success(t("messages.success.deleted") || "Списание успешно удалено");
+    } catch (error) {
+      toast.error(t("messages.error.delete") || "Ошибка при удалении списания");
+    }
+  };
 
   const columns: Array<{ header: string; accessorKey: string; cell: (row: WriteOff) => React.ReactNode }> = [
     {
@@ -99,6 +114,25 @@ export default function WriteOffsPage() {
       cell: (row: WriteOff) => {
         const item = row.items?.[0];
         return item?.stock_read?.store?.name || "-";
+      },
+    },
+    {
+      header: t("table.product") || "Товар",
+      accessorKey: "product",
+      cell: (row: WriteOff) => {
+        if (!row.items || row.items.length === 0) return "-";
+        
+        if (row.items.length === 1) {
+          return row.items[0]?.stock_read?.product?.product_name || "-";
+        }
+        
+        // If multiple items, show first product name + count
+        const firstName = row.items[0]?.stock_read?.product?.product_name || "-";
+        return (
+          <div className="max-w-xs truncate" title={row.items.map(item => item.stock_read?.product?.product_name).join(", ")}>
+            {firstName} {row.items.length > 1 && `(+${row.items.length - 1})`}
+          </div>
+        );
       },
     },
     {
@@ -219,6 +253,7 @@ export default function WriteOffsPage() {
           data={writeoffs}
           columns={columns}
           isLoading={isLoading}
+          onDelete={handleDelete}
           onRowClick={(writeoff) => {
             navigate(`/writeoffs/${writeoff.id}`);
           }}

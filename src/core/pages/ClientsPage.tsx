@@ -773,6 +773,7 @@ export default function ClientsPage() {
               <SelectItem value="Физ.лицо">{t("forms.individual")}</SelectItem>
               <SelectItem value="Юр.лицо">{t("forms.legal_entity")}</SelectItem>
               <SelectItem value="Магазин">Магазин</SelectItem>
+              <SelectItem value="Поставщик">{t("client.supplier") || "Поставщик"}</SelectItem>
             </SelectContent>
           </Select>
         </div>

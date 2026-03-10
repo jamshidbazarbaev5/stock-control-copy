@@ -399,6 +399,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             href: "/label-sizes",
           },
           {
+            icon: CreditCard,
+            label: t("navigation.chargeTypes") || "Тип услуги",
+            href: "/charge-types",
+          },
+          {
             icon: Receipt,
             label: t("navigation.cassas"),
             href: "/cassas",

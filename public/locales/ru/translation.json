@@ -189,6 +189,9 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "unpaid_only":"Только неоплаченные",
+    "reset":"Сбросить",
+    "filters":"Фильтры",
     "sale_id":"Продажа ID",
     "inventory_adjustment":"Простой приход",
     "total_debt":"Общий долг",
@@ -549,9 +552,11 @@
     "register": "Касса"
   },
   "client": {
+    "supplier":"Поставщик",
     "individual": "Физическое лицо",
     "corporate": "Юридическое лицо",
     "type": {
+      "Поставщик":"Поставщик",
       "Физ.лицо": "Физ.лицо",
       "Юр.лицо": "Юр.лицо"
     },
@@ -575,6 +580,13 @@
   },
 
   "forms": {
+    "start_date":"Дата начала",
+    "end_date":"Дата окончания",
+    "select_category":"Выберите категорию",
+    "sale_charges":"Доп услуги",
+    "supplier":"Поставщик",
+    "linked_supplier":"Связанный поставщик",
+    "reduce_from_budget":"Взять со счёта",
     "target_debt_currency":"Тип Долга",
     "per":"Перечисление",
     "usd_rate":"Курс USD",
@@ -772,7 +784,7 @@
     "to_store": "Куда",
     "password": "Пароль",
     "client_type": "Тип клиента",
-    "company_name": "Название компании",
+    "company_name": "Название",
     "ceo_name": "Имя руководителя",
     "profile": "Профиль",
     "change_password": "Изменить пароль",
@@ -816,11 +828,14 @@
     "seller": "Продавец"
   },
   "messages": {
+    "confirm_delete_payment":"Вы уверены, что хотите удалить этот платеж?",
+    "confirm_delete":"Удалить",
     "no_payments_yet":"Нет платежей",
     "create": "Создать",
     "no_payments_found": "Платежи не найдены",
     "created_successfully": "Успешно создано",
     "success": {
+      "payment_deleted":"Платеж успешно удален",
       "pricesSaved":"Успешно",
       "somePricesFailed":"Некоторые товары не сохранёни",
       "balance_added": "Баланс успешно добавлен",
@@ -834,6 +849,7 @@
       "debt_created": "Долг успешно создан"
     },
     "error": {
+      "payment_delete_failed":"Ошибка при удалении платежа",
       "payment_failed": "Ошибка при создании платежа",
       "payment_exceeds_budget": "Вы не можете оплатить этот долг бюджет магазина не хватет",
       "add_money": "Пополните все поля",
@@ -970,6 +986,7 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "min_stock":"Мин остаток",
     "total_cost_usd":"Общая сумма в USD",
     "debt_currency":"Тип долга ",
     "total_cost":"Общая цена",
@@ -1078,6 +1095,7 @@
     "recycled": "Переработан"
   },
   "messages": {
+     "confirm_delete":"Удалить",
       "no_payments_yet":"Нет платежей",
     "no_payments_found": "Нет платежи",
     "create": "Создать",
@@ -1332,4 +1350,6 @@
     "right": "Справа",
     "italic": "Курсив"
   }
+
+ 
 }

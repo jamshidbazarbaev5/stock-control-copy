@@ -29,7 +29,14 @@ export interface StoreClient extends BaseClient {
   balance_usd: string;
 }
 
-export type Client = IndividualClient | CorporateClient | StoreClient;
+export interface SupplierClient extends BaseClient {
+  type: "поставщик";
+  linked_supplier: number;
+  balance_uzs: string;
+  balance_usd: string;
+}
+
+export type Client = IndividualClient | CorporateClient | StoreClient | SupplierClient;
 
 export interface ClientHistoryEntry {
   sale: {

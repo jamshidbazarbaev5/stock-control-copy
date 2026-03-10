@@ -674,7 +674,7 @@ export default function SalesPage() {
                         <p className="font-semibold text-emerald-600">{formatCurrency(item?.subtotal)}</p>
                       </div>
                     </div>
-                    {item.pure_revenue && (
+                    {item.pure_revenue && currentUser?.role !== "Продавец" && (
                       <div className="pt-2 border-t border-gray-200">
                         <span className="text-gray-500 text-xs">Прибыль:</span>
                         <p className="font-bold text-blue-600">{formatCurrency(item?.pure_revenue)}</p>
@@ -718,7 +718,7 @@ export default function SalesPage() {
                     </div>
                     <div className="md:col-span-3">
                       <span className="font-bold text-blue-600 text-sm">
-                        {item.pure_revenue ? formatCurrency(item?.pure_revenue) : "-"}
+                        {item.pure_revenue && currentUser?.role !== "Продавец" ? formatCurrency(item?.pure_revenue) : "-"}
                       </span>
                     </div>
                   </div>
@@ -868,6 +868,54 @@ export default function SalesPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Sale Charges Section */}
+        {(row as any).sale_charges?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2 text-sm">
+              <span className="text-orange-600">➕ Доп. начисления</span>
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                {(row as any).sale_charges.length}
+              </span>
+            </h3>
+            <div className="space-y-1">
+              {(row as any).sale_charges.map((charge: any, i: number) => (
+                <div key={i} className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded px-3 py-1.5 text-sm">
+                  <span className="text-gray-700">{charge.charge_type_name || `Тип #${charge.charge_type}`}</span>
+                  <span className="font-semibold text-orange-700">{formatCurrency(charge.amount)}</span>
+                </div>
+              ))}
+              {(row as any).charges_total && parseFloat((row as any).charges_total) > 0 && (
+                <div className="flex justify-between items-center bg-orange-100 rounded px-3 py-1 text-xs font-semibold text-orange-800 mt-1">
+                  <span>Итого начислений:</span>
+                  <span>{formatCurrency((row as any).charges_total)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Debt currency info */}
+        {(row as any).debt_currency && (
+          <div className="flex flex-wrap gap-3 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs">
+            <span className="text-amber-700 font-semibold">Валюта долга:</span>
+            <span className="font-bold text-amber-900">{(row as any).debt_currency}</span>
+            {(row as any).debt_currency === "USD" && (row as any).debt_usd_rate && (
+              <>
+                <span className="text-amber-700 font-semibold">Курс:</span>
+                <span className="font-bold text-amber-900">{formatCurrency((row as any).debt_usd_rate)} сум</span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Sale summary: change_amount */}
+        {(row as any).change_amount && parseFloat((row as any).change_amount) > 0 && (
+          <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded px-3 py-1.5 text-sm">
+            <span className="text-gray-600">Сдача:</span>
+            <span className="font-semibold text-blue-700">{formatCurrency((row as any).change_amount)}</span>
           </div>
         )}
       </div>

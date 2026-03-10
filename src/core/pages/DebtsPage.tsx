@@ -48,9 +48,9 @@ export default function DebtsPage() {
     useState<DebtByClient | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [storeData, setStoreData] = useState<any>(null);
-  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин">(() => {
+  const [selectedTab, setSelectedTab] = useState<"Физ.лицо" | "Юр.лицо" | "Магазин" | "Поставщик">(() => {
     const saved = localStorage.getItem("debtsPageTab");
-    if (saved === "Физ.лицо" || saved === "Юр.лицо" || saved === "Магазин") {
+    if (saved === "Физ.лицо" || saved === "Юр.лицо" || saved === "Магазин" || saved === "Поставщик") {
       return saved;
     }
     return "Физ.лицо";
@@ -372,15 +372,16 @@ export default function DebtsPage() {
       <Tabs
         value={selectedTab}
         onValueChange={(value: string) => {
-          setSelectedTab(value as "Физ.лицо" | "Юр.лицо" | "Магазин");
+          setSelectedTab(value as "Физ.лицо" | "Юр.лицо" | "Магазин" | "Поставщик");
           localStorage.setItem("debtsPageTab", value);
         }}
         className="mb-6"
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="Физ.лицо">{t("forms.individual")}</TabsTrigger>
           <TabsTrigger value="Юр.лицо">{t("forms.legal_entity")}</TabsTrigger>
            <TabsTrigger value="Магазин">{t("forms.store")}</TabsTrigger>
+          <TabsTrigger value="Поставщик">{t("forms.supplier") || "Поставщик"}</TabsTrigger>
         </TabsList>
       </Tabs>
 

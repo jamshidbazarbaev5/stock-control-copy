@@ -1583,6 +1583,9 @@ export default function EditStockEntry() {
           exchangeRateId = Number(item.form.exchange_rate);
         }
 
+        // Check if currency is base currency (UZS)
+        const isBaseCurrency = item.calculationMetadata?.is_base_currency || false;
+
         const stockEntry: any = {
           product: Number(item.form.product),
           purchase_unit: Number(item.form.purchase_unit),
@@ -1595,15 +1598,15 @@ export default function EditStockEntry() {
               formatNumberForAPI(item.form.price_per_unit_uz) || 0,
           total_price_in_uz:
               formatNumberForAPI(item.form.total_price_in_uz) || 0,
-          price_per_unit_currency:
-              formatNumberForAPI(item.form.price_per_unit_currency) || 0,
-          total_price_in_currency:
-              formatNumberForAPI(item.form.total_price_in_currency) || 0,
           base_unit_in_uzs: formatNumberForAPI(item.form.base_unit_in_uzs),
-          base_unit_in_currency: formatNumberForAPI(
-              item.form.base_unit_in_currency,
-          ),
         };
+
+        // Only include currency-specific fields if NOT base currency
+        if (!isBaseCurrency) {
+          stockEntry.price_per_unit_currency = formatNumberForAPI(item.form.price_per_unit_currency) || 0;
+          stockEntry.total_price_in_currency = formatNumberForAPI(item.form.total_price_in_currency) || 0;
+          stockEntry.base_unit_in_currency = formatNumberForAPI(item.form.base_unit_in_currency);
+        }
 
         // Add stock_name only if it exists
         if (item.form.stock_name && item.form.stock_name.trim()) {

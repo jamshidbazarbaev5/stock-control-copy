@@ -71,6 +71,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useGetStores } from "../api/store";
 import { useCreateClient } from "../api/client";
+import { useGetChargeTypes } from "../api/charge-type";
 
 import { useQuery } from "@tanstack/react-query";
 import api, { fetchCurrencyRates } from "../api/api";
@@ -226,6 +227,11 @@ function CreateSale() {
   const [debtDueDate, setDebtDueDate] = useState<string>("");
   const [depositPaymentMethod, setDepositPaymentMethod] =
     useState<string>("Наличные");
+  const [debtCurrency, setDebtCurrency] = useState<"UZS" | "USD">("UZS");
+  const [debtUsdRate, setDebtUsdRate] = useState<string>("");
+
+  // Sale charges state
+  const [saleCharges, setSaleCharges] = useState<{ charge_type: number; amount: string }[]>([]);
 
   // Track if we came from insufficient balance modal (to skip sale_debt in this scenario)
   const [isFromInsufficientBalanceModal, setIsFromInsufficientBalanceModal] =
@@ -285,6 +291,10 @@ function CreateSale() {
 
   // Fetch data with search term for stocks
   const { data: storesData, isLoading: storesLoading } = useGetStores({});
+  const { data: chargeTypesData } = useGetChargeTypes({});
+  const chargeTypes: any[] = Array.isArray(chargeTypesData)
+    ? chargeTypesData
+    : (chargeTypesData as any)?.results || [];
 
   // Fetch clients with search API call
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
@@ -502,14 +512,19 @@ function CreateSale() {
     });
   }, [cartProducts, form]);
 
-  const updateTotalAmount = () => {
+  const updateTotalAmount = (charges?: { charge_type: number; amount: string }[]) => {
     const items = form.getValues("sale_items");
-    const total = items.reduce((sum, item) => {
+    const itemsTotal = items.reduce((sum, item) => {
       const quantity = item.quantity || 0;
       const pricePerUnit = parseFloat(item.price_per_unit) || 0;
       const actualTotal = quantity * pricePerUnit;
       return sum + actualTotal;
     }, 0);
+    const chargesTotal = (charges ?? saleCharges).reduce(
+      (sum, c) => sum + (parseFloat(c.amount) || 0),
+      0
+    );
+    const total = itemsTotal + chargesTotal;
     form.setValue("total_amount", total.toString());
 
     const discountAmount = parseFloat(form.getValues("discount_amount") || "0");
@@ -580,40 +595,27 @@ function CreateSale() {
       ? parseFloat(String(selectedProduct.min_price))
       : 10000;
 
-    // Always use empty quantity
-    const existingQuantity = "" as any;
+    // Set quantity: 1 if available >= 1, otherwise max available
+    const availableQuantity = selectedProduct.quantity
+      ? parseFloat(String(selectedProduct.quantity))
+      : 0;
+    const defaultQty = availableQuantity >= 1 ? 1 : availableQuantity;
 
     // Update cart products
     const newCartProducts = [...cartProducts];
-    if (newCartProducts[index]) {
-      newCartProducts[index] = {
-        id: Date.now() + index,
-        productId: selectedProduct.id || 0,
-        name: selectedProduct.product_name,
-        price: price,
-        quantity: existingQuantity,
-        total: price * existingQuantity,
-        product: selectedProduct,
-        barcode: selectedProduct.barcode,
-        selectedUnit: defaultUnit,
-        stock: stock,
-        stockId: stock?.id,
-      };
-    } else {
-      newCartProducts[index] = {
-        id: Date.now() + index,
-        productId: selectedProduct.id || 0,
-        name: selectedProduct.product_name,
-        price: price,
-        quantity: 0,
-        total: 0,
-        product: selectedProduct,
-        barcode: selectedProduct.barcode,
-        selectedUnit: defaultUnit,
-        stock: stock,
-        stockId: stock?.id,
-      };
-    }
+    newCartProducts[index] = {
+      id: Date.now() + index,
+      productId: selectedProduct.id || 0,
+      name: selectedProduct.product_name,
+      price: price,
+      quantity: defaultQty,
+      total: price * defaultQty,
+      product: selectedProduct,
+      barcode: selectedProduct.barcode,
+      selectedUnit: defaultUnit,
+      stock: stock,
+      stockId: stock?.id,
+    };
     setCartProducts(newCartProducts);
 
     // Set form values with explicit trigger to force re-render
@@ -631,7 +633,7 @@ function CreateSale() {
       shouldDirty: true,
     });
     // Preserve existing quantity
-    form.setValue(`sale_items.${index}.quantity`, existingQuantity, {
+    form.setValue(`sale_items.${index}.quantity`, defaultQty, {
       shouldValidate: true,
       shouldDirty: true,
     });
@@ -751,10 +753,16 @@ function CreateSale() {
           ? parseFloat(currentProduct.stock.extra_quantity)
           : currentProduct.stock.extra_quantity || 0)
       : 0;
-    const maxQuantity = baseQuantity + extraQuantity;
+    // Apply unit factor: available quantity in the currently selected unit (same as POSInterface)
+    const unitFactor = currentProduct.selectedUnit?.factor || 1;
+    const maxQuantity = (baseQuantity + extraQuantity) * unitFactor;
+    // Base quantity in unit for display
+    const unitShortName = currentProduct.selectedUnit?.short_name || "шт";
 
     if (value > maxQuantity) {
-      toast.error(t("messages.error.insufficient_quantity"));
+      toast.error(
+        `Недостаточно товара "${currentProduct.name}". Доступно: ${maxQuantity.toFixed(2)} ${unitShortName}`
+      );
       form.setValue(`sale_items.${index}.quantity`, maxQuantity);
 
       // Update cart product
@@ -837,15 +845,20 @@ function CreateSale() {
 
   const handleSubmit = async (data: SaleFormData) => {
     try {
-      // Calculate total_amount from items (price * quantity)
+      // Calculate total_amount from items (price * quantity) + charges
       const totalFromItems = data.sale_items.reduce((sum, item) => {
         const quantity = item.quantity || 0;
         const pricePerUnit = parseFloat(item.price_per_unit) || 0;
         return sum + quantity * pricePerUnit;
       }, 0);
+      const chargesTotal = saleCharges.reduce(
+        (sum, c) => sum + (parseFloat(c.amount) || 0),
+        0
+      );
+      const totalWithCharges = totalFromItems + chargesTotal;
 
       const discountAmount = parseFloat(data.discount_amount || "0");
-      const finalTotal = totalFromItems - discountAmount;
+      const finalTotal = totalWithCharges - discountAmount;
 
       // Get client balance info
       const selectedClientId =
@@ -924,8 +937,8 @@ function CreateSale() {
         }
       }
 
-      // Set total_amount from items calculation
-      data.total_amount = totalFromItems.toString();
+      // Set total_amount from items + charges calculation
+      data.total_amount = totalWithCharges.toString();
       data.discount_amount = discountAmount.toString();
 
       // Set store based on user role
@@ -994,6 +1007,11 @@ function CreateSale() {
         discount_amount: Number(
           String(data.discount_amount || "0").replace(/,/g, "")
         ).toFixed(2),
+        ...(saleCharges.filter(c => parseFloat(c.amount) > 0).length > 0 && {
+          sale_charges: saleCharges
+            .filter(c => parseFloat(c.amount) > 0)
+            .map(c => ({ charge_type: c.charge_type, amount: parseFloat(c.amount).toString() })),
+        }),
         ...(isAdmin || isSuperUser ? { sold_by: data.sold_by } : {}),
         on_credit: isOnCredit,
         sale_items: data.sale_items.map((item) => ({
@@ -1095,6 +1113,9 @@ function CreateSale() {
                 form.getValues("sale_debt.deposit_payment_method") ||
                 depositPaymentMethod ||
                 "Наличные",
+              // Add debt currency and rate at top level
+              debt_currency: debtCurrency,
+              ...(debtCurrency === "USD" && debtUsdRate ? { debt_usd_rate: parseFloat(debtUsdRate) } : {}),
             }
           : {}),
       };
@@ -1192,6 +1213,10 @@ function CreateSale() {
         setLoadingRates(true);
         const data = await fetchCurrencyRates();
         setCurrencyRates(data);
+        // Set default USD rate from fetched data
+        if (data && data.length > 0) {
+          setDebtUsdRate(parseFloat(String(data[0].rate)).toString());
+        }
       } catch (error) {
         console.error("Error fetching currency rates:", error);
         toast.error("Ошибка загрузки курсов валют");
@@ -1578,17 +1603,41 @@ function CreateSale() {
                           onValueChange={(value) => {
                             const unitId = parseInt(value, 10);
                             field.onChange(unitId);
-                            // Update the cart product's selected unit
-                            const selectedUnit = cartProducts[
-                              index
-                            ]?.product?.available_units?.find(
+                            const cartProduct = cartProducts[index];
+                            const selectedUnit = cartProduct?.product?.available_units?.find(
                               (unit) => unit.id === unitId
                             );
-                            if (selectedUnit && cartProducts[index]) {
+                            if (selectedUnit && cartProduct) {
+                              const factor = selectedUnit.factor || 1;
+                              // price = basePrice / factor (same as POSInterface)
+                              const basePrice = cartProduct.product.selling_price
+                                ? parseFloat(String(cartProduct.product.selling_price))
+                                : cartProduct.product.min_price
+                                ? parseFloat(String(cartProduct.product.min_price))
+                                : cartProduct.price;
+                              const newPrice = basePrice / factor;
+
+                              // Set quantity: 1 if available >= 1, otherwise max available in unit
+                              const quantitySource = cartProduct.stock?.quantity ?? cartProduct.product.quantity;
+                              const baseQty = typeof quantitySource === "string"
+                                ? parseFloat(quantitySource) : quantitySource || 0;
+                              const maxInUnit = baseQty * factor;
+                              const newQuantity = maxInUnit >= 1 ? 1 : maxInUnit;
+
+                              // Update price and quantity in form
+                              form.setValue(`sale_items.${index}.price_per_unit`, newPrice.toString());
+                              form.setValue(`sale_items.${index}.quantity`, newQuantity);
+
                               const newCartProducts = [...cartProducts];
-                              newCartProducts[index].selectedUnit =
-                                selectedUnit;
+                              newCartProducts[index] = {
+                                ...cartProduct,
+                                selectedUnit,
+                                price: newPrice,
+                                quantity: newQuantity,
+                                total: newPrice * newQuantity,
+                              };
                               setCartProducts(newCartProducts);
+                              updateTotalAmount();
                             }
                           }}
                         >
@@ -2050,6 +2099,10 @@ function CreateSale() {
                       setDebtDeposit("");
                       setDebtDueDate("");
                       setDepositPaymentMethod("Наличные");
+                      setDebtCurrency("UZS");
+                      if (value === "debt") {
+                        setIsDebtModalOpen(true);
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -2321,6 +2374,87 @@ function CreateSale() {
               )}
             />
           </div>
+
+          {/* Sale Charges */}
+          {chargeTypes.length > 0 && (
+            <div className="w-full space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">
+                  Доп. начисления
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    const firstUnused = chargeTypes.find(
+                      (ct: any) => !saleCharges.some(c => c.charge_type === ct.id)
+                    ) || chargeTypes[0];
+                    if (firstUnused) {
+                      const next = [...saleCharges, { charge_type: firstUnused.id, amount: "" }];
+                      setSaleCharges(next);
+                      updateTotalAmount(next);
+                    }
+                  }}
+                >
+                  + Добавить
+                </Button>
+              </div>
+              {saleCharges.map((charge, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <select
+                    value={charge.charge_type}
+                    onChange={(e) => {
+                      const next = saleCharges.map((c, i) =>
+                        i === idx ? { ...c, charge_type: Number(e.target.value) } : c
+                      );
+                      setSaleCharges(next);
+                    }}
+                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {chargeTypes.map((ct: any) => (
+                      <option key={ct.id} value={ct.id}>{ct.name}</option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    placeholder="Сумма"
+                    value={charge.amount}
+                    onChange={(e) => {
+                      const next = saleCharges.map((c, i) =>
+                        i === idx ? { ...c, amount: e.target.value } : c
+                      );
+                      setSaleCharges(next);
+                      updateTotalAmount(next);
+                    }}
+                    className="w-32 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = saleCharges.filter((_, i) => i !== idx);
+                      setSaleCharges(next);
+                      updateTotalAmount(next);
+                    }}
+                    className="text-red-500 hover:text-red-700 text-lg font-bold leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {saleCharges.length > 0 && (
+                <div className="text-xs text-right text-gray-500">
+                  Итого начислений:{" "}
+                  <span className="font-semibold text-gray-700">
+                    {formatCurrency(
+                      saleCharges.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)
+                    )} сум
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Debt Details */}
           {paymentMode === "debt" && (
@@ -2970,6 +3104,8 @@ function CreateSale() {
                     addDays(new Date(), 30).toISOString().split("T")[0]
                   );
                   setDepositPaymentMethod("Наличные");
+                  setDebtCurrency("UZS");
+                  setIsDebtModalOpen(true);
                 }}
                 className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl text-lg font-semibold transition-colors"
               >
@@ -2988,117 +3124,47 @@ function CreateSale() {
         </WideDialogContent>
       </WideDialog>
 
-      {/* Debt Details Modal - Выбор пользователя для долга */}
+      {/* Debt Details Modal - Выбор валюты долга */}
       <WideDialog open={isDebtModalOpen} onOpenChange={setIsDebtModalOpen}>
         <WideDialogContent className="max-w-md p-0">
           <WideDialogHeader className="p-6 pb-4">
-            <WideDialogTitle>Выбор пользователя для долга</WideDialogTitle>
+            <WideDialogTitle>Выбор валюты долга</WideDialogTitle>
           </WideDialogHeader>
           <div className="px-6 pb-6 space-y-4">
-            {/* Client Info */}
-            {(() => {
-              const selectedClientId = form.getValues("sale_debt.client");
-              const client = selectedClientId
-                ? clients.find((c) => c.id === selectedClientId)
-                : null;
-              const balanceUzs = (client as any)?.balance_uzs
-                ? parseFloat(String((client as any).balance_uzs))
-                : 0;
-              const balanceUsd = (client as any)?.balance_usd
-                ? parseFloat(String((client as any).balance_usd))
-                : 0;
-              const exchangeRate = currencyRates[0]?.rate
-                ? parseFloat(currencyRates[0].rate)
-                : 12500;
-              const totalBalanceUzs = balanceUzs + balanceUsd * exchangeRate;
-              const totalAmount = parseFloat(
-                form.getValues("total_amount") || "0"
-              );
-              const discountAmount = parseFloat(
-                form.getValues("discount_amount") || "0"
-              );
-              const finalTotal = totalAmount - discountAmount;
-              const debtAmount = Math.max(0, finalTotal - totalBalanceUzs);
-
-              return (
-                <div className="bg-amber-50 rounded-lg p-4">
-                  <div className="text-sm text-amber-800 space-y-1">
-                    <p>
-                      <strong>Клиент:</strong> {client?.name || "Не выбран"}
-                    </p>
-                    <p>
-                      <strong>Баланс клиента:</strong>{" "}
-                      {totalBalanceUzs.toLocaleString()} сум
-                    </p>
-                    <p>
-                      <strong>Сумма покупки:</strong>{" "}
-                      {finalTotal.toLocaleString()} сум
-                    </p>
-                    <p className="text-red-600 font-semibold">
-                      <strong>Сумма долга:</strong>{" "}
-                      {debtAmount.toLocaleString()} сум
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Due Date */}
+            {/* Debt Currency */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Срок оплаты <span className="text-red-500">*</span>
+                Валюта долга <span className="text-red-500">*</span>
               </label>
-              <Input
-                type="date"
-                value={
-                  form.watch("sale_debt.due_date") ||
-                  addDays(new Date(), 30).toISOString().split("T")[0]
-                }
-                onChange={(e) =>
-                  form.setValue("sale_debt.due_date", e.target.value)
-                }
-              />
-            </div>
-
-            {/* Deposit */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Задаток (необязательно)
-              </label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={form.watch("sale_debt.deposit") || ""}
-                onChange={(e) =>
-                  form.setValue("sale_debt.deposit", e.target.valueAsNumber)
-                }
-              />
-            </div>
-
-            {/* Deposit Payment Method */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Способ оплаты задатка
-              </label>
-              <Select
-                value={
-                  form.watch("sale_debt.deposit_payment_method") || "Наличные"
-                }
-                onValueChange={(value) =>
-                  form.setValue("sale_debt.deposit_payment_method", value)
-                }
+              <Select 
+                value={debtCurrency} 
+                onValueChange={(value: any) => setDebtCurrency(value as "UZS" | "USD")}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Наличные">Наличные</SelectItem>
-                  <SelectItem value="Карта">Карта</SelectItem>
-                  <SelectItem value="Click">Click</SelectItem>
-                  <SelectItem value="Перечисление">Перечисление</SelectItem>
+                  <SelectItem value="UZS">UZS (Сум)</SelectItem>
+                  <SelectItem value="USD">USD (Доллар)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Debt USD Rate - Only show if USD selected */}
+            {debtCurrency === "USD" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Курс USD <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="12500"
+                  value={debtUsdRate}
+                  onChange={(e) => setDebtUsdRate(e.target.value)}
+                />
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
@@ -3116,23 +3182,8 @@ function CreateSale() {
                 type="button"
                 className="flex-1 bg-amber-600 hover:bg-amber-700"
                 onClick={() => {
-                  // Set debt mode
-                  setInsufficientBalanceChoice("debt");
-                  form.setValue("on_credit", true);
-                  // Set default due_date if not set
-                  if (!form.getValues("sale_debt.due_date")) {
-                    form.setValue(
-                      "sale_debt.due_date",
-                      addDays(new Date(), 30).toISOString().split("T")[0]
-                    );
-                  }
-                  if (!form.getValues("sale_debt.deposit_payment_method")) {
-                    form.setValue(
-                      "sale_debt.deposit_payment_method",
-                      "Наличные"
-                    );
-                  }
                   setIsDebtModalOpen(false);
+                  // Debt currency is already set, form will be submitted
                 }}
               >
                 Подтвердить

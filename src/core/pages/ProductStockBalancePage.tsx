@@ -21,6 +21,8 @@ interface ProductStockBalance {
   store__name: string;
   total_quantity: number;
   total_cost_usd: number;
+  min_stock?: number;
+  is_low_stock?: boolean;
 }
 
 interface StockBalanceResponse {
@@ -53,6 +55,7 @@ export default function ProductStockBalancePage() {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [showZeroStock, setShowZeroStock] = useState<"true" | "false">("false");
   const [productName, setProductName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
 
   const formatNumber = (value: string | number) => {
@@ -64,13 +67,26 @@ export default function ProductStockBalancePage() {
   // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedStore, showZeroStock, productName]);
+  }, [selectedStore, showZeroStock, productName, selectedCategory]);
 
   const { data: storesData } = useGetStores({});
   const stores = Array.isArray(storesData)
     ? storesData
     : storesData?.results || [];
   const { data: currentUser } = useCurrentUser();
+
+  // Fetch categories
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const response = await api.get("/items/category/");
+      return response.data;
+    },
+  });
+  const categories = Array.isArray(categoriesData)
+    ? categoriesData
+    : categoriesData?.results || [];
+
   const { data, isLoading } = useQuery<StockBalanceResponse>({
     queryKey: [
       "stockBalance",
@@ -78,6 +94,7 @@ export default function ProductStockBalancePage() {
       selectedStore,
       showZeroStock,
       productName,
+      selectedCategory,
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -88,6 +105,7 @@ export default function ProductStockBalancePage() {
       }
       params.append("product_zero", showZeroStock);
       if (productName) params.append("product_name", productName);
+      if (selectedCategory !== "all") params.append("category", selectedCategory);
       const response = await api.get(
         `/dashboard/item_dashboard/?${params.toString()}`
       );
@@ -100,25 +118,59 @@ export default function ProductStockBalancePage() {
     {
       header: t("table.product"),
       accessorKey: "product__product_name",
+      cell: (row: any) => (
+        <span>
+          {row.product__product_name}
+        </span>
+      ),
     },
     {
       header: t("table.store"),
       accessorKey: "store__name",
+      cell: (row: any) => (
+        <span>
+          {row.store__name}
+        </span>
+      ),
     },
     {
       header: t("table.quantity"),
       accessorKey: "total_quantity",
-      cell: (row: any) => row.total_quantity?.toLocaleString(),
+      cell: (row: any) => (
+        <span>
+          {row.total_quantity?.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      header: t("table.min_stock") || "Мин. остаток",
+      accessorKey: "min_stock",
+      cell: (row: any) =>
+        row.min_stock != null ? (
+          <span className={row.is_low_stock ? "text-red-600 font-semibold" : ""}>
+            {row.min_stock.toLocaleString()}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       header: t("table.total_cost"),
       accessorKey: "total_cost",
-      cell: (row: any) => row.total_cost?.toLocaleString(),
+      cell: (row: any) => (
+        <span>
+          {row.total_cost?.toLocaleString()}
+        </span>
+      ),
     },
     ...(currentUser?.is_superuser ? [{
       header: t("table.total_cost_usd") || "Стоимость (USD)",
       accessorKey: "total_cost_usd",
-      cell: (row: any) => row.total_cost_usd ? `${row.total_cost_usd.toLocaleString()} $` : "",
+      cell: (row: any) => (
+        <span>
+          {row.total_cost_usd ? `${row.total_cost_usd.toLocaleString()} $` : ""}
+        </span>
+      ),
     }] : []),
     {
       header: t("table.total_kub_volume"),
@@ -132,13 +184,18 @@ export default function ProductStockBalancePage() {
           typeof row?.total_kub_volume === "number"
             ? row.total_kub_volume.toFixed(2).replace(".", ",")
             : null;
-        if (kub && kubVol) return `${kub} / ${kubVol}`;
-        if (kub) return kub;
-        if (kubVol) return kubVol;
-        return "0,00";
+        
+        // If both are 0, show "-"
+        if ((kub === "0,00" || !kub) && (kubVol === "0,00" || !kubVol)) {
+          return <span>-</span>;
+        }
+        
+        const val = kub && kubVol ? `${kub} / ${kubVol}` : kub ?? kubVol ?? "-";
+        return (
+          <span>{val}</span>
+        );
       },
     },
-
   ];
 
   // Change handler to ensure correct type
@@ -156,6 +213,7 @@ export default function ProductStockBalancePage() {
     }
     params.append("product_zero", showZeroStock);
     if (productName) params.append("product_name", productName);
+    if (selectedCategory !== "all") params.append("category", selectedCategory);
     try {
       const response = await api.get(
         `/dashboard/excel_export/?${params.toString()}`,
@@ -182,7 +240,7 @@ export default function ProductStockBalancePage() {
       <div className="flex flex-col space-y-4">
         <h1 className="text-2xl font-bold">{t("navigation.stock_balance")}</h1>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
             {currentUser?.is_superuser && (
               <Select value={selectedStore} onValueChange={setSelectedStore}>
                 <SelectTrigger className="w-full sm:w-[200px]">
@@ -213,6 +271,19 @@ export default function ProductStockBalancePage() {
                 <SelectItem value="false">
                   Не показывать нулевые остатки
                 </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder={t("forms.select_category") || "Выберите категорию"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                {categories.map((category: any) => (
+                  <SelectItem key={category.id} value={category.id?.toString()}>
+                    {category.category_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

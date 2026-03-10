@@ -22,6 +22,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useGetStores } from "../api/store";
 
 interface ExtendedUser extends User {
@@ -123,12 +130,19 @@ const userFields = (t: any, stores: any[] = []) => [
 
 export default function UsersPage() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ExtendedUser | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedStore, setSelectedStore] = useState<string>("all");
   const { t } = useTranslation();
 
-  const { data: staffsData, isLoading } = useGetUsers({});
+  const { data: staffsData, isLoading } = useGetUsers({
+    params: {
+      role: selectedRole === "all" ? undefined : selectedRole,
+      store: selectedStore === "all" ? undefined : selectedStore,
+      page_size: 1000, // Fetch all users
+    },
+  });
   const { data: storesData } = useGetStores({});
 
   // Handle both array and object response formats
@@ -141,7 +155,7 @@ export default function UsersPage() {
 
   const users: ExtendedUser[] = results.map((user, index) => ({
     ...user,
-    displayId: (page - 1) * 10 + index + 1,
+    displayId: index + 1,
   }));
 
   const { mutate: updateUser, isPending: isUpdating } = useUpdateUser();
@@ -206,6 +220,13 @@ export default function UsersPage() {
     }
   };
 
+  const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
+
+  const handleResetFilters = () => {
+    setSelectedRole("all");
+    setSelectedStore("all");
+  };
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex justify-between items-center mb-6">
@@ -220,6 +241,55 @@ export default function UsersPage() {
           <Plus className="w-4 h-4" />
           {t("common.create")}
         </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-base sm:text-lg font-medium">
+            {t("common.filters")}
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetFilters}
+            className="w-auto"
+          >
+            {t("common.reset") || "Сбросить"}
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t("forms.role")}</label>
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t("placeholders.select_role")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="Продавец">{t("roles.seller")}</SelectItem>
+                <SelectItem value="Администратор">{t("roles.admin")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t("forms.store")}</label>
+            <Select value={selectedStore} onValueChange={setSelectedStore}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t("placeholders.select_store")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("forms.all_stores")}</SelectItem>
+                {stores.map((store: any) => (
+                  <SelectItem key={store.id} value={store.id.toString()}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
@@ -300,26 +370,10 @@ export default function UsersPage() {
             ))}
           </div>
 
-          <div className="mt-6 flex items-center justify-between">
+          <div className="mt-6">
             <p className="text-sm text-gray-500">
               {t("common.total")}: {totalCount}
             </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-              >
-                {t("common.previous")}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setPage(page + 1)}
-                disabled={page * 10 >= totalCount}
-              >
-                {t("common.next")}
-              </Button>
-            </div>
           </div>
         </>
       )}

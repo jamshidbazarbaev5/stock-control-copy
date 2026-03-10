@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ResourceTable } from '../helpers/ResourseTable';
-import { type VehicleIncome, useGetVehicleIncomes } from '../api/vehicle-income';
+import { type VehicleIncome, useGetVehicleIncomes, useDeleteVehicleIncome } from '../api/vehicle-income';
 import { type Vehicle, useGetVehicles } from '../api/vehicle';
 import { type Driver, useGetDrivers } from '../api/driver';
 import { useGetStores } from '../api/store';
@@ -20,6 +20,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
 const incomeColumns = () => [
   {
@@ -147,6 +148,8 @@ export default function VehicleIncomesPage() {
     params: queryParams,
   });
 
+  const deleteVehicleIncome = useDeleteVehicleIncome();
+
   // Get the vehicle incomes array from the paginated response
   let vehicleIncomes: VehicleIncome[] = [];
   if (vehicleIncomesData) {
@@ -196,6 +199,19 @@ export default function VehicleIncomesPage() {
     setDateFrom('');
     setDateTo('');
     setCurrentIncomePage(1);
+  };
+
+  const handleDeleteIncome = async (id: number) => {
+    if (!window.confirm(t("messages.confirm_delete") || "Вы уверены, что хотите удалить этот доход?")) {
+      return;
+    }
+
+    try {
+      await deleteVehicleIncome.mutateAsync(id);
+      toast.success(t("messages.success.deleted") || "Доход успешно удален");
+    } catch (error) {
+      toast.error(t("messages.error.delete") || "Ошибка при удалении дохода");
+    }
   };
 
   const hasActiveFilters =
@@ -311,7 +327,7 @@ export default function VehicleIncomesPage() {
             data={enhancedIncomes}
             columns={incomeColumns()}
             isLoading={isLoading}
-            // onEdit={handleIncomeEdit}
+            onDelete={handleDeleteIncome}
             onAdd={() => navigate('/create-vehicle-income')}
             totalCount={(vehicleIncomesData as any)?.count || enhancedIncomes.length}
             pageSize={(vehicleIncomesData as any)?.page_size || 30}

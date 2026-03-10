@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical, RotateCcw, ClipboardList } from 'lucide-react';
 import '../../expanded-row-dark.css';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +25,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -44,6 +44,10 @@ export default function SupplierDetailPage() {
   const [paymentComment, setPaymentComment] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedStore, setSelectedStore] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [showUnpaidOnly, setShowUnpaidOnly] = useState<string>("all");
 
   // Return dialog state
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -56,7 +60,14 @@ export default function SupplierDetailPage() {
 
   // Fetch stock entries for this supplier
   const { data: stockEntriesData, isLoading: isLoadingEntries } = useGetStockEntries({
-    params: { supplier: id, page: currentPage },
+    params: { 
+      supplier: id, 
+      page: currentPage,
+      store: selectedStore === "all" ? undefined : selectedStore,
+      date_of_arrived_gte: startDate || undefined,
+      date_of_arrived_lte: endDate || undefined,
+      is_unpaid: showUnpaidOnly === "unpaid" ? "true" : undefined,
+    },
   });
   const { data: currentUser } = useCurrentUser();
   const { data: storesData } = useGetStores({});
@@ -85,6 +96,14 @@ export default function SupplierDetailPage() {
 
   const stockEntries = stockEntriesData?.results || [];
   const totalCount = stockEntriesData?.count || 0;
+
+  const handleResetFilters = () => {
+    setSelectedStore("all");
+    setStartDate("");
+    setEndDate("");
+    setShowUnpaidOnly("all");
+    setCurrentPage(1);
+  };
 
   const handlePaymentClick = (entry: any) => {
     setSelectedEntry(entry);
@@ -423,6 +442,69 @@ export default function SupplierDetailPage() {
         <h1 className="text-xl sm:text-2xl font-bold">
           {stockEntries[0]?.supplier.name || t('navigation.suppliers')} - {t('common.stock_entries')}
         </h1>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-base sm:text-lg font-medium">
+            {t("common.filters")}
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetFilters}
+            className="w-auto"
+          >
+            {t("common.reset") || "Сбросить"}
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {currentUser?.is_superuser && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("forms.store")}</label>
+              <select
+                className="w-full px-3 py-2 border rounded-md"
+                value={selectedStore}
+                onChange={(e) => setSelectedStore(e.target.value)}
+              >
+                <option value="all">{t("forms.all_stores")}</option>
+                {stores.map((store) => (
+                  <option key={store.id} value={store.id?.toString()}>
+                    {store.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t("forms.start_date")}</label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t("forms.end_date")}</label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t("common.debt_status")}</label>
+            <select
+              className="w-full px-3 py-2 border rounded-md"
+              value={showUnpaidOnly}
+              onChange={(e) => setShowUnpaidOnly(e.target.value)}
+            >
+              <option value="all">{t("common.all")}</option>
+              <option value="unpaid">{t("common.unpaid_only") || "Только неоплаченные"}</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg mb-4 sm:mb-6">

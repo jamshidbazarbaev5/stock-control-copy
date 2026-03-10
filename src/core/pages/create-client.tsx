@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { type Client, useCreateClient } from '../api/client';
 import {useGetStores}  from '../api/store.ts'
+import { useGetSuppliers } from '../api/supplier';
 import { ResourceForm } from '../helpers/ResourceForm';
 
 export default function CreateClient() {
   const navigate = useNavigate();
   const createClient = useCreateClient();
   const { t } = useTranslation();
-  const [clientType, setClientType] = useState<'Физ.лицо' | 'Юр.лицо' | 'Магазин'>('Физ.лицо');
+  const [clientType, setClientType] = useState<'Физ.лицо' | 'Юр.лицо' | 'Магазин' | 'Поставщик'>('Физ.лицо');
 
   // Custom mask for +998 phone numbers, no spaces
   const formatUzPhone = (value: string) => {
@@ -25,6 +26,11 @@ export default function CreateClient() {
     ? storesData
     : storesData?.results || [];
 
+  const { data: suppliersData } = useGetSuppliers({});
+  const suppliers = Array.isArray(suppliersData)
+    ? suppliersData
+    : suppliersData?.results || [];
+
   const commonFields = [
     {
       name: 'type',
@@ -36,14 +42,15 @@ export default function CreateClient() {
         { value: 'Физ.лицо', label: t('client.individual') },
         { value: 'Юр.лицо', label: t('client.corporate') },
         { value: 'Магазин', label: t('client.store') || 'Магазин' },
+        { value: 'Поставщик', label: t('client.supplier') || 'Поставщик' },
       ],
-      onChange: (value: 'Физ.лицо' | 'Юр.лицо' | 'Магазин') => setClientType(value),
+      onChange: (value: 'Физ.лицо' | 'Юр.лицо' | 'Магазин' | 'Поставщик') => setClientType(value),
     },
     {
       name: 'name',
-      label: clientType === 'Юр.лицо' || clientType === 'Магазин' ? t('forms.company_name') : t('forms.name'),
+      label: clientType === 'Юр.лицо' || clientType === 'Магазин' || clientType === 'Поставщик' ? t('forms.company_name') : t('forms.name'),
       type: 'text' as const,
-      placeholder: clientType === 'Юр.лицо' || clientType === 'Магазин' ? t('placeholders.enter_company_name') : t('placeholders.enter_name'),
+      placeholder: clientType === 'Юр.лицо' || clientType === 'Магазин' || clientType === 'Поставщик' ? t('placeholders.enter_company_name') : t('placeholders.enter_name'),
       required: true,
     },
     {
@@ -90,6 +97,20 @@ export default function CreateClient() {
     },
   ];
 
+  const supplierFields = [
+    {
+      name: 'linked_supplier',
+      label: t('forms.linked_supplier') || 'Поставщик',
+      type: 'select' as const,
+      placeholder: t('placeholders.select_supplier') || 'Выберите поставщика',
+      required: true,
+      options: suppliers.map(supplier => ({
+        value: supplier.id?.toString() || '',
+        label: supplier.name,
+      })),
+    },
+  ];
+
   const handleSubmit = async (data: Client) => {
     try {
       // @ts-ignore
@@ -108,7 +129,9 @@ export default function CreateClient() {
             ? [...commonFields, ...corporateFields]
             : clientType === 'Магазин'
               ? [...commonFields, ...storeFields]
-              : commonFields
+              : clientType === 'Поставщик'
+                ? [...commonFields, ...supplierFields]
+                : commonFields
         }
         onSubmit={handleSubmit}
         isSubmitting={createClient.isPending}

@@ -6,7 +6,7 @@ import api from "./api";
 export interface SaleDebt {
   client: number;
   due_date: string;
-  deposit?: string;
+  deposit?: string | number;
   deposit_payment_method?: string;
   client_read?: {
     id: number;
@@ -139,12 +139,18 @@ export interface Sale {
   on_credit: boolean;
   is_paid?: boolean;
   sale_debt?: SaleDebt;
+  debt_currency?: "UZS" | "USD";
+  debt_usd_rate?: string | number;
   total_amount: string;
   total_pure_revenue?: string;
+  charges_total?: string;
+  change_amount?: string;
+  sale_charges?: { id?: number; charge_type: number; charge_type_name?: string; amount: string }[];
   sale_payments?:
     | {
         payment_method: string;
         amount: string;
+        change_amount?: string;
       }[]
     | undefined;
   sale_refunds?: SaleRefund[];
