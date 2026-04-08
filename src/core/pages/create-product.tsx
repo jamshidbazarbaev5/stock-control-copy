@@ -375,8 +375,8 @@ export default function CreateProduct() {
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Ед измерения</h3>
           {measurements.map((measurement, index) => (
-            <div key={index} className="flex gap-4 items-end">
-              <div className="flex-1">
+            <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+              <div>
                 <label className="block text-sm font-medium mb-2">Из</label>
                 <select
                   className="w-full px-3 py-2 border rounded-md"
@@ -398,7 +398,7 @@ export default function CreateProduct() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1">
+              <div>
                 <label className="block text-sm font-medium mb-2">К</label>
                 <select
                   className="w-full px-3 py-2 border rounded-md"
@@ -420,7 +420,7 @@ export default function CreateProduct() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1">
+              <div>
                 <label className="block text-sm font-medium mb-2">Число</label>
                 <input
                   type="number"
@@ -440,7 +440,7 @@ export default function CreateProduct() {
               {index > 0 && (
                 <button
                   type="button"
-                  className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                  className="w-full sm:w-auto px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
                   onClick={() => {
                     setMeasurements(measurements.filter((_, i) => i !== index));
                   }}
@@ -465,7 +465,7 @@ export default function CreateProduct() {
         </div>
         {/* Dynamic Attribute Fields */}
         {selectedCategory && attributes.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-visible">
             <h3 className="text-lg font-medium">{t("forms.attributes")}</h3>
             {attributes.map((attribute) => {
               const existingValue = attributeValues.find(
@@ -581,7 +581,7 @@ export default function CreateProduct() {
                   );
                 case "many2many":
                   return attribute.related_objects ? (
-                    <div key={attribute.id} className="mb-4">
+                    <div key={attribute.id} className="mb-4 relative">
                       <MultiSelect
                         label={attribute.translations.ru}
                         options={attribute.related_objects.map(

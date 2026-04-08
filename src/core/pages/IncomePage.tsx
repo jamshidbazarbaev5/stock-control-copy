@@ -121,7 +121,10 @@ export default function IncomePage() {
     {
       header: t("table.source"),
       accessorKey: "source",
-      cell: (row: any) => row.source || "-",
+      cell: (row: any) => {
+        if (row.source === "driver_vehicle") return "Водитель/Транспорт";
+        return row.source || "-";
+      },
     },
     {
       header: t("forms.amount3"),
@@ -141,6 +144,9 @@ export default function IncomePage() {
       header: t("forms.payment_method"),
       accessorKey: "description.Payment Method",
       cell: (row: any) => {
+        if (row.source === "driver_vehicle") {
+          return "-";
+        }
         if (row.description["Payment Method"]) {
           return row.description["Payment Method"];
         }
@@ -154,6 +160,15 @@ export default function IncomePage() {
       header: t("forms.client"),
       accessorKey: "description.Client",
       cell: (row: any) => {
+        if (row.source === "driver_vehicle") {
+          const desc = row.description || {};
+          return (
+            <div className="text-sm">
+              <div>🚛 {desc.driver || "-"} / {desc.vehicle || "-"}</div>
+              {desc.comment && <div className="text-muted-foreground text-xs">{desc.comment}</div>}
+            </div>
+          );
+        }
         const clientName = row.description.Client;
         if (clientName && row.source === "Погашение долга") {
           return (
@@ -217,6 +232,34 @@ export default function IncomePage() {
 
   // Render expanded row with product details
   const renderExpandedRow = (row: any) => {
+    // Handle driver_vehicle type
+    if (row.source === "driver_vehicle") {
+      const desc = row.description || {};
+      return (
+        <div className="p-4">
+          <h3 className="text-sm font-medium mb-3">Детали водителя/транспорта</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xs text-muted-foreground mb-1">Водитель</div>
+              <div className="font-semibold">{desc.driver || "-"}</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xs text-muted-foreground mb-1">Транспорт</div>
+              <div className="font-semibold">{desc.vehicle || "-"}</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xs text-muted-foreground mb-1">Бюджет</div>
+              <div className="font-semibold">{desc.budget ? formatCurrency(desc.budget) : "-"}</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xs text-muted-foreground mb-1">Комментарий</div>
+              <div className="font-semibold">{desc.comment || "-"}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Check if the row has Items in the description
     const items = row.description?.Items || [];
 
@@ -290,6 +333,7 @@ export default function IncomePage() {
             <SelectItem value="all">{t("forms.all_sources")}</SelectItem>
             <SelectItem value="Погашение долга">Погашение долга</SelectItem>
             <SelectItem value="Продажа">Продажа</SelectItem>
+            <SelectItem value="driver_vehicle">Водитель/Транспорт</SelectItem>
           </SelectContent>
         </Select>
 

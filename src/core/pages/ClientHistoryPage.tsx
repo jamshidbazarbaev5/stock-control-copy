@@ -30,10 +30,10 @@ export default function ClientHistoryPage() {
   );
 
   if (isClientLoading || isHistoryLoading) {
-    return <div className="container py-8 px-4">Loading...</div>;
+    return <div className="container py-8 px-4">{t("common.loading")}</div>;
   }
 
-  if (!client || client.type !== "Юр.лицо") {
+  if (!client) {
     return (
       <div className="container py-8 px-4">{t("messages.error.not_found")}</div>
     );
@@ -57,7 +57,7 @@ export default function ClientHistoryPage() {
 
       cell: (row: any) => (
         <div className="flex items-center gap-2">
-          {row.type === 'Расход' ? (
+          {row.type === t("forms.expense") ? (
             <div className="flex items-center gap-2 text-red-600">
               <CoinsIcon className="h-4 w-4" />
               {row.type}
@@ -75,11 +75,11 @@ export default function ClientHistoryPage() {
       header: t('forms.amount'),
       accessorKey: 'amount_deducted',
       cell: (row: any) => {
-        const amount = row.type === 'Расход' 
+        const amount = row.type === t("forms.expense") 
           ? row.amount_deducted 
           : (parseFloat(row.new_balance) - parseFloat(row.previous_balance)).toString();
         return (
-          <div className={`flex items-center gap-2 ${row.type === 'Расход' ? 'text-red-600' : 'text-green-600'}`}>
+          <div className={`flex items-center gap-2 ${row.type === t("forms.expense") ? 'text-red-600' : 'text-green-600'}`}>
             <CoinsIcon className="h-4 w-4" />
             {new Intl.NumberFormat('ru-RU').format(parseFloat(amount || '0'))}
           </div>
@@ -118,6 +118,8 @@ export default function ClientHistoryPage() {
     },
   ];
 
+  // @ts-ignore
+  // @ts-ignore
   return (
     <div className="container py-8 px-4">
       <div className="mb-6">
@@ -140,8 +142,8 @@ export default function ClientHistoryPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("common.all")}</SelectItem>
-            <SelectItem value="Расход">Расход</SelectItem>
-            <SelectItem value="Пополнение">Пополнение</SelectItem>
+            <SelectItem value="Расход">{t("forms.expense")}</SelectItem>
+            <SelectItem value="Пополнение">{t("forms.replenishment")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -150,6 +152,78 @@ export default function ClientHistoryPage() {
         data={history || []}
         columns={columns}
         isLoading={isHistoryLoading}
+        onRowClick={() => {}}
+        expandedRowRenderer={(row: any) => {
+          const sale = row.sale_read || row;
+          const fmt = (v: string | number) =>
+            new Intl.NumberFormat("ru-RU").format(parseFloat(String(v || "0")));
+          return (
+            <div className="p-4 space-y-4 bg-muted/30">
+              {/* Sale items */}
+              {sale.sale_items?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">{t("forms.products")}</h4>
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-1 pr-4">{t("table.product")}</th>
+                        <th className="py-1 pr-4">{t("table.unit")}</th>
+                        <th className="py-1 pr-4">{t("table.quantity")}</th>
+                        <th className="py-1 pr-4">{t("table.price")}</th>
+                        <th className="py-1">{t("table.total")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sale.sale_items.map((item: any) => (
+                        <tr key={item.id} className="border-b border-muted">
+                          <td className="py-1 pr-4">{item.product_read?.product_name}</td>
+                          <td className="py-1 pr-4">{item.selling_unit_name}</td>
+                          <td className="py-1 pr-4">{fmt(item.quantity)}</td>
+                          <td className="py-1 pr-4">{fmt(item.price_per_unit)}</td>
+                          <td className="py-1">{fmt(item.subtotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Payments */}
+              {sale.sale_payments?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">{t("forms.payments")}</h4>
+                  <div className="flex flex-wrap gap-3">
+                    {sale.sale_payments.map((p: any) => (
+                      <div key={p.id} className="bg-background rounded px-3 py-1.5 border text-sm">
+                        {p.payment_method}: {fmt(p.amount)} {p.currency}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Totals */}
+              <div className="flex flex-wrap gap-6 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("table.total")}:</span>{" "}
+                  <span className="font-semibold">{fmt(sale.total_amount)}</span>
+                </div>
+                {parseFloat(sale.discount_amount || "0") > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">{t("forms.discount")}:</span>{" "}
+                    <span className="font-semibold text-red-600">{fmt(sale.discount_amount)}</span>
+                  </div>
+                )}
+                {sale.use_client_balance && parseFloat(sale.paid_from_balance_uzs || "0") > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">{t("forms.paid_from_balance")}:</span>{" "}
+                    <span className="font-semibold">{fmt(sale.paid_from_balance_uzs)} UZS</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }}
       />
     </div>
   );

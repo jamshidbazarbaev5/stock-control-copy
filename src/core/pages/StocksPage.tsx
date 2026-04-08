@@ -23,6 +23,8 @@ import {
   DollarSign,
   Package,
   ChevronDown,
+  ArrowRightLeft,
+  Trash2,
 } from "lucide-react";
 import { useGetStocks, useDeleteStock, useUpdateExtraQuantity } from "../api/stock";
 import { useGetStores } from "../api/store";
@@ -44,9 +46,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  WideDialog,
+  WideDialogContent,
+  WideDialogHeader,
+  WideDialogTitle,
+  WideDialogFooter,
+} from "@/components/ui/wide-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import api from "../api/api";
 
 type PaginatedData<T> = { results: T[]; count: number } | T[];
 
@@ -59,15 +69,14 @@ const COLUMN_CONFIG: Record<string, { label: string }> = {
   supplier: { label: "Поставщик" },
   total_price_in_currency: { label: "Общая цена (валюта)" },
   total_price_in_uz: { label: "Общая цена (UZS)" },
+  price_per_unit_currency: { label: "Цена за ед. закупки (валюта)" },
+  price_per_unit_uz: { label: "Цена за ед. закупки (UZS)" },
   base_unit_in_currency: { label: "Цена за базовую единицу (валюта)" },
   base_unit_in_uzs: { label: "Цена за базовую единицу (UZS)" },
   date_of_arrived: { label: "Дата прихода" },
   quantity: { label: "Количество (базовая единица)" },
   purchase_unit_quantity: { label: "Количество (единица закупки)" },
   sale_id: { label: "Sale ID" },
-  is_debt: { label: "Долг" },
-  amount_of_debt: { label: "Сумма долга" },
-  advance_of_debt: { label: "Аванс долга" },
   actions: { label: "Действия" },
 };
 
@@ -113,6 +122,15 @@ export default function StocksPage() {
   const [selectedStockForExtra, setSelectedStockForExtra] = useState<Stock | null>(null);
   const [extraQuantityAmount, setExtraQuantityAmount] = useState<string>("");
 
+  // Reallocate stock dialog state
+  const [reallocateDialogOpen, setReallocateDialogOpen] = useState(false);
+  const [reallocateOldStock, setReallocateOldStock] = useState<Stock | null>(null);
+  const [reallocateStockOptions, setReallocateStockOptions] = useState<Stock[]>([]);
+  const [reallocateNewStockId, setReallocateNewStockId] = useState<number | null>(null);
+  const [reallocateQuantity, setReallocateQuantity] = useState<string>("");
+  const [reallocateLoading, setReallocateLoading] = useState(false);
+  const [reallocateStocksLoading, setReallocateStocksLoading] = useState(false);
+
   // Column visibility state - load from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
       () => {
@@ -123,7 +141,7 @@ export default function StocksPage() {
         // Default: all columns visible except debt-related and sale_id
         return Object.keys(COLUMN_CONFIG).reduce(
             (acc, key) => {
-              acc[key] = !["is_debt", "amount_of_debt", "advance_of_debt", "sale_id"].includes(key);
+              acc[key] = !["sale_id"].includes(key);
               return acc;
             },
             {} as Record<string, boolean>,
@@ -240,14 +258,41 @@ export default function StocksPage() {
 
         return (
             <div className="inline-flex items-center gap-2">
-              {/* If product_zero filter is active, only show history link */}
+              {/* If product_zero filter is active, show history link + reallocate */}
               {productZero ? (
-                <button 
-                  onClick={() => navigate(`/stocks/${row.id}/history`)}
-                  className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
-                >
-                  <span>{label}</span>
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors border-r border-border pr-2">
+                      <span>{label}</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => navigate(`/stocks/${row.id}/history`)}>
+                      <span className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 3v5h5" /><path d="M3 3l6.1 6.1" /><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
+                        </svg>
+                        {t("navigation.history")}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
+                      <span className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-4 w-4" />
+                        Перенос продажи на другой приход
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setSelectedStocks([row.id!]);
+                      setWriteOffDialogOpen(true);
+                    }}>
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Списать товар
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -339,7 +384,7 @@ export default function StocksPage() {
                         )}
                       </>
                     )}
-                    {(row.product?.category_read?.category_name === "Лист" || 
+                    {(row.product?.category_read?.category_name === "Лист" ||
                       row.product_read?.category_read?.category_name === "Лист") && (
                       <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
                         <span className="flex items-center gap-2">
@@ -348,6 +393,21 @@ export default function StocksPage() {
                         </span>
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
+                      <span className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-4 w-4" />
+                        Перенос продажи на другой приход
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setSelectedStocks([row.id!]);
+                      setWriteOffDialogOpen(true);
+                    }}>
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Списать товар
+                      </span>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -395,6 +455,22 @@ export default function StocksPage() {
               : "-",
     },
     {
+      header: "Цена за ед. закупки (валюта)",
+      accessorKey: "price_per_unit_currency",
+      cell: (row: Stock) =>
+          row.price_per_unit_currency
+              ? `${Number(row.price_per_unit_currency).toFixed(2)} ${row.currency?.short_name || "UZS"}`
+              : "-",
+    },
+    {
+      header: "Цена за ед. закупки (UZS)",
+      accessorKey: "price_per_unit_uz",
+      cell: (row: Stock) =>
+          row.price_per_unit_uz
+              ? `${Number(row.price_per_unit_uz).toLocaleString()} UZS`
+              : "-",
+    },
+    {
       header: "Цена за базовую единицу (валюта)",
       accessorKey: "base_unit_in_currency",
       cell: (row: Stock) =>
@@ -439,56 +515,44 @@ export default function StocksPage() {
     },
    
     {
-      header: "Долг",
-      accessorKey: "is_debt",
-      cell: (row: any) => (row.is_debt ? "Да" : "Нет"),
-    },
-    {
-      header: "Сумма долга",
-      accessorKey: "amount_of_debt",
-      cell: (row: any) =>
-          row.amount_of_debt
-              ? `${Number(row.amount_of_debt).toLocaleString()} UZS`
-              : "-",
-    },
-    {
-      header: "Аванс долга",
-      accessorKey: "advance_of_debt",
-      cell: (row: any) =>
-          row.advance_of_debt
-              ? `${Number(row.advance_of_debt).toLocaleString()} UZS`
-              : "-",
-    },
-    {
       header: t("table.actions"),
       accessorKey: "actions",
       cell: (row: any) => {
-        // If product_zero filter is active, only show history button
+        // If product_zero filter is active, show history + reallocate
         if (productZero) {
           return (
-              <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigate(`/stocks/${row.id}/history`)}
-                  title={t("navigation.history")}
-              >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                  <path d="M3 3v5h5" />
-                  <path d="M3 3l6.1 6.1" />
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3 3" />
-                </svg>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/stocks/${row.id}/history`)}>
+                    <span className="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 3v5h5" /><path d="M3 3l6.1 6.1" /><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
+                      </svg>
+                      {t("navigation.history")}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
+                    <span className="flex items-center gap-2">
+                      <ArrowRightLeft className="h-4 w-4" />
+                      Перенос продажи на другой приход
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setSelectedStocks([row.id!]);
+                    setWriteOffDialogOpen(true);
+                  }}>
+                    <span className="flex items-center gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Списать товар
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
           );
         }
 
@@ -589,7 +653,7 @@ export default function StocksPage() {
                       )}
                     </>
                 )}
-                {(row.product?.category_read?.category_name === "Лист" || 
+                {(row.product?.category_read?.category_name === "Лист" ||
                   row.product_read?.category_read?.category_name === "Лист") && (
                   <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
                     <span className="flex items-center gap-2">
@@ -598,6 +662,21 @@ export default function StocksPage() {
                     </span>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
+                  <span className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    Перенос продажи на другой приход
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setSelectedStocks([row.id!]);
+                  setWriteOffDialogOpen(true);
+                }}>
+                  <span className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Списать товар
+                  </span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
         );
@@ -732,6 +811,60 @@ export default function StocksPage() {
       setExtraQuantityAmount("");
       window.location.reload()
     } catch (error) {
+    }
+  };
+
+  const handleOpenReallocate = async (stock: Stock) => {
+    setReallocateOldStock(stock);
+    setReallocateNewStockId(null);
+    setReallocateQuantity("");
+    setReallocateDialogOpen(true);
+    setReallocateStocksLoading(true);
+
+    const productId = stock.product?.id || stock.product_read?.id;
+    if (!productId) {
+      toast.error(t("common.could_not_determine_product"));
+      setReallocateStocksLoading(false);
+      return;
+    }
+
+    const storeId = stock.store?.id || stock.store_read?.id;
+    try {
+      const response = await api.get(`items/stock/?product=${productId}${storeId ? `&store=${storeId}` : ""}`);
+      const allStocks: Stock[] = response.data.results || [];
+      setReallocateStockOptions(allStocks.filter((s) => s.id !== stock.id));
+    } catch {
+      toast.error(t("common.error_loading_stocks"));
+    } finally {
+      setReallocateStocksLoading(false);
+    }
+  };
+
+  const handleReallocateSubmit = async () => {
+    if (!reallocateOldStock || !reallocateNewStockId || !reallocateQuantity) {
+      toast.error(t("common.fill_all_fields"));
+      return;
+    }
+    const qty = parseFloat(reallocateQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      toast.error(t("common.quantity_must_be_positive"));
+      return;
+    }
+    setReallocateLoading(true);
+    try {
+      await api.post("sales/reallocate-stock/", {
+        old_stock_id: reallocateOldStock.id,
+        new_stock_id: reallocateNewStockId,
+        quantity: qty,
+      });
+      toast.success(t("common.reallocate_sale_success"));
+      setReallocateDialogOpen(false);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch {
+      toast.error(t("common.reallocate_sale_error"));
+      setTimeout(() => window.location.reload(), 2000);
+    } finally {
+      setReallocateLoading(false);
     }
   };
 
@@ -1129,8 +1262,7 @@ export default function StocksPage() {
         <WriteOffDialog
             open={writeOffDialogOpen}
             onClose={() => {
-              setWriteOffDialogOpen(false);
-              setSelectedStocks([]);
+              window.location.reload();
             }}
             selectedStocks={selectedStocks}
             stocksData={stocksData}
@@ -1209,6 +1341,97 @@ export default function StocksPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Reallocate Stock Dialog */}
+        <WideDialog open={reallocateDialogOpen} onOpenChange={setReallocateDialogOpen}>
+          <WideDialogContent width="wide" className="max-h-[90vh] overflow-auto">
+            <WideDialogHeader>
+              <WideDialogTitle>{t("common.reallocate_sale")}</WideDialogTitle>
+            </WideDialogHeader>
+            <div className="space-y-4">
+              {reallocateOldStock && (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-1">
+                  <div className="text-sm text-blue-700 font-medium">{t("common.current_stock")}</div>
+                  <div className="text-sm">
+                    ID: {reallocateOldStock.id} — {reallocateOldStock.product?.product_name || reallocateOldStock.product_read?.product_name || "-"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {t("table.quantity")}: {Number(reallocateOldStock.quantity || 0).toFixed(2)} | {t("common.supplier")}: {reallocateOldStock.stock_entry?.supplier?.name || reallocateOldStock.supplier_read?.name || "-"}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>{t("common.quantity_to_transfer")}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={reallocateQuantity}
+                  onChange={(e) => setReallocateQuantity(e.target.value)}
+                  placeholder={t("common.quantity_to_transfer")}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Выберите новый приход (new_stock_id)</Label>
+                {reallocateStocksLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">Загрузка приходов...</div>
+                ) : reallocateStockOptions.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">Нет доступных приходов</div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden max-h-[40vh] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Выбор</th>
+                          <th className="px-3 py-2 text-left">ID</th>
+                          <th className="px-3 py-2 text-left">Название</th>
+                          <th className="px-3 py-2 text-left">Поставщик</th>
+                          <th className="px-3 py-2 text-right">Количество</th>
+                          <th className="px-3 py-2 text-left">Дата</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reallocateStockOptions.map((s) => (
+                          <tr
+                            key={s.id}
+                            className={`border-b cursor-pointer transition-colors ${reallocateNewStockId === s.id ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/50"}`}
+                            onClick={() => setReallocateNewStockId(s.id!)}
+                          >
+                            <td className="px-3 py-2">
+                              <input
+                                type="radio"
+                                checked={reallocateNewStockId === s.id}
+                                onChange={() => setReallocateNewStockId(s.id!)}
+                                className="w-4 h-4"
+                              />
+                            </td>
+                            <td className="px-3 py-2">{s.id}</td>
+                            <td className="px-3 py-2">{s.stock_name || s.product?.product_name || s.product_read?.product_name || "-"}</td>
+                            <td className="px-3 py-2">{s.stock_entry?.supplier?.name || s.supplier_read?.name || "-"}</td>
+                            <td className="px-3 py-2 text-right">{Number(s.quantity || 0).toFixed(2)}</td>
+                            <td className="px-3 py-2">{s.date_of_arrived ? new Date(s.date_of_arrived).toLocaleDateString("ru-RU") : "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+            <WideDialogFooter>
+              <Button variant="outline" onClick={() => { setReallocateDialogOpen(false); window.location.reload(); }}>
+                Отмена
+              </Button>
+              <Button
+                onClick={handleReallocateSubmit}
+                disabled={!reallocateNewStockId || !reallocateQuantity || reallocateLoading}
+              >
+                {reallocateLoading ? "Сохранение..." : "Перенести"}
+              </Button>
+            </WideDialogFooter>
+          </WideDialogContent>
+        </WideDialog>
 
         {/* Extra Quantity Dialog */}
         <Dialog

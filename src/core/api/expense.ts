@@ -6,6 +6,7 @@ export interface Expense {
   store: number;
   amount: string;
   expense_name: number;
+  user_name?:string;
   comment?: string;
   payment_method: string;
   store_read?: {

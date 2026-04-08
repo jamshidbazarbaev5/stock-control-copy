@@ -9,10 +9,13 @@ export interface BaseClient {
   name: string;
   phone_number: string;
   address: string;
+  ceo_name: string;
+  balance_uzs?: string;
 }
 
 export interface IndividualClient extends BaseClient {
   type: "Физ.лицо";
+  // ceo_name?: string;
 }
 
 export interface CorporateClient extends BaseClient {
@@ -24,8 +27,9 @@ export interface CorporateClient extends BaseClient {
 
 export interface StoreClient extends BaseClient {
   type: "Магазин";
+  ceo_name: string;
   linked_store: number;
-  balance_uzs: string;
+  balance_uzs?: string;
   balance_usd: string;
 }
 
@@ -38,6 +42,26 @@ export interface SupplierClient extends BaseClient {
 
 export type Client = IndividualClient | CorporateClient | StoreClient | SupplierClient;
 
+export interface SaleItem {
+  id: number;
+  product_read: {
+    id: number;
+    product_name: string;
+  };
+  quantity: string;
+  price_per_unit: string;
+  subtotal: string;
+  selling_unit_name: string;
+}
+
+export interface SalePayment {
+  id: number;
+  payment_method: string;
+  amount: string;
+  currency: string;
+  usd_rate_at_payment: string;
+}
+
 export interface ClientHistoryEntry {
   sale: {
     id: number;
@@ -47,11 +71,21 @@ export interface ClientHistoryEntry {
     store: number;
     sold_by: number;
     client: number;
+    sale_items: SaleItem[];
+    sale_payments: SalePayment[];
+    discount_amount: string;
+    use_client_balance: boolean;
+    paid_from_balance_uzs: string;
+    paid_from_balance_usd: string;
+    store_read?: { id: number; name: string };
+    sold_by_read?: { id: number; name: string };
   };
+  type: string;
   previous_balance: string;
   new_balance: string;
   amount_deducted: string;
   timestamp: string;
+  worker_read?: { id: number; name: string };
 }
 
 export interface IncrementBalancePayload {

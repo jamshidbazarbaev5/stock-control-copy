@@ -12,13 +12,14 @@ export default function CreateExpenseName() {
   const navigate = useNavigate();
   const createExpenseName = useCreateExpenseName();
   const [name, setName] = useState('');
-  const [reduceFromBudget, setReduceFromBudget] = useState(false);
+  const [isOverallExpense, setIsOverallExpense] = useState(false);
+  const [reduceFromProfit, setReduceFromProfit] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     try {
-      await createExpenseName.mutateAsync({ name, reduce_from_budget: reduceFromBudget } as ExpenseName);
+      await createExpenseName.mutateAsync({ name, is_overall_expense: isOverallExpense, reduce_from_profit: reduceFromProfit } as ExpenseName);
       toast.success(t('messages.success.expense_name_created'));
       navigate('/expense-name');
     } catch (error) {
@@ -43,13 +44,26 @@ export default function CreateExpenseName() {
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
-            id="reduce_from_budget"
-            checked={reduceFromBudget}
-            onChange={(e) => setReduceFromBudget(e.target.checked)}
+            id="is_overall_expense"
+            checked={isOverallExpense}
+            onChange={(e) => setIsOverallExpense(e.target.checked)}
             className="w-4 h-4 cursor-pointer"
           />
-          <Label htmlFor="reduce_from_budget" className="cursor-pointer font-normal">
-            {t('forms.reduce_from_budget') || 'Вычитать из бюджета'}
+          <Label htmlFor="is_overall_expense" className="cursor-pointer font-normal">
+            Общий расход
+          </Label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="reduce_from_profit"
+            checked={reduceFromProfit}
+            onChange={(e) => setReduceFromProfit(e.target.checked)}
+            className="w-4 h-4 cursor-pointer"
+          />
+          <Label htmlFor="reduce_from_profit" className="cursor-pointer font-normal">
+            Расход из прибыли
           </Label>
         </div>
 

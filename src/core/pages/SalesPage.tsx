@@ -182,6 +182,7 @@ export default function SalesPage() {
   const [saleId, setSaleId] = useState<string>("");
   const [stockId, setStockId] = useState<string>("");
   const [selectedShift, setSelectedShift] = useState<string>("all");
+  const [shiftSearchTerm, setShiftSearchTerm] = useState<string>('');
   const [selectedSoldBy, setSelectedSoldBy] = useState<string>("all");
 
   // Reset to page 1 when any filter changes
@@ -386,21 +387,21 @@ export default function SalesPage() {
     // }
     // Get the store budget and sale total_amount
     // Some store_read objects may not have budget, so fallback to 0 if missing
-    const storeBudget = Number(
-      saleToDelete.store_read && "budget" in saleToDelete.store_read
-        ? (saleToDelete.store_read as any).budget
-        : 0,
-    );
-    const saleAmount = Number(saleToDelete.total_amount ?? 0);
-    // If deleting would make budget negative, show error
-    if (storeBudget - saleAmount < 0) {
-      toast.error(
-        t("messages.error.delete_budget_negative", {
-          item: t("navigation.sales"),
-        }) || "Cannot delete: store budget would be negative.",
-      );
-      return;
-    }
+    // const storeBudget = Number(
+    //   saleToDelete.store_read && "budget" in saleToDelete.store_read
+    //     ? (saleToDelete.store_read as any).budget
+    //     : 0,
+    // );
+    // const saleAmount = Number(saleToDelete.total_amount ?? 0);
+    // // If deleting would make budget negative, show error
+    // if (storeBudget - saleAmount < 0) {
+    //   toast.error(
+    //     t("messages.error.delete_budget_negative", {
+    //       item: t("navigation.sales"),
+    //     }) || "Cannot delete: store budget would be negative.",
+    //   );
+    //   return;
+    // }
 
     try {
       await deleteSale.mutateAsync(id);
@@ -423,6 +424,7 @@ export default function SalesPage() {
     setSaleId("");
     setStockId("");
     setSelectedShift("all");
+    setShiftSearchTerm('');
     setSelectedSoldBy("all");
     setPage(1);
   };
@@ -626,13 +628,15 @@ export default function SalesPage() {
             </h3>
 
             {/* Table-like header for desktop */}
-            <div className="hidden md:grid md:grid-cols-12 gap-2 mb-2 px-3 py-2 bg-blue-100 rounded-t-lg border-b border-blue-300">
+            <div className={`hidden md:grid ${currentUser?.role !== "Продавец" ? "md:grid-cols-12" : "md:grid-cols-9"} gap-2 mb-2 px-3 py-2 bg-blue-100 rounded-t-lg border-b border-blue-300`}>
               <div className="md:col-span-1 text-xs font-semibold text-blue-900">ID</div>
               <div className="md:col-span-3 text-xs font-semibold text-blue-900">Товар</div>
               <div className="md:col-span-1 text-xs font-semibold text-blue-900">Кол-во</div>
               <div className="md:col-span-2 text-xs font-semibold text-blue-900">Цена</div>
               <div className="md:col-span-2 text-xs font-semibold text-blue-900">Сумма</div>
-              <div className="md:col-span-3 text-xs font-semibold text-blue-900">Прибыль</div>
+              {currentUser?.role !== "Продавец" && (
+                <div className="md:col-span-3 text-xs font-semibold text-blue-900">Прибыль</div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -683,7 +687,7 @@ export default function SalesPage() {
                   </div>
 
                   {/* Desktop view - Table format */}
-                  <div className="hidden md:grid md:grid-cols-12 gap-2 p-3 items-center border-b border-blue-100 last:border-b-0">
+                  <div className={`hidden md:grid ${currentUser?.role !== "Продавец" ? "md:grid-cols-12" : "md:grid-cols-9"} gap-2 p-3 items-center border-b border-blue-100 last:border-b-0`}>
                     <div className="md:col-span-1">
                       <span className="text-xs text-gray-600 font-medium">#{item.id}</span>
                     </div>
@@ -716,11 +720,13 @@ export default function SalesPage() {
                         {formatCurrency(item?.subtotal)}
                       </span>
                     </div>
-                    <div className="md:col-span-3">
-                      <span className="font-bold text-blue-600 text-sm">
-                        {item.pure_revenue && currentUser?.role !== "Продавец" ? formatCurrency(item?.pure_revenue) : "-"}
-                      </span>
-                    </div>
+                    {currentUser?.role !== "Продавец" && (
+                      <div className="md:col-span-3">
+                        <span className="font-bold text-blue-600 text-sm">
+                          {item.pure_revenue ? formatCurrency(item?.pure_revenue) : "-"}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Client info section - shown below all item details */}
@@ -1074,11 +1080,12 @@ export default function SalesPage() {
       accessorKey: "quantity",
       cell: (row: Sale) => {
         if (!row.sale_items?.length) return "-";
-        
+
         // If only one item, show the quantity directly
         if (row.sale_items.length === 1) {
           const item = row.sale_items[0];
           const unitName =
+            item.selling_unit_name ||
             item.product_read?.available_units?.find(
               (u: any) => u.id === item.selling_unit,
             )?.short_name || "";
@@ -1363,29 +1370,25 @@ export default function SalesPage() {
           </div>
         )}
 
-        {currentUser?.role !== "Продавец" && (
-          <>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t("forms.start_date")}</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full"
-              />
-            </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t("forms.start_date")}</label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t("forms.end_date")}</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full"
-              />
-            </div>
-          </>
-        )}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t("forms.end_date")}</label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full"
+          />
+        </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">
@@ -1412,12 +1415,29 @@ export default function SalesPage() {
                   <SelectValue placeholder="Выберите смену" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 py-1.5">
+                    <Input
+                      type="text"
+                      value={shiftSearchTerm}
+                      onChange={(e) => setShiftSearchTerm(e.target.value)}
+                      placeholder="Поиск по ID смены..."
+                      className="h-8 text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
                   <SelectItem value="all">Все смены</SelectItem>
-                  {shifts?.map((shift) => (
-                    <SelectItem key={shift.id} value={shift.id.toString()}>
-                      Смена #{shift.id} - {shift.cashier.name}
-                    </SelectItem>
-                  ))}
+                  {shifts
+                    ?.filter((shift) =>
+                      !shiftSearchTerm ||
+                      String(shift.id).includes(shiftSearchTerm) ||
+                      shift.cashier?.name?.toLowerCase().includes(shiftSearchTerm.toLowerCase()) ||
+                      shift.store?.name?.toLowerCase().includes(shiftSearchTerm.toLowerCase())
+                    )
+                    .map((shift) => (
+                      <SelectItem key={shift.id} value={shift.id.toString()}>
+                        #{shift.id} — {shift.cashier?.name || 'Без кассира'} ({shift.store?.name || ''})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1462,7 +1482,6 @@ export default function SalesPage() {
               // canDelete={(sale: Sale) => !sale.on_credit}
               totalCount={totalCount}
               onRefund={
-                currentUser?.is_mobile_user === false &&
                 (currentUser?.is_superuser ||
                   currentUser?.role === "Продавец" ||
                   currentUser?.role === "Админ")

@@ -31,6 +31,8 @@
   },
 
   "dashboard": {
+    "cassa_balance": "Баланс",
+    "total": "Всего",
     "remaining":"Ещё есть",
     "total_amount":"Общая сумма",
     "other": "Другие",
@@ -189,6 +191,9 @@
     "total_pages": "Всего страниц"
   },
   "common": {
+    "loading": "Загрузка...",
+    "unit": "Единица",
+    "legal_entity": "Юр.лицо",
     "unpaid_only":"Только неоплаченные",
     "reset":"Сбросить",
     "filters":"Фильтры",
@@ -288,6 +293,21 @@
     "enter_payment_amount": "Введите сумму платежа",
     "payment_successful": "Платеж успешно выполнен",
     "payment_failed": "Ошибка при выполнении платежа",
+    "reallocate_sale": "Перенос продажи на другой приход",
+    "reallocate_sale_success": "Продажа успешно перенесена",
+    "reallocate_sale_error": "Ошибка при переносе продажи",
+    "current_stock": "Текущий приход",
+    "quantity_to_transfer": "Количество для переноса",
+    "select_new_stock": "Выберите новый приход",
+    "loading_stocks": "Загрузка приходов...",
+    "no_available_stocks": "Нет доступных приходов",
+    "transfer": "Перенести",
+    "saving": "Сохранение...",
+    "supplier": "Поставщик",
+    "fill_all_fields": "Заполните все поля",
+    "quantity_must_be_positive": "Количество должно быть больше 0",
+    "could_not_determine_product": "Не удалось определить продукт",
+    "error_loading_stocks": "Ошибка загрузки приходов",
     "comment": "Комментарий",
     "enter_comment": "Введите комментарий",
     "cancel": "Отмена",
@@ -308,6 +328,8 @@
     "add": "Добавить",
     "submit": "Отправить",
     "back": "Назад",
+    "kassa": "Касса",
+    "all_tab": "Общее",
     "loading": "Загрузка...",
     "select": "Выбрать",
     "yes": "Да",
@@ -484,6 +506,8 @@
     "notes_updated": "Примечания обновлены"
   },
   "navigation": {
+    "charge_types": "Доп услуги",
+    "chargeTypes": "Доп услиги",
     "shift": "Смена",
     "writeoff": "Списание",
     "writeoffs": "Списание",
@@ -580,6 +604,13 @@
   },
 
   "forms": {
+    "discount": "Скидка",
+    "products": "Товары",
+
+    "expense": "Расход",
+    "replenishment": "Пополнение",
+    "select_type": "Выберите тип",
+    "paid_from_balance": "Оплачено с баланса",
     "start_date":"Дата начала",
     "end_date":"Дата окончания",
     "select_category":"Выберите категорию",
@@ -624,6 +655,7 @@
     "base_unit": "Базовая единица",
     "price_per_unit": "Цена за едииницу",
     "barcode": "Баркод",
+    "sale_period": "Период продажи",
     "reason": "Причина",
     "currency_name": "Название валюты",
     "short_name": "Короткое название",
@@ -897,6 +929,7 @@
     "select_approver": "Выберите утверждающего",
     "select_approval_status": "Выберите статус утверждения",
     "select_awaiting_status": "Выберите статус ожидания",
+    "select_sale_period": "Выберите период продажи",
     "select_sponsor": "Выберите спонсора",
     "quantity_of_parts": "Введите количество частей",
     "search_loansponsor": "Пишите спонсора",
@@ -986,6 +1019,8 @@
     "complex": "Сложная оплата"
   },
   "table": {
+    "total": "Итого",
+    "unit": "Единица",
     "min_stock":"Мин остаток",
     "total_cost_usd":"Общая сумма в USD",
     "debt_currency":"Тип долга ",
@@ -1349,7 +1384,10 @@
     "center": "По центру",
     "right": "Справа",
     "italic": "Курсив"
+  },
+  "sale_period": {
+    "day": "День",
+    "week": "Неделя",
+    "all": "Все"
   }
-
- 
 }

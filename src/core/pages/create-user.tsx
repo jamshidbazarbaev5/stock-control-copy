@@ -12,7 +12,7 @@ interface UserFormData {
   password: string;
   store: number;
   can_view_quantity:boolean;
-  
+  sale_period: string;
   is_active: boolean;
   is_mobile_user:boolean;
 }
@@ -115,6 +115,18 @@ export default function CreateUser() {
         { value: true, label: t('common.yes') },
         { value: false, label: t('common.no') },
       ],
+    },
+    {
+      name: 'sale_period',
+      label: t('forms.sale_period'),
+      type: 'select',
+      placeholder: t('placeholders.select_sale_period'),
+      required: true,
+      options: [
+        { value: 'day', label: t('sale_period.day') },
+        { value: 'week', label: t('sale_period.week') },
+        { value: 'all', label: t('sale_period.all') },
+      ],
     }
   ];
 
@@ -128,6 +140,7 @@ export default function CreateUser() {
           password: data.password,
           is_mobile_user: data.is_mobile_user,
           can_view_quantity: data.can_view_quantity !== undefined ? Boolean(data.can_view_quantity) : true,
+          sale_period: data.sale_period,
           store_write: Number(data.store),
           is_active: Boolean(data.is_active)
       };

@@ -1411,64 +1411,18 @@ export default function EditStockEntry() {
     setActiveCalculationItemId(null);
   };
 
-  const totalInUZS = stockItems.reduce((sum, item) => {
-    if (item.isCalculated) {
-      return sum + (Number(item.form.total_price_in_uz) || 0);
-    }
-    return sum;
-  }, 0);
+  // const totalInUZS = stockItems.reduce((sum, item) => {
+  //   if (item.isCalculated) {
+  //     return sum + (Number(item.form.total_price_in_uz) || 0);
+  //   }
+  //   return sum;
+  // }, 0);
 
   const selectedSupplier = suppliers.find(
     (s: Supplier) => s.id === Number(commonForm.watch("supplier"))
   );
 
-  // For edit mode: add back the already-paid amount from this entry for proper balance checking
-  // This shows: "if we cancel the previous payment and make the new one, would we have enough?"
-  const originalPaidAmount = Number(stockEntryData?.from_balance_supplier) || 0;
-  
-  // Get the supplier's balance_type to know how to interpret from_balance_supplier
-  const supplierBalanceType = selectedSupplier 
-    ? ((selectedSupplier as any).balance_type === "USD" || (selectedSupplier as any).balance_type === "UZS" 
-        ? (selectedSupplier as any).balance_type 
-        : "UZS")
-    : "UZS";
-  
-  const supplierBalanceUZS = selectedSupplier
-    ? (Number(selectedSupplier.balance) || 0) + (supplierBalanceType === "UZS" ? originalPaidAmount : 0)
-    : 0;
 
-  const balanceType = commonForm.watch("supplier_balance_type");
-  const usdRateData = currencyRates?.[0];
-  const usdRate = usdRateData ? parseFloat(usdRateData.rate) : 0;
-
-  let isBalanceSufficient;
-  let displayBalance = supplierBalanceUZS;
-  let displayTotal = totalInUZS;
-  let displayCurrency = "UZS";
-  let displayPaidAmount = originalPaidAmount;
-
-  if (balanceType === "USD" && usdRate > 0) {
-    const totalInUSD = totalInUZS / usdRate;
-    // Add back the already-paid amount for display (to match validation logic)
-    // If supplier's balance_type is USD, don't convert; if it's UZS, convert it
-    let supplierBalanceInUSD = (Number((selectedSupplier as any)?.balance_in_usd) || 0);
-    if (supplierBalanceType === "USD") {
-      supplierBalanceInUSD += originalPaidAmount;
-      displayPaidAmount = originalPaidAmount;
-    } else {
-      supplierBalanceInUSD += (originalPaidAmount / usdRate);
-      displayPaidAmount = originalPaidAmount / usdRate;
-    }
-    
-    isBalanceSufficient = totalInUSD <= supplierBalanceInUSD;
-    displayBalance = supplierBalanceInUSD;
-    displayTotal = totalInUSD;
-    displayCurrency = "USD";
-  } else {
-    isBalanceSufficient = totalInUZS <= supplierBalanceUZS;
-    displayPaidAmount = originalPaidAmount;
-  }
-  const balanceAfterPurchase = displayBalance - displayTotal;
 
   const handleSubmit = async () => {
     try {
@@ -1496,67 +1450,6 @@ export default function EditStockEntry() {
         toast.error("Please select a payment method for the advance payment.");
         setIsSubmitting(false);
         return;
-      }
-
-      // Check supplier balance if using supplier balance
-      if (commonValues.use_supplier_balance) {
-        const selectedSupplier = suppliers.find(
-            (s: Supplier) => s.id === Number(commonValues.supplier),
-        );
-        if (selectedSupplier) {
-          const totalInUZS = stockItems.reduce((sum, item) => {
-            if (item.isCalculated) {
-              return sum + (Number(item.form.total_price_in_uz) || 0);
-            }
-            return sum;
-          }, 0);
-          // Add back the already-paid amount from this entry for validation
-          const originalPaidAmount = Number(stockEntryData?.from_balance_supplier) || 0;
-          
-          // Get the supplier's balance_type to know how to interpret from_balance_supplier
-          const supplierBalanceType = (selectedSupplier as any).balance_type === "USD" || (selectedSupplier as any).balance_type === "UZS" 
-            ? (selectedSupplier as any).balance_type 
-            : "UZS";
-          
-          const type = commonValues.supplier_balance_type === "USD" ? "USD" : "UZS";
-          const usdRate = Number(currencyRates?.[0]?.rate) || 0;
-          
-          let totalAmount: number;
-          let balance: number;
-          let balanceCurrency: string;
-          
-          if (type === "USD" && usdRate > 0) {
-            totalAmount = totalInUZS / usdRate;
-            // If supplier's balance_type is USD, add back as USD; otherwise convert from UZS
-            let balanceInUSD = Number((selectedSupplier as any).balance_in_usd) || 0;
-            if (supplierBalanceType === "USD") {
-              balanceInUSD += originalPaidAmount;
-            } else {
-              balanceInUSD += (originalPaidAmount / usdRate);
-            }
-            balance = balanceInUSD;
-            balanceCurrency = "USD";
-          } else {
-            totalAmount = totalInUZS;
-            // If supplier's balance_type is USD, convert from USD; otherwise add as UZS
-            let balanceInUZS = Number(selectedSupplier.balance) || 0;
-            if (supplierBalanceType === "USD") {
-              balanceInUZS += (originalPaidAmount * usdRate);
-            } else {
-              balanceInUZS += originalPaidAmount;
-            }
-            balance = balanceInUZS;
-            balanceCurrency = "UZS";
-          }
-          
-          if (balance < totalAmount) {
-            toast.error(
-                `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} ${balanceCurrency}, Требуется: ${formatPrice(totalAmount)} ${balanceCurrency}`,
-            );
-            setIsSubmitting(false);
-            return;
-          }
-        }
       }
 
       // Validate all items are calculated
@@ -2071,83 +1964,41 @@ export default function EditStockEntry() {
                 commonForm.watch("supplier") && (
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg mt-4">
                       <h3 className="font-semibold mb-2">
-                        {t("common.supplier_info") || "Supplier Information"}
+                        {t("common.supplier_info") || "Информация о поставщике"}
                       </h3>
                       {(() => {
                         if (selectedSupplier) {
+                          const balanceUzs = Number((selectedSupplier as any).balance_uzs) || 0;
+                          const balanceUsd = Number((selectedSupplier as any).balance_usd) || 0;
+
                           return (
                               <div className="space-y-3">
-                                <div className="p-3 bg-card border border-blue-200 dark:border-blue-700 rounded-lg">
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                {t("common.supplier_name") || "Supplier"}:
-                              </span>
-                                      <span className="font-medium">
-                                {selectedSupplier.name}
-                              </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                {t("common.supplier_balance") ||
-                                    "Available Balance"}
-                                :
-                              </span>
-                                      <span
-                                          className={`font-semibold ${displayBalance > 0 ? "text-green-600" : "text-red-600"}`}
-                                      >
-                                {formatPrice(displayBalance)} {displayCurrency}
-                                {displayPaidAmount > 0 && (
-                                  <span className="text-xs block text-muted-foreground">
-                                    (включая {formatPrice(displayPaidAmount)} {supplierBalanceType} из этой записи)
-                                  </span>
-                                )}
-                              </span>
-                                    </div>
-                                    <div className="flex justify-between border-t border-border pt-2">
-                              <span className="text-muted-foreground">
-                                {t("common.total_amount") || "Purchase Amount"}:
-                              </span>
-                                      <span className="font-semibold">
-                                {formatPrice(displayTotal)} {displayCurrency}
-                              </span>
-                                    </div>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Имя поставщика:
+                                    </span>
+                                    <span className="font-medium">
+                                      {selectedSupplier.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Баланс (UZS):
+                                    </span>
+                                    <span className="font-semibold">
+                                      {formatPrice(balanceUzs)} UZS
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Баланс (USD):
+                                    </span>
+                                    <span className="font-semibold">
+                                      {formatPrice(balanceUsd)} USD
+                                    </span>
                                   </div>
                                 </div>
-
-                                {!isBalanceSufficient && (
-                                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                                      <div className="flex items-start gap-2">
-                                        <span className="font-semibold">⚠️</span>
-                                        <div>
-                                          <p className="font-semibold">
-                                            Недостаточный баланс
-                                          </p>
-                                          <p className="text-xs mt-1">
-                                            Баланс поставщика ({formatPrice(displayBalance)} {displayCurrency})
-                                            меньше суммы покупки ({formatPrice(displayTotal)}{" "}
-                                            {displayCurrency}). Нехватка:{" "}
-                                            {formatPrice(displayTotal - displayBalance)} {displayCurrency}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                )}
-
-                                {isBalanceSufficient && (
-                                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                                      <div className="flex items-start gap-2">
-                                        <span className="font-semibold">✓</span>
-                                        <div>
-                                          <p className="font-semibold">Оплата доступна</p>
-                                          <p className="text-xs mt-1">
-                                            Остаток баланса после покупки:{" "}
-                                            {balanceAfterPurchase.toFixed(2)} {displayCurrency}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                )}
                               </div>
                           );
                         }

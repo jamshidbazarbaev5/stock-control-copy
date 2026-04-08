@@ -130,8 +130,13 @@ export default function SuppliersPage() {
   });
 
   // Queries and Mutations
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchName]);
+
   const { data: suppliersData, isLoading } = useGetSuppliers({
-    params: { 
+    params: {
       page,
       ...(searchName && { name: searchName }),
     },
@@ -411,13 +416,10 @@ export default function SuppliersPage() {
         </div>
         <div className="mb-4">
           <Input
-            placeholder={t("placeholders.search_by_name") || "Search by name..."}
+            type="text"
             value={searchName}
-            onChange={(e) => {
-              setSearchName(e.target.value);
-              setPage(1);
-            }}
-            className="max-w-sm"
+            onChange={(e) => setSearchName(e.target.value)}
+            placeholder={t("placeholders.search_supplier") || "Поиск по имени поставщика"}
           />
         </div>
         <ResourceTable
@@ -513,49 +515,6 @@ export default function SuppliersPage() {
               </WideDialogTitle>
             </WideDialogHeader>
             <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="debt_currency">
-                  {t("common.debt_currency") || "Debt Currency"} *
-                </Label>
-                <Select
-                    value={balanceForm.debt_currency}
-                    onValueChange={(value: "USD" | "UZS") =>
-                        setBalanceForm({ ...balanceForm, debt_currency: value })
-                    }
-                >
-                  <SelectTrigger id="debt_currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="UZS">UZS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedSupplierForBalance && (() => {
-                const s: any = selectedSupplierForBalance;
-                const debtAmount = balanceForm.debt_currency === "USD"
-                  ? Number(s.remaining_debt_usd || 0)
-                  : Number(s.remaining_debt_uzs || 0);
-
-                return (
-                  <div className="space-y-2 p-4 bg-muted rounded-lg">
-                    <div className="font-medium text-sm">
-                      {t("common.remaining_debt") || "Remaining Debt"}:
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">
-                        {balanceForm.debt_currency}:
-                      </span>
-                      <span className="font-bold text-lg text-orange-500">
-                        {formatPrice(debtAmount)} {balanceForm.debt_currency}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
               <div className="space-y-2">
                 <Label htmlFor="payment_method">
                   {t("common.payment_method")} *
@@ -654,7 +613,7 @@ export default function SuppliersPage() {
                                       className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}
                                   >
                             {budgetAmount.toLocaleString()}{" "}
-                                    {t("common.currency") || "сум"}
+                                    {balanceForm.payment_method === "Валюта" ? "$" : "сум"}
                           </span>
                                 </div>
                                 {isInsufficient && (
@@ -671,7 +630,9 @@ export default function SuppliersPage() {
                   )}
 
               <div className="space-y-2">
-                <Label htmlFor="amount">{t("common.amount")} *</Label>
+                <Label htmlFor="amount">
+                  {t("common.amount")} ({balanceForm.payment_method === "Валюта" ? "$" : "сум"}) *
+                </Label>
                 <Input
                     id="amount"
                     type="number"
@@ -806,7 +767,7 @@ export default function SuppliersPage() {
                           {massPaymentForm.payment_type}:
                         </span>
                               <span className={`font-bold text-lg ${isInsufficient ? "text-destructive" : ""}`}>
-                          {budgetAmount.toLocaleString()} {t("common.currency") || "сум"}
+                          {budgetAmount.toLocaleString()} {massPaymentForm.payment_type === "Валюта" ? "$" : "сум"}
                         </span>
                             </div>
                             {isInsufficient && (
@@ -821,7 +782,7 @@ export default function SuppliersPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="mass_amount">{t("common.amount")} *</Label>
+                <Label htmlFor="mass_amount">{t("common.amount")} ({massPaymentForm.payment_type === "Валюта" ? "$" : "сум"}) *</Label>
                 <Input
                     id="mass_amount"
                     type="number"

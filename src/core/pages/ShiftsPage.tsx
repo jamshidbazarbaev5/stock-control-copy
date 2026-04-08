@@ -124,6 +124,10 @@ export default function ShiftsPage() {
   const totalCount = response?.data?.count || 0;
   const columns = [
     {
+      header: t("table.id"),
+      accessorKey: (row: Shift) => row.id.toString(),
+    },
+    {
       header: t("table.store"),
       accessorKey: (row: Shift) => row.store?.name,
     },

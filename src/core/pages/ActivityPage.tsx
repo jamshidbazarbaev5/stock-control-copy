@@ -27,7 +27,8 @@ import { useGetExpenseNames } from '../api/expense-name';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { shiftsApi } from '../api/shift';
+import { shiftsApi, type Shift } from '../api/shift';
+
 import {
   SmartphoneNfc,
   Printer,
@@ -75,6 +76,10 @@ const PaymentIcon = ({ method }: { method: string }) => {
       return <Landmark className="h-4 w-4 text-orange-500" />;
     case 'Валюта':
       return <DollarSign className="h-4 w-4 text-yellow-600" />;
+    case 'Payme':
+      return <SmartphoneNfc className="h-4 w-4 text-cyan-600" />;
+    case 'UzumNasiya':
+      return <SmartphoneNfc className="h-4 w-4 text-emerald-500" />;
     default:
       return null;
   }
@@ -84,16 +89,20 @@ interface SummaryCardProps {
   title: string;
   totals: TotalWithPayments | undefined;
   debtTotal?: number;
+  changeAmount?: number;
   variant?: 'sales' | 'expenses' | 'debt' | 'default';
+  compact?: boolean;
 }
 
 
 
-const SummaryCard = ({
+const  SummaryCard = ({
                        title,
                        totals,
                        debtTotal,
+                       changeAmount,
                        variant = 'default',
+                       compact = false,
                      }: SummaryCardProps) => {
   if (!totals) return null;
 
@@ -148,6 +157,63 @@ const SummaryCard = ({
   const theme = themes[variant] || themes.default;
   const Icon = theme.MainIcon;
 
+  if (compact) {
+    return (
+      <div
+        className={`
+          group relative overflow-hidden rounded-xl border transition-all duration-300 ease-out
+          ${theme.wrapper}
+        `}
+      >
+        <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-50`} />
+        <div className="relative p-3 z-10">
+          {/* Header + Total inline */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg ${theme.iconBox} shadow-sm ring-1 ring-inset ring-black/5`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {title}
+              </h3>
+            </div>
+            <div className="text-right">
+              <div className={`text-lg font-bold tracking-tight ${theme.mainText} tabular-nums`}>
+                {formatCurrency(totals.total)}
+              </div>
+              {totals.total_in_currency > 0 && (
+                <div className={`text-xs font-medium flex items-center justify-end gap-1 ${theme.subText}`}>
+                  <span className="opacity-70">USD:</span>
+                  <span className="tabular-nums">
+                    ${totals.total_in_currency.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className={`border-t border-dashed w-full ${theme.divider} mb-2`} />
+
+          {/* Payment breakdown - horizontal wrap */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {Object.entries(totals.by_payment_type)
+              .filter(([, amount]) => amount > 0)
+              .map(([method, amount]) => (
+                <div key={method} className="flex items-center gap-1.5">
+                  <PaymentIcon method={method} />
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{method}:</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                    {formatCurrency(amount)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
       <div
           className={`
@@ -179,6 +245,11 @@ const SummaryCard = ({
                   ${theme.badge}
                 `}>
                       Долг: {formatCurrency(debtTotal)}
+                    </div>
+                )}
+                {changeAmount !== undefined && changeAmount > 0 && (
+                    <div className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md text-[14px] font-bold uppercase tracking-wide border bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/30">
+                      Сдача: {formatCurrency(changeAmount)}
                     </div>
                 )}
               </div>
@@ -246,8 +317,23 @@ export default function ActivityPage() {
   const { data: currentUser } = useCurrentUser();
   const navigate = useNavigate();
 
-  // Active tab state
-  const [activeTab, setActiveTab] = useState<ActivityTab>('sales');
+  // Active tab state - persist to localStorage
+  const [activeTab, setActiveTab] = useState<ActivityTab>(() => {
+    const saved = localStorage.getItem('activityPageTab');
+    return (saved as ActivityTab) || 'sales';
+  });
+  const [summaryTab, setSummaryTab] = useState<'kassa' | 'all'>(() => {
+    const saved = localStorage.getItem('activityPageSummaryTab');
+    return (saved as 'kassa' | 'all') || 'kassa';
+  });
+
+  // Persist tabs to localStorage
+  useEffect(() => {
+    localStorage.setItem('activityPageTab', activeTab);
+  }, [activeTab]);
+  useEffect(() => {
+    localStorage.setItem('activityPageSummaryTab', summaryTab);
+  }, [summaryTab]);
 
   // Shared filters (apply to all tabs)
   const [selectedStore, setSelectedStore] = useState<string>('all');
@@ -264,6 +350,9 @@ export default function ActivityPage() {
   // Expenses-specific filters
   const [expensesPaymentType, setExpensesPaymentType] = useState<string>('all');
   const [expensesExpenseName, setExpensesExpenseName] = useState<string>('all');
+
+  // Shift search
+  const [shiftSearchTerm, setShiftSearchTerm] = useState<string>('');
 
   // Debt payments-specific filters
   const [debtPaymentsClient, setDebtPaymentsClient] = useState<string>('all');
@@ -285,8 +374,11 @@ export default function ActivityPage() {
     },
     enabled: currentUser?.role !== 'Продавец',
   });
+
+
+  // Fetch shifts for dropdown
   const { data: shiftsData } = useQuery({
-    queryKey: ['shifts'],
+    queryKey: ['shifts-dropdown'],
     queryFn: async () => {
       const response = await shiftsApi.getAll();
       return response.data;
@@ -299,7 +391,8 @@ export default function ActivityPage() {
   const clients = Array.isArray(clientsData) ? clientsData : clientsData?.results || [];
   const expenseNames = Array.isArray(expenseNamesData) ? expenseNamesData : expenseNamesData?.results || [];
   const users = Array.isArray(usersData) ? usersData : usersData?.results || [];
-  const shifts = shiftsData?.results || [];
+  const shifts: Shift[] = shiftsData?.results || [];
+
 
   // Build params based on active tab
   const getCurrentParams = () => {
@@ -445,11 +538,11 @@ export default function ActivityPage() {
       accessorKey: 'discount_amount',
       cell: (row: ActivitySale) => formatCurrency(row.discount_amount) ,
     },
-    {
+    ...(currentUser?.role !== 'Продавец' ? [{
       header: 'Чистая прибыль',
       accessorKey: 'total_pure_revenue',
       cell: (row: ActivitySale) => formatCurrency(row.total_pure_revenue),
-    },
+    }] : []),
     {
       header: 'Статус',
       accessorKey: 'on_credit',
@@ -502,10 +595,15 @@ export default function ActivityPage() {
 
   // Expenses columns
   const expensesColumns = [
+
     {
       header: t('forms.store'),
       accessorKey: 'store_read.name',
       cell: (row: ActivityExpense) => row.store_read?.name || '-',
+    },  {
+      header: 'Сотрудник',
+      accessorKey: 'user_name',
+      cell: (row: ActivityExpense) => row.user_name || '-',
     },
     {
       header: t('forms.expense_name'),
@@ -536,6 +634,7 @@ export default function ActivityPage() {
       accessorKey: 'comment',
       cell: (row: ActivityExpense) => row.comment || '-',
     },
+
   ];
 
   // Debt payments columns
@@ -586,6 +685,7 @@ export default function ActivityPage() {
     setSalesProduct('');
     setSalesOnCredit('all');
     setSalesShiftId('all');
+    setShiftSearchTerm('');
     setExpensesPaymentType('all');
     setExpensesExpenseName('all');
     setDebtPaymentsClient('all');
@@ -809,10 +909,25 @@ export default function ActivityPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActivityTab)}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="sales">Продажи</TabsTrigger>
-          <TabsTrigger value="expenses">Расходы</TabsTrigger>
-          <TabsTrigger value="debt_payments">Оплаты долгов</TabsTrigger>
+        <TabsList className="mb-4 bg-muted/60 p-1 rounded-xl h-auto gap-1">
+          <TabsTrigger
+            value="sales"
+            className="rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-emerald-400 transition-all"
+          >
+            Продажи
+          </TabsTrigger>
+          <TabsTrigger
+            value="expenses"
+            className="rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-rose-400 transition-all"
+          >
+            Расходы
+          </TabsTrigger>
+          <TabsTrigger
+            value="debt_payments"
+            className="rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-violet-400 transition-all"
+          >
+            Оплаты долгов
+          </TabsTrigger>
         </TabsList>
 
         {/* Sales Tab */}
@@ -874,12 +989,30 @@ export default function ActivityPage() {
                     <SelectValue placeholder="Выберите смену" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="px-2 py-1.5">
+                      <Input
+                        type="text"
+                        value={shiftSearchTerm}
+                        onChange={(e) => setShiftSearchTerm(e.target.value)}
+                        placeholder="Поиск по ID смены..."
+                        className="h-8 text-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     <SelectItem value="all">Все смены</SelectItem>
-                    {shifts.map((shift: any) => (
-                      <SelectItem key={shift.id} value={String(shift.id)}>
-                        Смена #{shift.id}
-                      </SelectItem>
-                    ))}
+                    {shifts
+                      .filter((shift) =>
+                        !shiftSearchTerm ||
+                        String(shift.id).includes(shiftSearchTerm) ||
+                        shift.cashier?.name?.toLowerCase().includes(shiftSearchTerm.toLowerCase()) ||
+                        shift.store?.name?.toLowerCase().includes(shiftSearchTerm.toLowerCase())
+                      )
+                      .map((shift) => (
+                        <SelectItem key={shift.id} value={String(shift.id)}>
+                          #{shift.id} — {shift.cashier?.name || 'Без кассира'} ({shift.store?.name || ''})
+                        </SelectItem>
+                      ))
+                    }
                   </SelectContent>
                 </Select>
               )}
@@ -896,6 +1029,24 @@ export default function ActivityPage() {
             pageSize={activityData?.page_size || 30}
             expandedRowRenderer={(row: ActivitySale) => renderExpandedSaleRow(row)}
           />
+          {/* Summary sub-tabs: Касса / Общее */}
+          <div className="flex gap-2 m-4">
+            <Button
+              variant={summaryTab === 'kassa' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSummaryTab('kassa')}
+            >
+              {t('common.kassa')}
+            </Button>
+            <Button
+              variant={summaryTab === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSummaryTab('all')}
+            >
+              {t('common.all_tab')}
+            </Button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <SummaryCard
               title="Продажи (Общее)"
@@ -905,20 +1056,43 @@ export default function ActivityPage() {
             />
             <SummaryCard
               title="Расходы (Общее)"
-              totals={activityData?.overall_totals?.expenses_total}
+              totals={summaryTab === 'all' ? activityData?.overall_totals?.all_expenses_total : activityData?.overall_totals?.expenses_total}
               variant="expenses"
             />
             <SummaryCard
               title="Оплаты долгов (Общее)"
-              totals={activityData?.overall_totals?.debt_payments_total}
+              totals={summaryTab === 'all' ? activityData?.overall_totals?.all_debt_payments_total : activityData?.overall_totals?.debt_payments_total}
               variant="debt"
             />
             <SummaryCard
               title="Остаток"
-              totals={activityData?.overall_totals?.remaining}
+              totals={summaryTab === 'all' ? activityData?.overall_totals?.all_remaining : activityData?.overall_totals?.remaining}
+              changeAmount={activityData?.overall_totals?.change_amount}
               variant="default"
             />
           </div>
+
+          {/* Admin Totals - only shown in Касса tab */}
+          {summaryTab === 'kassa' && (activityData?.overall_totals?.admin_expenses_total ?? activityData?.overall_totals?.admin_debt_payments_total) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {activityData?.overall_totals?.admin_expenses_total && (
+                <SummaryCard
+                  title="Расходы (Админ)"
+                  totals={activityData.overall_totals.admin_expenses_total}
+                  variant="expenses"
+                  compact
+                />
+              )}
+              {activityData?.overall_totals?.admin_debt_payments_total && (
+                <SummaryCard
+                  title="Оплаты долгов (Админ)"
+                  totals={activityData.overall_totals.admin_debt_payments_total}
+                  variant="debt"
+                  compact
+                />
+              )}
+            </div>
+          )}
         </TabsContent>
 
         {/* Expenses Tab */}

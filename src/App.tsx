@@ -113,6 +113,20 @@ import EditVehicleIncome from "./core/pages/edit-vehicle-income";
 
 const queryClient = new QueryClient();
 
+// Prevent scroll from changing number input values globally
+if (typeof document !== "undefined") {
+  document.addEventListener(
+    "wheel",
+    (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.type === "number" && target === document.activeElement) {
+        target.blur();
+      }
+    },
+    { passive: true }
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -756,7 +770,7 @@ function App() {
                 }
               />
               <Route
-                path="/sponsors/:id/loans/:currency"
+                path="/sponsors/:id/loans"
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <SponsorLoansPage />

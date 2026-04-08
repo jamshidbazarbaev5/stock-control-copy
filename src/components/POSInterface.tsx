@@ -62,6 +62,9 @@ interface ProductInCart {
     short_name: string;
     factor: number;
     is_base: boolean;
+    selling_price?: number | string;
+    min_price?: number | string;
+    selling_price_in_currency?: number | string | null;
   } | null;
   stock?: Stock;
   stockId?: number;
@@ -578,12 +581,13 @@ const POSInterfaceCore = () => {
                 is_base: true,
               };
 
-              // Use selling_price from product data, fallback to min_price
-              const price = product.selling_price
-                ? parseFloat(String(product.selling_price))
-                : product.min_price
-                    ? parseFloat(String(product.min_price))
-                    : 10000;
+              // Use unit's selling_price from available_units, fallback to product selling_price
+              const unitPrice = defaultUnit?.selling_price
+                ? parseFloat(String(defaultUnit.selling_price))
+                : null;
+              const price = unitPrice
+                || (product.selling_price ? parseFloat(String(product.selling_price)) : 0)
+                || (product.min_price ? parseFloat(String(product.min_price)) : 10000);
 
               // Add product with each available stock
               for (const stock of stocks) {
@@ -736,12 +740,16 @@ const POSInterfaceCore = () => {
                 factor: 1,
                 is_base: true,
               };
-          // Use selling_price from product data, fallback to min_price
-          const price = product.selling_price
-              ? parseFloat(String(product.selling_price))
-              : product.min_price
-                  ? parseFloat(String(product.min_price))
-                  : 10000;
+          // Use unit's selling_price from available_units, fallback to product selling_price
+          // @ts-ignore
+          // @ts-ignore
+          // @ts-ignore
+          const unitPrice :any = (defaultUnit as any)?.selling_price
+              ? parseFloat(String((defaultUnit as any)?.selling_price))
+              : null;
+          const price:any = unitPrice
+              || (product.selling_price ? parseFloat(String(product.selling_price)) : 0)
+              || (product.min_price ? parseFloat(String(product.min_price)) : 10000);
 
           // Check if product already exists in cart
           const existingProductIndex = cartProducts.findIndex(
@@ -1465,10 +1473,10 @@ const POSInterfaceCore = () => {
     }
   };
 
-  // const clearCart = () => {
-  //   setCartProducts([]);
-  //   setFocusedProductIndex(-1);
-  // };
+  const clearCart = () => {
+    setCartProducts([]);
+    setFocusedProductIndex(-1);
+  };
 
   // Utility function to clear localStorage state
   const clearPersistedState = () => {
@@ -1774,11 +1782,21 @@ const POSInterfaceCore = () => {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Product Header */}
             <div className="mb-3 px-6 pt-3 flex-shrink-0">
-              <h2 className="text-lg font-bold mb-1 text-gray-900">
-                {cartProducts.length > 0
-                    ? `${cartProducts.length} товар(ов) в корзине`
-                    : "Корзина пуста"}
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold mb-1 text-gray-900">
+                  {cartProducts.length > 0
+                      ? `${cartProducts.length} товар(ов) в корзине`
+                      : "Корзина пуста"}
+                </h2>
+                {cartProducts.length > 0 && (
+                  <button
+                    onClick={clearCart}
+                    className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Очистить корзину
+                  </button>
+                )}
+              </div>
               <div className="text-sm text-gray-700 font-medium">
                 Общая сумма: {total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум
               </div>
@@ -2036,28 +2054,37 @@ const POSInterfaceCore = () => {
                   {/* Table Header - Fixed */}
                   <div className="flex-shrink-0">
                     <table className="w-full">
+                      <colgroup>
+                        <col style={{width: '30px'}} />
+                        <col />
+                        <col style={{width: '110px'}} />
+                        <col style={{width: '65px'}} />
+                        <col style={{width: '80px'}} />
+                        <col style={{width: '110px'}} />
+                        <col style={{width: '50px'}} />
+                      </colgroup>
                       <thead className="bg-gray-100">
                       <tr>
-                        <th className="text-left px-2 py-1 font-bold text-gray-700 text-xs">
+                        <th className="text-left px-1 py-1 font-bold text-gray-700 text-xs">
                           №
                         </th>
-                        <th className="text-left px-2 py-1 font-bold text-gray-700 text-xs">
+                        <th className="text-left px-1 py-1 font-bold text-gray-700 text-xs">
                           Товар
                         </th>
-                        <th className="text-right px-2 py-1 font-bold text-gray-700 text-xs">
+                        <th className="text-right px-1 py-1 font-bold text-gray-700 text-xs">
                           Цена
                         </th>
-                        <th className="text-center px-2 py-1 font-bold text-gray-700 text-xs">
-                          Ед. изм.
+                        <th className="text-center px-1 py-1 font-bold text-gray-700 text-xs">
+                          Ед.
                         </th>
-                        <th className="text-right px-2 py-1 font-bold text-gray-700 text-xs">
+                        <th className="text-right px-1 py-1 font-bold text-gray-700 text-xs">
                           Кол-во
                         </th>
-                        <th className="text-right px-2 py-1 font-bold text-gray-700 text-xs">
+                        <th className="text-right px-1 py-1 font-bold text-gray-700 text-xs">
                           Сумма
                         </th>
-                        <th className="text-center px-2 py-1 font-bold text-gray-700 text-xs w-16">
-                          Действия
+                        <th className="text-center px-1 py-1 font-bold text-gray-700 text-xs">
+                          
                         </th>
                       </tr>
                       </thead>
@@ -2067,6 +2094,15 @@ const POSInterfaceCore = () => {
                   {/* Scrollable Table Body */}
                   <div className="overflow-y-auto overflow-x-hidden flex-1">
                     <table className="w-full">
+                      <colgroup>
+                        <col style={{width: '30px'}} />
+                        <col />
+                        <col style={{width: '110px'}} />
+                        <col style={{width: '65px'}} />
+                        <col style={{width: '80px'}} />
+                        <col style={{width: '110px'}} />
+                        <col style={{width: '50px'}} />
+                      </colgroup>
                       <tbody>
                       {cartProducts.length === 0 ? (
                           <tr>
@@ -2096,8 +2132,8 @@ const POSInterfaceCore = () => {
                                               : "bg-white"
                                   } transition-all duration-200 hover:bg-gray-100 h-12`}
                               >
-                                <td className="px-2 py-1 text-gray-900 text-xs font-medium">{index + 1}</td>
-                                <td className="px-2 py-1 font-medium text-gray-900">
+                                <td className="px-1 py-1 text-gray-900 text-xs font-medium">{index + 1}</td>
+                                <td className="px-1 py-1 font-medium text-gray-900">
                                   <div>
                                     <div className="text-xs leading-tight">{product.name}</div>
                                     {product.barcode && (
@@ -2117,9 +2153,14 @@ const POSInterfaceCore = () => {
                                       ) * (product.selectedUnit?.factor || 1)).toFixed(2)}{" "}
                                       {product.selectedUnit?.short_name || "шт"}
                                     </div>
+                                    {window.location.hostname === "muza.smart-sawda.uz" && product.product.avg_stock_price && (
+                                        <div className="text-xs text-orange-600 font-medium leading-tight">
+                                          Ср. себест.: {parseFloat(product.product.avg_stock_price).toLocaleString()} сум
+                                        </div>
+                                    )}
                                   </div>
                                 </td>
-                                <td className="px-2 py-1 text-right text-gray-900">
+                                <td className="px-1 py-1 text-right text-gray-900">
                                   <button
                                       onClick={() => {
                                         setSelectedProductForPrice(product);
@@ -2127,12 +2168,15 @@ const POSInterfaceCore = () => {
                                         setPriceInput('');
                                         setIsPriceModalOpen(true);
                                       }}
-                                      className="w-16 text-right px-1 py-0 text-xs font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors h-6"
+                                      className="w-full text-right px-1.5 py-0 text-[11px] font-medium border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors h-6 truncate"
+                                      title={product.price.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                   >
-                                    {product.price.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                                    {product.price >= 1000000
+                                      ? product.price.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+                                      : product.price.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                   </button>
                                 </td>
-                                <td className="px-2 py-1 text-center text-gray-900">
+                                <td className="px-1 py-1 text-center text-gray-900">
                                   {product.product.available_units &&
                                   product.product.available_units.length > 0 ? (
                                       <Select
@@ -2146,13 +2190,13 @@ const POSInterfaceCore = () => {
                                                     (u) => u.id === unitId,
                                                 );
                                             if (selectedUnit) {
-                                              // Recalculate price based on unit factor: base_price / factor
-                                              const basePrice = product.product.selling_price
-                                                  ? parseFloat(String(product.product.selling_price))
-                                                  : product.product.min_price
-                                                      ? parseFloat(String(product.product.min_price))
-                                                      : 10000;
-                                              const newPrice = basePrice / selectedUnit.factor;
+                                              // Use unit's own selling_price from available_units
+                                              const unitSellingPrice = selectedUnit.selling_price
+                                                  ? parseFloat(String(selectedUnit.selling_price))
+                                                  : null;
+                                              const newPrice = unitSellingPrice
+                                                  || (product.product.selling_price ? parseFloat(String(product.product.selling_price)) : 0)
+                                                  || (product.product.min_price ? parseFloat(String(product.product.min_price)) : 10000);
                                               // Set quantity: 1 if available >= 1, otherwise max available in unit
                                               const baseQuantity = product.product.quantity
                                                   ? parseFloat(String(product.product.quantity))
@@ -2169,7 +2213,7 @@ const POSInterfaceCore = () => {
                                             }
                                           }}
                                       >
-                                        <SelectTrigger className="w-16 text-xs h-6">
+                                        <SelectTrigger className="w-full text-xs h-6">
                                           <SelectValue placeholder="Ед." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2180,7 +2224,6 @@ const POSInterfaceCore = () => {
                                                       value={unit.id.toString()}
                                                   >
                                                     {unit.short_name}
-                                                    {unit.is_base && " (осн.)"}
                                                   </SelectItem>
                                               ),
                                           )}
@@ -2192,7 +2235,7 @@ const POSInterfaceCore = () => {
                                 </span>
                                   )}
                                 </td>
-                                <td className="px-2 py-1 text-right text-gray-900">
+                                <td className="px-1 py-1 text-right text-gray-900">
                                   <div className="flex items-center justify-end space-x-1">
                                     <button
                                         onClick={() => {
@@ -2246,10 +2289,12 @@ const POSInterfaceCore = () => {
                                     </button>
                                   </div>
                                 </td>
-                                <td className="px-2 py-1 text-right font-bold text-gray-900 text-xs">
-                                  {product.total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                                <td className="px-1 py-1 text-right font-bold text-gray-900 text-[11px] truncate" title={product.total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}>
+                                  {product.total >= 1000000
+                                    ? product.total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+                                    : product.total.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                                 </td>
-                                <td className="px-2 py-1 text-center">
+                                <td className="px-1 py-1 text-center">
                                   <button
                                       onClick={() => {
                                         removeProduct(product.id);
@@ -3747,7 +3792,7 @@ const POSInterfaceCore = () => {
                                   String(
                                       selectedProductForQuantity?.product.quantity || 0,
                                   ),
-                              )
+                              ) * (selectedProductForQuantity?.selectedUnit?.factor || 1)
                           }
                           className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-xl text-base font-bold transition-colors min-h-[48px] active:scale-95 touch-manipulation"
                       >

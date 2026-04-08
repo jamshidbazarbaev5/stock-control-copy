@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGetLoanPaymentsByLoan } from '../api/loanpaymentByLoan';
 import { ResourceTable } from '../helpers/ResourseTable';
@@ -6,10 +6,13 @@ import { ResourceTable } from '../helpers/ResourseTable';
 // Optionally import Loan type if needed for details
 import { fetchLoans, type Loan } from '../api/loan';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default function LoanPaymentsPage() {
   const { id: sponsorId, loanId } = useParams<{ id: string; loanId: string; currency: string }>();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data: payments = [], isLoading } = useGetLoanPaymentsByLoan(sponsorId, loanId);
   const [loan, setLoan] = useState<Loan | null>(null);
   const [isLoanLoading, setIsLoanLoading] = useState(false);
@@ -42,7 +45,16 @@ export default function LoanPaymentsPage() {
 
   return (
     <div className="container py-8 px-4">
-    
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => navigate(-1)}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        {t('common.back')}
+      </Button>
+
       <h3 className="text-lg font-bold mb-2">{t('Платежи по займу')} #{loanId}</h3>
       {isLoanLoading ? (
         <div>{t('Загрузка информации о займе...')}</div>

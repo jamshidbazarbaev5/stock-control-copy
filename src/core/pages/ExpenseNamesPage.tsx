@@ -15,7 +15,8 @@ export default function ExpenseNamesPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedExpenseName, setSelectedExpenseName] = useState<ExpenseName | null>(null);
   const [editName, setEditName] = useState('');
-  const [editReduceFromBudget, setEditReduceFromBudget] = useState(false);
+  const [editIsOverallExpense, setEditIsOverallExpense] = useState(false);
+  const [editReduceFromProfit, setEditReduceFromProfit] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 30;
 
@@ -37,10 +38,17 @@ export default function ExpenseNamesPage() {
       accessorKey: 'name',
     },
     {
-      header: t('forms.reduce_from_budget') || 'Вычитать из бюджета',
-      accessorKey: 'reduce_from_budget',
+      header: 'Общий расход',
+      accessorKey: 'is_overall_expense',
       cell: (row: any) => (
-        <span>{row.reduce_from_budget ? '✓' : '—'}</span>
+        <span>{row.is_overall_expense ? '✓' : '—'}</span>
+      ),
+    },
+    {
+      header: 'Расход из прибыли',
+      accessorKey: 'reduce_from_profit',
+      cell: (row: any) => (
+        <span>{row.reduce_from_profit ? '✓' : '—'}</span>
       ),
     },
   ];
@@ -48,7 +56,8 @@ export default function ExpenseNamesPage() {
   const handleEdit = (expenseName: ExpenseName) => {
     setSelectedExpenseName(expenseName);
     setEditName(expenseName.name);
-    setEditReduceFromBudget(expenseName.reduce_from_budget ?? false);
+    setEditIsOverallExpense((expenseName as any).is_overall_expense ?? false);
+    setEditReduceFromProfit((expenseName as any).reduce_from_profit ?? false);
     setIsEditModalOpen(true);
   };
 
@@ -68,8 +77,9 @@ export default function ExpenseNamesPage() {
       await updateExpenseName.mutateAsync({
         id: selectedExpenseName.id,
         name: editName,
-        reduce_from_budget: editReduceFromBudget,
-      });
+        is_overall_expense: editIsOverallExpense,
+        reduce_from_profit: editReduceFromProfit,
+      } as any);
       toast.success(t('messages.success.expense_name_updated'));
       setIsEditModalOpen(false);
       setSelectedExpenseName(null);
@@ -112,13 +122,26 @@ export default function ExpenseNamesPage() {
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                id="edit-reduce_from_budget"
-                checked={editReduceFromBudget}
-                onChange={(e) => setEditReduceFromBudget(e.target.checked)}
+                id="edit-is_overall_expense"
+                checked={editIsOverallExpense}
+                onChange={(e) => setEditIsOverallExpense(e.target.checked)}
                 className="w-4 h-4 cursor-pointer"
               />
-              <Label htmlFor="edit-reduce_from_budget" className="cursor-pointer font-normal">
-                {t('forms.reduce_from_budget') || 'Вычитать из бюджета'}
+              <Label htmlFor="edit-is_overall_expense" className="cursor-pointer font-normal">
+                Общий расход
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="edit-reduce_from_profit"
+                checked={editReduceFromProfit}
+                onChange={(e) => setEditReduceFromProfit(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <Label htmlFor="edit-reduce_from_profit" className="cursor-pointer font-normal">
+                Расход из прибыли
               </Label>
             </div>
 

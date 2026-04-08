@@ -17,7 +17,7 @@ interface TokenResponse {
 const getBaseURL = (): string => {
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'https://test.smart-sawda.uz/api/v1/';
+    return 'https://test2.smart-sawda.uz/api/v1/';
   }
   return `https://${hostname}/api/v1/`;
 };

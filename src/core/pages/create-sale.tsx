@@ -43,6 +43,9 @@ interface ProductInCart {
     short_name: string;
     factor: number;
     is_base: boolean;
+    selling_price?: number | string;
+    min_price?: number | string;
+    selling_price_in_currency?: number | string | null;
   } | null;
   stock?: Stock;
   stockId?: number;
@@ -367,7 +370,7 @@ function CreateSale() {
       sale_items: [
         {
           product_write: 0,
-          quantity: 1,
+          quantity: "" as any,
           selling_unit: 0,
           price_per_unit: "0",
         },
@@ -414,7 +417,7 @@ function CreateSale() {
         form.setValue("sale_items", [
           {
             product_write: 0,
-            quantity: 1,
+            quantity: "" as any,
             selling_unit: 0,
             price_per_unit: "0",
           },
@@ -431,12 +434,13 @@ function CreateSale() {
           is_base: true,
         };
 
-        // Use selling_price from product data, fallback to min_price
-        const price = product.selling_price
-          ? parseFloat(String(product.selling_price))
-          : product.min_price
-          ? parseFloat(String(product.min_price))
-          : 10000;
+        // Use unit's selling_price from available_units, fallback to product selling_price
+        const unitPrice = defaultUnit?.selling_price
+          ? parseFloat(String(defaultUnit.selling_price))
+          : null;
+        const price = unitPrice
+          || (product.selling_price ? parseFloat(String(product.selling_price)) : 0)
+          || (product.min_price ? parseFloat(String(product.min_price)) : 10000);
 
         // Create cart item
         const newProduct: ProductInCart = {
@@ -444,8 +448,8 @@ function CreateSale() {
           productId: product.id || 0,
           name: product.product_name,
           price: price,
-          quantity: 1,
-          total: price,
+          quantity: "" as any,
+          total: 0,
           product: product,
           barcode: product.barcode,
           selectedUnit: defaultUnit || null,
@@ -462,7 +466,7 @@ function CreateSale() {
           shouldValidate: true,
           shouldDirty: true,
         });
-        form.setValue("sale_items.0.quantity", 1, {
+        form.setValue("sale_items.0.quantity", "" as any, {
           shouldValidate: true,
           shouldDirty: true,
         });
@@ -588,18 +592,13 @@ function CreateSale() {
       is_base: true,
     };
 
-    // Use selling_price from product data, fallback to min_price
-    const price = selectedProduct.selling_price
-      ? parseFloat(String(selectedProduct.selling_price))
-      : selectedProduct.min_price
-      ? parseFloat(String(selectedProduct.min_price))
-      : 10000;
-
-    // Set quantity: 1 if available >= 1, otherwise max available
-    const availableQuantity = selectedProduct.quantity
-      ? parseFloat(String(selectedProduct.quantity))
-      : 0;
-    const defaultQty = availableQuantity >= 1 ? 1 : availableQuantity;
+    // Use unit's selling_price from available_units, fallback to product selling_price
+    const unitPrice = defaultUnit?.selling_price
+      ? parseFloat(String(defaultUnit.selling_price))
+      : null;
+    const price = unitPrice
+      || (selectedProduct.selling_price ? parseFloat(String(selectedProduct.selling_price)) : 0)
+      || (selectedProduct.min_price ? parseFloat(String(selectedProduct.min_price)) : 10000);
 
     // Update cart products
     const newCartProducts = [...cartProducts];
@@ -608,8 +607,8 @@ function CreateSale() {
       productId: selectedProduct.id || 0,
       name: selectedProduct.product_name,
       price: price,
-      quantity: defaultQty,
-      total: price * defaultQty,
+      quantity: "" as any,
+      total: 0,
       product: selectedProduct,
       barcode: selectedProduct.barcode,
       selectedUnit: defaultUnit,
@@ -632,8 +631,8 @@ function CreateSale() {
       shouldValidate: true,
       shouldDirty: true,
     });
-    // Preserve existing quantity
-    form.setValue(`sale_items.${index}.quantity`, defaultQty, {
+    // Set empty quantity so user enters it manually
+    form.setValue(`sale_items.${index}.quantity`, "" as any, {
       shouldValidate: true,
       shouldDirty: true,
     });
@@ -791,6 +790,11 @@ function CreateSale() {
 
   const [usdInputValues, setUsdInputValues] = useState<{
     [key: number]: string;
+  }>({});
+
+  // Track raw payment amount input to avoid reformatting while typing
+  const [paymentInputValues, setPaymentInputValues] = useState<{
+    [key: number]: string | null;
   }>({});
 
   const handleUsdChange = (
@@ -1560,10 +1564,17 @@ function CreateSale() {
                           )}
                           {field.value > 0 && activeSearchIndex !== index && (
                             <div className="mt-2 px-3 py-2 bg-blue-50 border border-black-300 rounded-md text-sm flex justify-between items-center shadow-sm">
-                              <span className="font-medium text-black-900 ">
-                                {cartProducts[index]?.name ||
-                                  t("common.selected")}
-                              </span>
+                              <div>
+                                <span className="font-medium text-black-900 ">
+                                  {cartProducts[index]?.name ||
+                                    t("common.selected")}
+                                </span>
+                                {window.location.hostname === "muza.smart-sawda.uz" && cartProducts[index]?.product?.avg_stock_price && (
+                                  <div className="text-xs text-gray-600">
+                                    Ср. себестоимость: {parseFloat(cartProducts[index].product.avg_stock_price!).toLocaleString()} сум
+                                  </div>
+                                )}
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1609,13 +1620,13 @@ function CreateSale() {
                             );
                             if (selectedUnit && cartProduct) {
                               const factor = selectedUnit.factor || 1;
-                              // price = basePrice / factor (same as POSInterface)
-                              const basePrice = cartProduct.product.selling_price
-                                ? parseFloat(String(cartProduct.product.selling_price))
-                                : cartProduct.product.min_price
-                                ? parseFloat(String(cartProduct.product.min_price))
-                                : cartProduct.price;
-                              const newPrice = basePrice / factor;
+                              // Use unit's own selling_price from available_units
+                              const unitSellingPrice = selectedUnit.selling_price
+                                ? parseFloat(String(selectedUnit.selling_price))
+                                : null;
+                              const newPrice = unitSellingPrice
+                                || (cartProduct.product.selling_price ? parseFloat(String(cartProduct.product.selling_price)) : 0)
+                                || (cartProduct.product.min_price ? parseFloat(String(cartProduct.product.min_price)) : cartProduct.price);
 
                               // Set quantity: 1 if available >= 1, otherwise max available in unit
                               const quantitySource = cartProduct.stock?.quantity ?? cartProduct.product.quantity;
@@ -1892,17 +1903,31 @@ function CreateSale() {
                           <FormControl>
                             <Input
                               type="text"
+                              inputMode="decimal"
                               value={
-                                value !== undefined && value !== null
-                                  ? formatCurrency(value)
-                                  : ""
+                                paymentInputValues[index] !== null && paymentInputValues[index] !== undefined
+                                  ? paymentInputValues[index]!
+                                  : value !== undefined && value !== null
+                                    ? formatCurrency(value)
+                                    : ""
                               }
+                              onFocus={() => {
+                                const current = value !== undefined && value !== null ? value : 0;
+                                setPaymentInputValues(prev => ({
+                                  ...prev,
+                                  [index]: current === 0 ? "" : String(current),
+                                }));
+                              }}
                               onChange={(e) => {
-                                // Remove all non-digit and non-decimal characters for parsing
-                                const rawValue = e.target.value
-                                  .replace(/[^\d.,]/g, "")
-                                  .replace(/,/g, "");
-                                const newAmount = parseFloat(rawValue) || 0;
+                                const raw = e.target.value.replace(/[^\d.,]/g, "");
+                                setPaymentInputValues(prev => ({
+                                  ...prev,
+                                  [index]: raw,
+                                }));
+                              }}
+                              onBlur={() => {
+                                const raw = (paymentInputValues[index] || "").replace(/,/g, ".");
+                                const newAmount = parseFloat(raw) || 0;
                                 const totalAmount = parseFloat(
                                   form.watch("total_amount")
                                 );
@@ -1911,7 +1936,6 @@ function CreateSale() {
                                   .filter((_, i) => i !== index)
                                   .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-                                // Update payment amount
                                 if (
                                   newAmount + otherPaymentsTotal >
                                   totalAmount
@@ -1920,6 +1944,10 @@ function CreateSale() {
                                 } else {
                                   onChange(newAmount);
                                 }
+                                setPaymentInputValues(prev => ({
+                                  ...prev,
+                                  [index]: null,
+                                }));
                               }}
                             />
                           </FormControl>

@@ -28,6 +28,14 @@ export interface CurrentUser {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    payments?: {
+      id: number;
+      payment_method: string;
+      income: string;
+      expense: string;
+      expected: string;
+      actual: string | null;
+    }[];
   };
   can_view_quantity: boolean;
   is_superuser: boolean;

@@ -29,6 +29,7 @@ export interface ProductMovementParams {
   page?: number;
   product_id?: number;
   store_id?: number;
+  stock_id?: number;
   stock_name?: string;
   document_type?: string;
   date_from?: string;
@@ -49,6 +50,7 @@ export const useGetProductMovements = (params: ProductMovementParams) => {
       if (params.page) queryParams.page = params.page;
       if (params.product_id) queryParams.product_id = params.product_id;
       if (params.store_id) queryParams.store_id = params.store_id;
+      if (params.stock_id) queryParams.stock_id = params.stock_id;
       if (params.stock_name) queryParams.stock_name = params.stock_name;
       if (params.document_type) queryParams.document_type = params.document_type;
       if (params.date_from) queryParams.date_from = params.date_from;

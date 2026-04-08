@@ -75,18 +75,18 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
 
       {/* Selected Tags */}
       {selectedOptions.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex flex-wrap gap-1.5 mb-2 max-h-24 overflow-y-auto">
           {selectedOptions.map((option) => (
             <span
               key={option.id}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs sm:text-sm sm:px-3 sm:py-1"
             >
-              {option.name}
+              <span className="truncate max-w-[120px] sm:max-w-[200px]">{option.name}</span>
               <button
                 type="button"
                 onClick={() => removeOption(option.id)}
                 disabled={disabled}
-                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
               >
                 <X size={14} />
               </button>
@@ -118,7 +118,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && !disabled && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-56 sm:max-h-64 overflow-hidden left-0 right-0">
           {/* Search Input */}
           <div className="p-2 border-b border-gray-200 sticky top-0 bg-white">
             <input

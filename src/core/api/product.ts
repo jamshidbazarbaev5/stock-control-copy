@@ -26,6 +26,8 @@ export interface AttributeValueResponse {
 
 export interface Product {
   id?: number;
+  base_unit_name?: string;
+  // selling_price?:number;
   is_imported?:boolean;
   has_barcode?: boolean;
   barcode?: string;
@@ -72,9 +74,14 @@ export interface Product {
   has_shtuk?: boolean;
   base_unit?: number;
   ikpu?: string;
+  avg_stock_price?: string;
   history?: any;
   available_units?: Array<{
     id: number;
+    selling_price?: number;
+
+    min_price: number;
+    selling_price_in_currency: number;
     short_name: string;
     factor: number;
     is_base: boolean;

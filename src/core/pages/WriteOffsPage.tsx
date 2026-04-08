@@ -150,6 +150,25 @@ export default function WriteOffsPage() {
       ),
     },
     {
+      header: "Количество",
+      accessorKey: "quantity",
+      cell: (row: WriteOff) => {
+        if (!row.items || row.items.length === 0) return "-";
+        if (row.items.length === 1) {
+          return row.items[0].quantity;
+        }
+        return (
+          <div>
+            {row.items.map((item) => (
+              <div key={item.id} className="text-sm">
+                {item.stock_read?.product?.product_name}: {item.quantity}
+              </div>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
       header: "Количество товаров",
       accessorKey: "items_count",
       cell: (row: WriteOff) => row.items?.length || 0,

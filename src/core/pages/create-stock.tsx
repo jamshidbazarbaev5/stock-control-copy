@@ -44,8 +44,8 @@ import {
   Save,
   RotateCcw,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
+// import { useQuery } from "@tanstack/react-query";
+// import { api } from "../api/client";
 
 interface CommonFormValues {
   store: number | string;
@@ -302,19 +302,19 @@ export default function CreateStock() {
     },
   });
 
-  interface CurrencyRate {
-    created_at: string;
-    rate: string;
-    currency_detail: { id: number; name: string; short_name: string; is_base: boolean };
-  }
-  const { data: currencyRates } = useQuery<CurrencyRate[]>({
-    queryKey: ["currency-rates"],
-    queryFn: async () => {
-      const response = await api.get("/currency/rates/");
-      return response.data;
-    },
-    enabled: commonForm.watch("use_supplier_balance") === true,
-  });
+  // interface CurrencyRate {
+  //   created_at: string;
+  //   rate: string;
+  //   currency_detail: { id: number; name: string; short_name: string; is_base: boolean };
+  // }
+  // const { data: currencyRates } = useQuery<CurrencyRate[]>({
+  //   queryKey: ["currency-rates"],
+  //   queryFn: async () => {
+  //     const response = await api.get("/currency/rates/");
+  //     return response.data;
+  //   },
+  //   enabled: commonForm.watch("use_supplier_balance") === true,
+  // });
 
   const [createProductOpen, setCreateProductOpen] = useState(false);
   const [createSupplierOpen, setCreateSupplierOpen] = useState(false);
@@ -726,7 +726,7 @@ export default function CreateStock() {
         currentForm.purchase_unit_quantity = formatPurchaseUnitQuantity(
           quantity * conversion_factor,
         );
-      }
+      } 
 
       const currentQty =
         changedField === "purchase_unit_quantity"
@@ -1044,32 +1044,6 @@ export default function CreateStock() {
       ) {
         toast.error("Please fill all required common fields");
         return;
-      }
-
-      // Check supplier balance if using supplier balance
-      if (commonValues.use_supplier_balance) {
-        const selectedSupplier = suppliers.find(
-          (s: Supplier) => s.id === Number(commonValues.supplier),
-        );
-        if (selectedSupplier) {
-          const totalUZS = stockItems.reduce((sum, item) => {
-            if (item.isCalculated) {
-              return sum + (Number(item.form.total_price_in_uz) || 0);
-            }
-            return sum;
-          }, 0);
-          const type = commonForm.getValues("supplier_balance_type") === "USD" ? "USD" : "UZS";
-          const usdRate = Number(currencyRates?.[0]?.rate) || 0;
-          const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
-          const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
-          if (balance < totalAmount) {
-            toast.error(
-              `Недостаточный баланс поставщика. Баланс: ${formatPrice(balance)} ${type}, Требуется: ${formatPrice(totalAmount)} ${type}`,
-            );
-            setIsSubmitting(false);
-            return;
-          }
-        }
       }
 
       // Validate all items are calculated
@@ -1542,22 +1516,14 @@ export default function CreateStock() {
             </div>
           )}
 
-          {/* Supplier Balance Info - show when supplier_balance is selected */}
-          {commonForm.watch("payment_type") === "supplier_balance" && commonForm.watch("supplier") && (
-            <div className="space-y-2">
-              <Label htmlFor="supplier_balance_type">{t("forms.balance_type") || "Balance Type"} *</Label>
-              <div className="p-3 bg-muted border border-border rounded-md text-sm font-medium">
-                {commonForm.watch("supplier_balance_type") || "USD"}
-              </div>
-            </div>
-          )}
+
 
           {/* Show supplier balance info when use_supplier_balance is checked */}
           {commonForm.watch("use_supplier_balance") &&
             commonForm.watch("supplier") && (
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg mt-4">
                 <h3 className="font-semibold mb-2">
-                  {t("common.supplier_info") || "Supplier Information"}
+                  {t("common.supplier_info") || "Информация о поставщике"}
                 </h3>
                 {(() => {
                   const selectedSupplier = suppliers.find(
@@ -1565,83 +1531,37 @@ export default function CreateStock() {
                       s.id === Number(commonForm.watch("supplier")),
                   );
                   if (selectedSupplier) {
-                    const totalUZS = stockItems.reduce((sum, item) => {
-                      if (item.isCalculated) {
-                        return sum + (Number(item.form.total_price_in_uz) || 0);
-                      }
-                      return sum;
-                    }, 0);
-                    const type = commonForm.watch("supplier_balance_type") === "USD" ? "USD" : "UZS";
-                    const usdRate = Number(currencyRates?.[0]?.rate) || 0;
-                    const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
-                    const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
-                    const canPay = balance >= totalAmount;
+                    const balanceUzs = Number((selectedSupplier as any).balance_uzs) || 0;
+                    const balanceUsd = Number((selectedSupplier as any).balance_usd) || 0;
+
                     return (
                       <div className="space-y-3">
-                        <div className="p-3 bg-card border border-blue-200 dark:border-blue-700 rounded-lg">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                {t("common.supplier_name") || "Supplier"}:
-                              </span>
-                              <span className="font-medium">
-                                {selectedSupplier.name}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                {t("common.supplier_balance") ||
-                                  "Available Balance"}
-                                :
-                              </span>
-                              <span
-                                className={`font-semibold ${balance > 0 ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {formatPrice(balance)} {type}
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-t border-border pt-2">
-                              <span className="text-muted-foreground">
-                                {t("common.total_amount") || "Purchase Amount"}:
-                              </span>
-                              <span className="font-semibold">
-                                {formatPrice(totalAmount)} {type}
-                              </span>
-                            </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Имя поставщика:
+                            </span>
+                            <span className="font-medium">
+                              {selectedSupplier.name}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Баланс (UZS):
+                            </span>
+                            <span className="font-semibold">
+                              {formatPrice(balanceUzs)} UZS
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Баланс (USD):
+                            </span>
+                            <span className="font-semibold">
+                              {formatPrice(balanceUsd)} USD
+                            </span>
                           </div>
                         </div>
-
-                        {!canPay && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold">⚠️</span>
-                              <div>
-                                <p className="font-semibold">
-                                  Недостаточный баланс
-                                </p>
-                                <p className="text-xs mt-1">
-                                  Баланс поставщика ({formatPrice(balance)} {type})
-                                  меньше суммы покупки ({formatPrice(totalAmount)} {type}). Нехватка: {formatPrice(totalAmount - balance)} {type}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {canPay && (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold">✓</span>
-                              <div>
-                                <p className="font-semibold">Оплата доступна</p>
-                                <p className="text-xs mt-1">
-                                  Остаток баланса после покупки:{" "}
-                                  {(balance - totalAmount).toFixed(2)} {type}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   }
@@ -2294,35 +2214,7 @@ export default function CreateStock() {
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={
-              isSubmitting ||
-              (() => {
-                // Disable if using supplier balance and insufficient balance
-                if (
-                  commonForm.watch("payment_type") === "supplier_balance" &&
-                  commonForm.watch("supplier")
-                ) {
-                  const selectedSupplier = suppliers.find(
-                    (s: Supplier) =>
-                      s.id === Number(commonForm.watch("supplier")),
-                  );
-                  if (selectedSupplier) {
-                    const totalUZS = stockItems.reduce((sum, item) => {
-                      if (item.isCalculated) {
-                        return sum + (Number(item.form.total_price_in_uz) || 0);
-                      }
-                      return sum;
-                    }, 0);
-                    const type = commonForm.watch("supplier_balance_type") === "USD" ? "USD" : "UZS";
-                    const usdRate = Number(currencyRates?.[0]?.rate) || 0;
-                    const totalAmount = type === "USD" ? (usdRate > 0 ? totalUZS / usdRate : 0) : totalUZS;
-                    const balance = type === "USD" ? (Number((selectedSupplier as any).balance_in_usd) || 0) : (Number(selectedSupplier.balance) || 0);
-                    return balance < totalAmount;
-                  }
-                }
-                return false;
-              })()
-            }
+            disabled={isSubmitting}
           >
             {isSubmitting ? t("common.submitting") : t("common.submit")}
           </Button>

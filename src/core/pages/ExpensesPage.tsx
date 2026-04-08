@@ -60,7 +60,7 @@ export default function ExpensesPage() {
   const deleteExpense = useDeleteExpense();
 
   const { data: storesData } = useGetStores({});
-  const { data: expenseNamesData } = useGetExpenseNames({});
+  const { data: expenseNamesData } = useGetExpenseNames({ params: { page_size: 1000 } });
 
   const stores = Array.isArray(storesData)
     ? storesData
@@ -89,10 +89,16 @@ export default function ExpensesPage() {
       cell: (row: Expense) => row.store_read?.name || "-",
     },
     {
+      header: t("forms.user"),
+      accessorKey: "user_name",
+      cell: (row: Expense) => row.user_name || "-",
+    },
+    {
       header: t("forms.expense_name"),
       accessorKey: "expense_name_read.name",
       cell: (row: Expense) => row.expense_name_read?.name || "-",
     },
+
     {
       header: t("forms.amount3"),
       accessorKey: "amount",

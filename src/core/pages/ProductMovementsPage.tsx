@@ -47,6 +47,7 @@ export default function ProductMovementsPage() {
   const [selectedProductName, setSelectedProductName] = useState<string>('');
   const [selectedStockName, setSelectedStockName] = useState<string>('');
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
+  const [stockId, setStockId] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
 
@@ -73,7 +74,7 @@ export default function ProductMovementsPage() {
   // Fetch stock names when product and store are selected
   const { data: stockNamesData } = useGetStockNames(
     selectedProductId,
-    selectedStore ? Number(selectedStore) : undefined
+    selectedStore && selectedStore !== "all" ? Number(selectedStore) : undefined
   );
   const stockNames = stockNamesData?.stock_names || [];
 
@@ -81,9 +82,10 @@ export default function ProductMovementsPage() {
   const { data: movementsData, isLoading } = useGetProductMovements({
     page,
     product_id: selectedProductId,
-    store_id: selectedStore ? Number(selectedStore) : undefined,
-    stock_name: selectedStockName || undefined,
-    document_type: selectedDocumentType || undefined,
+    store_id: selectedStore && selectedStore !== "all" ? Number(selectedStore) : undefined,
+    stock_id: stockId ? Number(stockId) : undefined,
+    stock_name: selectedStockName && selectedStockName !== "all" ? selectedStockName : undefined,
+    document_type: selectedDocumentType && selectedDocumentType !== "all" ? selectedDocumentType : undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   });
@@ -94,7 +96,7 @@ export default function ProductMovementsPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [selectedProductId, selectedStore, selectedStockName, selectedDocumentType, dateFrom, dateTo]);
+  }, [selectedProductId, selectedStore, stockId, selectedStockName, selectedDocumentType, dateFrom, dateTo]);
 
   // Reset stock name when product changes
   useEffect(() => {
@@ -123,6 +125,7 @@ export default function ProductMovementsPage() {
     setSelectedProductId(undefined);
     setSelectedProductName('');
     setProductSearchQuery('');
+    setStockId('');
     setSelectedStockName('');
     setSelectedDocumentType('');
     setDateFrom('');
@@ -275,6 +278,14 @@ export default function ProductMovementsPage() {
               </SelectContent>
             </Select>
           )}
+
+          {/* Stock ID */}
+          <Input
+            type="number"
+            placeholder="Приход ид"
+            value={stockId}
+            onChange={(e) => setStockId(e.target.value)}
+          />
 
           {/* Stock Name Select */}
           <Select

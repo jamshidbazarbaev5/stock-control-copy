@@ -13,7 +13,7 @@ export default function EditExpensePage() {
   const updateExpense = useUpdateExpense();
   const { data: expense } = useGetExpense(Number(id));
   const { data: storesData } = useGetStores({});
-  const { data: expenseNamesData } = useGetExpenseNames({});
+  const { data: expenseNamesData } = useGetExpenseNames({ params: { page_size: 1000 } });
 
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
   const expenseNames = Array.isArray(expenseNamesData) ? expenseNamesData : expenseNamesData?.results || [];

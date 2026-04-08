@@ -18,6 +18,8 @@ export interface SaleDebt {
 
 export interface SaleItem {
   stock_read?: any;
+  sale_unit?: string;
+  selling_unit_name?: string;
   price_per_unit?: string;
   price_with_discount?: string;
   id?: number;
@@ -49,6 +51,9 @@ export interface SaleItem {
     }>;
     available_units?: Array<{
       id: number;
+      selling_price: number;
+      min_price: number;
+
       short_name: string;
       factor: number;
       is_base: boolean;
@@ -95,6 +100,9 @@ export interface SaleRefund {
         available_units?: Array<{
           id: number;
           short_name: string;
+          selling_price: number;
+          min_price: number;
+          selling_price_in_currency: number;
           factor: number;
           is_base: boolean;
         }>;

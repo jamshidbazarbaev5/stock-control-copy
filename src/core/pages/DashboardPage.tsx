@@ -134,6 +134,9 @@ const DashboardPage = () => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>("all");
 
+  // Auto-refresh for sellers: always refetch on mount/navigation
+  const [refreshKey] = useState(() => Date.now());
+
   // Handler for showing more unsold products
   const handleShowMoreUnsoldProducts = () => {
     setDisplayedUnsoldProducts((prev) =>
@@ -282,6 +285,7 @@ const DashboardPage = () => {
     endDate,
     selectedStore,
     currentUser?.role,
+    refreshKey,
   ]);
 
   // Fetch net profit data
@@ -564,6 +568,40 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cassa Balance - Shift Payments */}
+        {currentUser?.shift?.payments && currentUser.shift.payments.length > 0 && (
+          <Card className="bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                {t("dashboard.cassa_balance") || "Касса"}
+              </CardTitle>
+              <Wallet className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {currentUser.shift.payments.map((payment: any) => (
+                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {payment.payment_method}
+                    </span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                      {Number(payment.expected || 0).toLocaleString("uz-UZ")} UZS
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700 mt-2">
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                    {t("dashboard.total") || "Итого"}
+                  </span>
+                  <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                    {currentUser.shift.payments.reduce((sum: number, p: any) => sum + Number(p.expected || 0), 0).toLocaleString("uz-UZ")} UZS
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }

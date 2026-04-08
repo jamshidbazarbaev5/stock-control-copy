@@ -5,6 +5,8 @@ export interface LoanPaymentCreate {
   loan: number;
   notes: string;
   payment_method: string;
+  currency_type?: string;
+  rate?: number;
 }
 
 export async function createLoanPayment(sponsorId: number, loanId: number, data: LoanPaymentCreate) {

@@ -20,6 +20,7 @@ export interface StockEntryPayment {
   amount: string;
   comment: string;
   payment_type: string;
+  debt_currency: string;
   payment_date: string;
 }
 

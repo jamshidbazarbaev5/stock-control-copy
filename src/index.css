@@ -1,6 +1,16 @@
 @import "tailwindcss";
   @import "flag-icons/css/flag-icons.min.css";
 
+/* Hide number input spinners and prevent scroll changing values */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
   /* Custom flag for Karakalpak */
   .fi-kaa {
     background: linear-gradient(to bottom,

@@ -239,65 +239,58 @@ export default function ProductStockBalancePage() {
     <div className="container mx-auto py-8 px-4">
       <div className="flex flex-col space-y-4">
         <h1 className="text-2xl font-bold">{t("navigation.stock_balance")}</h1>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
-            {currentUser?.is_superuser && (
-              <Select value={selectedStore} onValueChange={setSelectedStore}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder={t("forms.select_store")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("forms.all_stores")}</SelectItem>
-                  {stores.map((store) => (
-                    <SelectItem
-                      key={store.id}
-                      value={store.id?.toString() || ""}
-                    >
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Input
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            placeholder={t(
+              "forms.search_by_product_name",
+              "Поиск по названию товара"
             )}
-            <Select
-              value={showZeroStock}
-              onValueChange={handleShowZeroStockChange}
-            >
-              <SelectTrigger className="w-full sm:w-[280px]">
-                <SelectValue placeholder="Показать нулевые остатки" />
+          />
+          {currentUser?.is_superuser && (
+            <Select value={selectedStore} onValueChange={setSelectedStore}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("forms.select_store")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">Показать нулевые остатки</SelectItem>
-                <SelectItem value="false">
-                  Не показывать нулевые остатки
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder={t("forms.select_category") || "Выберите категорию"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
-                {categories.map((category: any) => (
-                  <SelectItem key={category.id} value={category.id?.toString()}>
-                    {category.category_name}
+                <SelectItem value="all">{t("forms.all_stores")}</SelectItem>
+                {stores.map((store) => (
+                  <SelectItem
+                    key={store.id}
+                    value={store.id?.toString() || ""}
+                  >
+                    {store.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="w-full">
-            <Input
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              placeholder={t(
-                "forms.search_by_product_name",
-                "Поиск по названию товара"
-              )}
-              className="w-full h-12 text-base px-4"
-            />
-          </div>
+          )}
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("forms.select_category") || "Выберите категорию"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              {categories.map((category: any) => (
+                <SelectItem key={category.id} value={category.id?.toString()}>
+                  {category.category_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={showZeroStock}
+            onValueChange={handleShowZeroStockChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Показать нулевые остатки" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="false">Не показывать нулевые остатки</SelectItem>
+              <SelectItem value="true">Показать нулевые остатки</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex justify-between items-center mt-6 mb-4">

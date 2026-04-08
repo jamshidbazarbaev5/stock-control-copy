@@ -327,14 +327,12 @@ export default function DebtsPage() {
       header: t("forms.actions"),
       cell: (client: DebtByClient) => (
         <div className="space-x-2">
-          {selectedTab === "Юр.лицо" && (
-            <button
-              onClick={() => navigate(`/clients/${client.id}/history`)}
-              className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white"
-            >
-              История баланса
-            </button>
-          )}
+          <button
+            onClick={() => navigate(`/clients/${client.id}/history`)}
+            className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white"
+          >
+            История
+          </button>
           <button
             onClick={() => handleMassPaymentClick(client)}
             className="px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white"

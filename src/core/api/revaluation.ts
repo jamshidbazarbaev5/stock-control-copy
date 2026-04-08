@@ -22,6 +22,7 @@ interface RevaluationData {
   new_selling_price: string;
   new_min_price: string;
   new_selling_price_in_currency?: string;
+  new_min_stock?: number;
   product_ids: number[];
 }
 

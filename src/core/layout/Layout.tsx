@@ -272,15 +272,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         label: t("navigation.recyclings"),
         href: "/recyclings",
       },
-      {
-        icon: CreditCard,
-        label: t("navigation.exchange_loans"),
-        href: "/exchange-loans",
-      },
+      // {
+      //   icon: CreditCard,
+      //   label: t("navigation.exchange_loans"),
+      //   href: "/exchange-loans",
+      // },
       {
         icon: BanknoteIcon,
         label: t("navigation.vehicle_incomes"),
         href: "/vehicle-incomes",
+      },
+      {
+        icon: User2,
+        label: t("navigation.sponsors"),
+        href: "/sponsors",
       },
     ];
 
@@ -387,12 +392,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             href: "/expense-name",
           },
           { icon: User2, label: t("navigation.users"), href: "/users" },
-          {
-            icon: User2,
-            label: t("navigation.sponsors"),
-            href: "/sponsors",
-          },
-         
           {
             icon: Ruler,
             label: t("navigation.labelSizes"),
@@ -703,7 +702,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     onClick={(e) => {
                       e.preventDefault();
                       setMobileMenuOpen(false);
-                      if (item.href) navigate(item.href);
+                      if (item.href === '/dashboard') {
+                        window.location.href = '/dashboard';
+                      } else if (item.href) {
+                        navigate(item.href);
+                      }
                     }}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left mb-1 transition-colors
                       ${

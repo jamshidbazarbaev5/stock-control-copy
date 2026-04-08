@@ -11,7 +11,7 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreChange: (storeId: number) => void, onPaymentTypeChange: (paymentType: string) => void, isSuperuser: boolean) => {
   const fields = [];
-  
+
   // Only show store field if user is superuser
   if (isSuperuser) {
     fields.push({
@@ -24,7 +24,7 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
       onChange: (value: string) => onStoreChange(parseInt(value, 10))
     });
   }
-  
+
   fields.push(
     {
       name: 'expense_name',
@@ -35,19 +35,6 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
       options: [], // Will be populated with expense names
     },
     {
-      name: 'amount',
-      label: isSuperuser ? `${t('forms.amount3')} (${t('table.budget')}: ${storeBudget.toLocaleString()} UZS)` : t('forms.amount3'),
-      type: 'text',
-      placeholder: t('placeholders.enter_amount'),
-      required: true,
-      validation: {
-        max: {
-          value: storeBudget,
-          message: t('validation.amount_exceeds_budget')
-        }
-      }
-    },
-    ...(isSuperuser ? [{
       name: 'payment_type',
       label: t('forms.payment_method'),
       type: 'select',
@@ -58,10 +45,23 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
         { value: 'Карта', label: t('forms.card') },
         { value: 'Click', label: t('forms.click') },
         { value: 'Перечисление', label: t('forms.transfer') },
-         { value: 'Валюта', label: t('forms.rate') },
+        { value: 'Валюта', label: t('forms.rate') },
       ],
       onChange: (value: string) => onPaymentTypeChange(value)
-    }] : []),
+    },
+    {
+      name: 'amount',
+      label: `${t('forms.amount3')} (${t('table.budget')}: ${storeBudget.toLocaleString()})`,
+      type: 'text',
+      placeholder: t('placeholders.enter_amount'),
+      required: true,
+      validation: {
+        max: {
+          value: storeBudget,
+          message: t('validation.amount_exceeds_budget')
+        }
+      }
+    },
     {
       name: 'comment',
       label: t('forms.comment'),
@@ -70,7 +70,7 @@ const expenseFields = (t: (key: string) => string, storeBudget: number, onStoreC
       required: false,
     }
   );
-  
+
   return fields;
 };
 
@@ -97,18 +97,26 @@ export default function CreateExpense() {
 
   const updateBudget = (storeId: number | null, paymentType: string) => {
     if (!storeId) return;
-    
-    // For sellers, use shift.store.budgets
-    if (!isSuperuser && currentUser?.shift?.store?.budgets) {
-      const budgetForType = currentUser.shift.store.budgets.find(b => b.budget_type === paymentType);
-      setStoreBudget(budgetForType ? parseFloat(budgetForType.amount) : 0);
-      return;
+
+    // For sellers, use shift.payments expected values
+    if (!isSuperuser && currentUser?.shift?.payments) {
+      const shiftPayment = currentUser.shift.payments.find((p: any) => p.payment_method === paymentType);
+      if (shiftPayment) {
+        setStoreBudget(parseFloat(shiftPayment.expected) || 0);
+        return;
+      }
+      // Fallback to store budgets
+      if (currentUser?.shift?.store?.budgets) {
+        const budgetForType = currentUser.shift.store.budgets.find((b: any) => b.budget_type === paymentType);
+        setStoreBudget(budgetForType ? parseFloat(budgetForType.amount) : 0);
+        return;
+      }
     }
-    
+
     // For superusers, use selected store budgets
     const selectedStore = stores.find(store => store.id === storeId);
     if (selectedStore?.budgets) {
-      const budgetForType = selectedStore.budgets.find(b => b.budget_type === paymentType);
+      const budgetForType = selectedStore.budgets.find((b: any) => b.budget_type === paymentType);
       setStoreBudget(budgetForType ? parseFloat(budgetForType.amount) : 0);
     } else {
       setStoreBudget(selectedStore?.budget ? parseFloat(selectedStore.budget) : 0);
@@ -175,7 +183,6 @@ export default function CreateExpense() {
       
       if (!isSuperuser && currentUser?.shift?.store?.id) {
         submissionData.store = currentUser.shift.store.id;
-        submissionData.payment_type = 'Наличные';
       }
 
       await createExpense.mutateAsync(submissionData);

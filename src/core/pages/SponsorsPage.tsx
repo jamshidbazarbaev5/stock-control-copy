@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreateLoanModal } from '../components/modals/CreateLoanModal';
-import { SelectCurrencyModal } from '../components/modals/SelectCurrencyModal';
 import { createLoan } from '../api/loan';
 import { Button } from '../../components/ui/button';
+import { FaArrowLeft } from 'react-icons/fa';
 
 export default function SponsorsPage() {
   const { t } = useTranslation();
@@ -15,7 +15,6 @@ export default function SponsorsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [createLoanOpen, setCreateLoanOpen] = useState(false);
   const [selectedSponsorId, setSelectedSponsorId] = useState<number | null>(null);
-  const [currencyModalOpen, setCurrencyModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -68,13 +67,7 @@ export default function SponsorsPage() {
   };
 
   const handleRowClick = (sponsor: Sponsor) => {
-    setSelectedSponsorId(sponsor.id!);
-    setCurrencyModalOpen(true);
-  };
-
-  const handleSelectCurrency = (currency: string) => {
-    if (!selectedSponsorId) return;
-    navigate(`/sponsors/${selectedSponsorId}/loans/${currency}`);
+    navigate(`/sponsors/${sponsor.id}/loans`);
   };
 
   const sponsorColumns = [
@@ -107,6 +100,13 @@ export default function SponsorsPage() {
 
   return (
       <div className="container py-8 px-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 mb-4 text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <FaArrowLeft className="w-4 h-4" />
+          {t('common.back')}
+        </button>
         <ResourceTable<Sponsor>
             data={sponsors}
             columns={sponsorColumns}
@@ -123,11 +123,6 @@ export default function SponsorsPage() {
             onOpenChange={setCreateLoanOpen}
             sponsorId={selectedSponsorId}
             onCreate={handleCreateLoan}
-        />
-        <SelectCurrencyModal
-            open={currencyModalOpen}
-            onOpenChange={setCurrencyModalOpen}
-            onSelect={handleSelectCurrency}
         />
       </div>
   );

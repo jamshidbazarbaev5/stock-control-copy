@@ -113,7 +113,10 @@ export interface ActivityExpense {
   };
   comment: string;
   payment_type: string;
+  related_type: string | null;
+  related_id: number | null;
   date: string;
+  user_name?: string;
 }
 
 export interface ActivityDebtPayment {
@@ -150,8 +153,15 @@ export interface OverallTotals {
   sales_total?: TotalWithPayments;
   debt_total?: number;
   expenses_total?: TotalWithPayments;
+  budget_expenses_total?: TotalWithPayments;
   debt_payments_total?: TotalWithPayments;
+  change_amount?: number;
   remaining?: TotalWithPayments;
+  admin_expenses_total?: TotalWithPayments;
+  admin_debt_payments_total?: TotalWithPayments;
+  all_expenses_total?: TotalWithPayments;
+  all_debt_payments_total?: TotalWithPayments;
+  all_remaining?: TotalWithPayments;
 }
 
 export interface ActivityPaginatedResponse<T> {

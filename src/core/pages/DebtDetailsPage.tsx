@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { ResourceForm } from "../helpers/ResourceForm";
 import { ResourceTable } from "../helpers/ResourseTable";
 import {
@@ -67,6 +67,19 @@ export default function DebtDetailsPage() {
     currentPage,
   );
   const createPayment = useCreateDebtPayment();
+
+  const deleteDebt = useMutation({
+    mutationFn: async (debtId: number) => {
+      await api.delete(`/debts/${debtId}/`);
+    },
+    onSuccess: () => {
+      toast.success("Долг успешно удалён");
+      queryClient.invalidateQueries({ queryKey: ["debtsHistory", Number(clientId), currentPage] });
+    },
+    onError: () => {
+      toast.error("Ошибка при удалении долга");
+    },
+  });
 
   const debts = debtsData?.results || [];
   const totalCount = (debtsData as any)?.count || 0;
@@ -645,6 +658,18 @@ export default function DebtDetailsPage() {
                 {t("forms.add_payment")}
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm("Вы уверены, что хотите удалить этот долг?")) {
+                  deleteDebt.mutate(row.id);
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {t("common.delete") || "Удалить"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),

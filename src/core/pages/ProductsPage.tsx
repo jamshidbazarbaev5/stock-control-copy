@@ -34,6 +34,7 @@ import {
   WideDialogTitle,
   WideDialogFooter,
 } from "@/components/ui/wide-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "../api/api";
 import { type Stock } from "../api/stock";
 import {
@@ -50,9 +51,8 @@ interface PriceEdit {
   selling_price?: string;
   selling_price_in_currency?: string;
   min_price?: string;
+  min_stock?: string;
 }
-
-type DebtCurrency = "UZS" | "USD";
 
 const columns = (
   t: any,
@@ -62,16 +62,14 @@ const columns = (
   priceEdits: Record<number, PriceEdit>,
   onPriceChange: (
     productId: number,
-    field: "selling_price" | "selling_price_in_currency" | "min_price",
+    field: "selling_price" | "selling_price_in_currency" | "min_price" | "min_stock",
     value: string,
   ) => void,
-  onCurrencyPriceChange?: (
+  _onCurrencyPriceChange?: (
     productId: number,
     currencyPrice: string,
     sellInCurrencyUnit: any,
   ) => void,
-  debtCurrencySelections?: Record<number, DebtCurrency>,
-  onDebtCurrencyChange?: (productId: number, currency: DebtCurrency) => void,
 ) => [
   {
     header: t("table.select"),
@@ -100,39 +98,6 @@ const columns = (
     header: t("table.category"),
     accessorKey: (row: Product) =>
       row.category_read?.category_name || row.category_write,
-  },
-  {
-    header: t("table.selling_price_in_currency"),
-    accessorKey: "selling_price_in_currency",
-    cell: (product: any) => {
-      if (!product?.sell_in_currency_unit) {
-        return <span className="text-muted-foreground">-</span>;
-      }
-      const editValue = priceEdits[product?.id]?.selling_price_in_currency;
-      return (
-        <Input
-          type="number"
-          step="0.01"
-          value={
-            editValue !== undefined
-              ? editValue
-              : product?.selling_price_in_currency || ""
-          }
-          onChange={(e) => {
-            e.stopPropagation();
-            if (product?.id && onCurrencyPriceChange) {
-              onCurrencyPriceChange(
-                product.id,
-                e.target.value,
-                product.sell_in_currency_unit,
-              );
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-28"
-        />
-      );
-    },
   },
   {
     header: t("table.selling_price"),
@@ -180,43 +145,23 @@ const columns = (
   },
 
   {
-    header: t("table.debt_currency") || "Валюта долга",
-    accessorKey: "debt_currency",
+    header: t("table.min_stock") || "Мин. остаток",
+    accessorKey: "min_stock",
     cell: (product: any) => {
-      const currentValue = debtCurrencySelections?.[product?.id] || product?.debt_currency || "UZS";
+      const editValue = priceEdits[product?.id]?.min_stock;
       return (
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              name={`debt_currency_${product?.id}`}
-              value="UZS"
-              checked={currentValue === "UZS"}
-              onChange={() => {
-                if (product?.id && onDebtCurrencyChange) {
-                  onDebtCurrencyChange(product.id, "UZS");
-                }
-              }}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">UZS</span>
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              name={`debt_currency_${product?.id}`}
-              value="USD"
-              checked={currentValue === "USD"}
-              onChange={() => {
-                if (product?.id && onDebtCurrencyChange) {
-                  onDebtCurrencyChange(product.id, "USD");
-                }
-              }}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">USD</span>
-          </label>
-        </div>
+        <Input
+          type="text"
+          value={editValue !== undefined ? editValue : product?.min_stock || ""}
+          onChange={(e) => {
+            e.stopPropagation();
+            if (product?.id) {
+              onPriceChange(product.id, "min_stock", e.target.value);
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-24"
+        />
       );
     },
   },
@@ -245,6 +190,7 @@ const columns = (
 
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem("products_searchTerm") || "");
@@ -255,12 +201,12 @@ export default function ProductsPage() {
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [isRevaluationDialogOpen, setIsRevaluationDialogOpen] = useState(false);
   const [priceEdits, setPriceEdits] = useState<Record<number, PriceEdit>>({});
+  const [unitPriceEdits, setUnitPriceEdits] = useState<Record<string, PriceEdit>>({});
   const [productTab, setProductTab] = useState<
     "with_quantity" | "without_quantity" | "imported"
   >(() => (localStorage.getItem("products_productTab") as "with_quantity" | "without_quantity" | "imported") || "with_quantity");
   const [expandedRows, setExpandedRows] = useState<Record<number, Stock[]>>({});
   const [loadingRows, setLoadingRows] = useState<Set<number>>(new Set());
-  const [debtCurrencySelections, setDebtCurrencySelections] = useState<Record<number, DebtCurrency>>({});
 
   // Import dialog state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -533,13 +479,30 @@ export default function ProductsPage() {
 
   const handlePriceChange = (
     productId: number,
-    field: "selling_price" | "selling_price_in_currency" | "min_price",
+    field: "selling_price" | "selling_price_in_currency" | "min_price" | "min_stock",
     value: string,
   ) => {
     setPriceEdits((prev) => ({
       ...prev,
       [productId]: {
         ...prev[productId],
+        productId,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleUnitPriceChange = (
+    productId: number,
+    unitId: number,
+    field: "selling_price" | "selling_price_in_currency" | "min_price",
+    value: string,
+  ) => {
+    const key = `${productId}-${unitId}`;
+    setUnitPriceEdits((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
         productId,
         [field]: value,
       },
@@ -592,50 +555,34 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDebtCurrencyChange = async (productId: number, currency: DebtCurrency) => {
-    // Update local state immediately for responsive UI
-    setDebtCurrencySelections((prev) => ({
-      ...prev,
-      [productId]: currency,
-    }));
-
-    try {
-      await api.post("items/update-debt-currency/", {
-        product_ids: [productId],
-        debt_currency: currency,
-      });
-      toast.success(t("forms.debt_currency_updated") || "Валюта долга обновлена");
-    } catch (error) {
-      console.error("Error updating debt currency:", error);
-      toast.error(t("messages.error.debt_currency_update") || "Ошибка при обновлении валюты долга");
-      // Revert local state on error
-      setDebtCurrencySelections((prev) => {
-        const newSelections = { ...prev };
-        delete newSelections[productId];
-        return newSelections;
-      });
-    }
-  };
-
   const handleSavePrices = async () => {
-    const editsToSave = Object.values(priceEdits).filter(
+    const regularEditsToSave = Object.values(priceEdits).filter(
       (edit) =>
         edit.selling_price !== undefined ||
         edit.selling_price_in_currency !== undefined ||
-        edit.min_price !== undefined,
+        edit.min_price !== undefined ||
+        edit.min_stock !== undefined,
     );
 
-    if (editsToSave.length === 0) {
+    const unitEditsToSave = Object.entries(unitPriceEdits).filter(
+      ([_key, edit]) =>
+        edit.selling_price !== undefined ||
+        edit.selling_price_in_currency !== undefined ||
+        edit.min_price !== undefined ||
+        edit.min_stock !== undefined,
+    );
+
+    if (regularEditsToSave.length === 0 && unitEditsToSave.length === 0) {
       toast.error(
         t("messages.error.noPriceChanges") || "No price changes to save",
       );
       return;
     }
 
-    const totalToSave = editsToSave.length;
+    const totalToSave = regularEditsToSave.length + unitEditsToSave.length;
 
-    // Process all edits in parallel using Promise.allSettled
-    const promises = editsToSave.map(async (edit) => {
+    // Handle regular price edits (existing functionality)
+    const regularPromises = regularEditsToSave.map(async (edit) => {
       const product = products.find((p) => p.id === edit.productId);
       if (!product) {
         return { success: false, productId: edit.productId, error: "Product not found" };
@@ -656,12 +603,18 @@ export default function ProductsPage() {
             ? String(product.selling_price_in_currency)
             : undefined;
 
+      const newMinStock =
+        edit.min_stock !== undefined
+          ? edit.min_stock
+          : String(product.min_stock || "0");
+
       try {
         await revaluateProducts({
           comment: "Price update from products page",
           new_selling_price: newSellingPrice,
           new_min_price: newMinPrice,
           new_selling_price_in_currency: newSellingPriceInCurrency,
+          new_min_stock: parseFloat(newMinStock),
           product_ids: [edit.productId],
           ...(selectedStore && { store_id: parseInt(selectedStore) }),
         });
@@ -672,26 +625,98 @@ export default function ProductsPage() {
       }
     });
 
-    // Wait for all promises to settle
-    const results = await Promise.allSettled(promises);
+    // Handle unit price edits (new functionality)
+    const unitPromises = unitEditsToSave.map(async ([key, edit]) => {
+      const [productIdStr, unitIdStr] = key.split('-');
+      const productId = parseInt(productIdStr);
+      const unitId = parseInt(unitIdStr);
+      
+      const product = products.find((p) => p.id === productId);
+      if (!product) {
+        return { success: false, key, error: "Product not found" };
+      }
 
-    // Collect successful product IDs
-    const productIdsToRemove: number[] = [];
-    results.forEach((result) => {
-      if (result.status === "fulfilled" && result.value.success) {
-        productIdsToRemove.push(result.value.productId);
+      const unit = product.available_units?.find(u => u.id === unitId);
+      if (!unit) {
+        return { success: false, key, error: "Unit not found" };
+      }
+
+      const newSellingPrice = edit.selling_price !== undefined
+        ? parseFloat(edit.selling_price)
+        : parseFloat(String(unit.selling_price || "0"));
+      const newSellingPriceInCurrency = edit.selling_price_in_currency !== undefined
+        ? parseFloat(edit.selling_price_in_currency)
+        : parseFloat(String(unit.selling_price_in_currency || "0"));
+      const newMinPrice = edit.min_price !== undefined
+        ? parseFloat(edit.min_price)
+        : parseFloat(String(unit.min_price || "0"));
+
+      const updateData: any = {
+        product_id: productId,
+        new_selling_price: newSellingPrice,
+        new_selling_price_in_currency: newSellingPriceInCurrency,
+        new_min_price: newMinPrice,
+      };
+
+      // Add unit_id only for non-base units
+      if (!unit.is_base) {
+        updateData.unit_id = unitId;
+      }
+
+      // Add min_stock only for base units
+      if (unit.is_base) {
+        updateData.new_min_stock = edit.min_stock !== undefined
+          ? parseFloat(edit.min_stock)
+          : parseFloat(String(product.min_stock || "0"));
+      }
+
+      try {
+        const payload = {
+          comment: "Unit price update",
+          products: [updateData],
+          ...(selectedStore && { store_id: parseInt(selectedStore) }),
+        };
+
+        await api.post("revaluation/bulk/", payload);
+        return { success: true, key };
+      } catch (error) {
+        return { success: false, key, error };
       }
     });
 
-    // Show single toast message
-    if (productIdsToRemove.length > 0) {
+    // Wait for all promises to settle
+    const allPromises = [...regularPromises, ...unitPromises];
+    const results = await Promise.allSettled(allPromises);
+
+    // Collect successful updates
+    const successfulRegularEdits: number[] = [];
+    const successfulUnitEdits: string[] = [];
+    
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled" && result.value.success) {
+        if (index < regularPromises.length) {
+          // Regular edit
+          const value = result.value as { success: boolean; productId: number };
+          successfulRegularEdits.push(value.productId);
+        } else {
+          // Unit edit
+          const value = result.value as { success: boolean; key: string };
+          successfulUnitEdits.push(value.key);
+        }
+      }
+    });
+
+    const totalSuccessful = successfulRegularEdits.length + successfulUnitEdits.length;
+
+    // Show toast messages
+    if (totalSuccessful > 0) {
       toast.success(
         t("messages.success.pricesSaved") || "Идет сохранение",
       );
     }
 
-    if (productIdsToRemove.length < totalToSave) {
-      const failedCount = totalToSave - productIdsToRemove.length;
+    if (totalSuccessful < totalToSave) {
+      const failedCount = totalToSave - totalSuccessful;
       toast.error(
         t("messages.error.somePricesFailed") || `Не удалось сохранить ${failedCount} цен`,
       );
@@ -700,11 +725,25 @@ export default function ProductsPage() {
     // Clear successful edits from state
     setPriceEdits((prev) => {
       const newEdits = { ...prev };
-      productIdsToRemove.forEach(id => {
+      successfulRegularEdits.forEach(id => {
         delete newEdits[id];
       });
       return newEdits;
     });
+
+    setUnitPriceEdits((prev) => {
+      const newEdits = { ...prev };
+      successfulUnitEdits.forEach(key => {
+        delete newEdits[key];
+      });
+      return newEdits;
+    });
+
+    // Refresh data so updated prices are visible
+    if (totalSuccessful > 0) {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setExpandedRows({});
+    }
   };
 
   // Fetch stock data for expanded row
@@ -756,63 +795,142 @@ export default function ProductsPage() {
         </div>
       );
     }
-    
-    if (!stockData || stockData.length === 0) {
-      return (
-        <div className="p-4 bg-gray-50 text-center text-gray-500">
-          Нет данных о партиях
-        </div>
-      );
-    }
 
     return (
-      <div className="p-4 bg-gray-50">
-        <h3 className="text-lg font-semibold mb-4">Партии товара</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left">№ Партии</th>
-                <th className="px-4 py-2 text-left">Поставщик</th>
-                <th className="px-4 py-2 text-right">Количество</th>
-                <th className="px-4 py-2 text-right">Цена за ед. (валюта)</th>
-                <th className="px-4 py-2 text-right">Цена за ед. (сум)</th>
-                <th className="px-4 py-2 text-left">Дата поступления</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stockData.map((stock: Stock, index: number) => (
-                <tr key={stock.id || index} className="border-b hover:bg-gray-100">
-                  <td className="px-4 py-2">{stock.stock_name || stock.id}</td>
-                  <td className="px-4 py-2">
-                    {stock.stock_entry?.supplier?.name || 
-                     stock.supplier?.name || 
-                     "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {stock.quantity || "0"} {stock.purchase_unit?.short_name || ""}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {stock.price_per_unit_currency
-                      ? parseFloat(stock.price_per_unit_currency).toLocaleString()
-                      : "—"}{" "}
-                    {stock.currency?.short_name || ""}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {stock.base_unit_in_uzs
-                      ? parseFloat(stock.base_unit_in_uzs).toLocaleString()
-                      : "—"} сум
-                  </td>
-                  <td className="px-4 py-2">
-                    {stock.date_of_arrived
-                      ? new Date(stock.date_of_arrived).toLocaleDateString("ru-RU")
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="p-4 bg-gray-50 space-y-6">
+        {/* Available Units Table */}
+        {row.available_units && row.available_units.filter((u) => !u.is_base).length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Единицы измерения и цены</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-fixed">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left w-[25%]">Единица</th>
+                    <th className="px-4 py-2 text-right w-[35%]">Цена продажи</th>
+                    <th className="px-4 py-2 text-right w-[35%]">Мин. цена</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {row.available_units.filter((unit) => !unit.is_base).map((unit) => {
+                    const unitKey = `${row.id!}-${unit.id}`;
+                    const unitEdit = unitPriceEdits[unitKey];
+                    return (
+                      <tr key={unit.id} className="border-b hover:bg-gray-100">
+                        <td className="px-4 py-2 font-medium">{unit.short_name}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex justify-end">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={
+                                unitEdit?.selling_price !== undefined
+                                  ? unitEdit.selling_price
+                                  : unit.selling_price || ""
+                              }
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                if (row.id) {
+                                  handleUnitPriceChange(row.id, unit.id, "selling_price", e.target.value);
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full max-w-[140px] h-8 text-xs text-right border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex justify-end">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={
+                                unitEdit?.min_price !== undefined
+                                  ? unitEdit.min_price
+                                  : unit.min_price || ""
+                              }
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                if (row.id) {
+                                  handleUnitPriceChange(row.id, unit.id, "min_price", e.target.value);
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full max-w-[140px] h-8 text-xs text-right border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {/*<div className="mt-2 text-xs text-gray-600 space-y-1">*/}
+            {/*  <p>• Для базовой единицы unit_id не отправляется</p>*/}
+            {/*  <p>• Для остальных единиц unit_id обязательно</p>*/}
+            {/*  <p>• Минимальный остаток устанавливается только для базовой единицы</p>*/}
+            {/*</div>*/}
+          </div>
+        )}
+
+        {/* Stock Batches Table */}
+        {stockData && stockData.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Партии товара</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left">№ Партии</th>
+                    <th className="px-4 py-2 text-left">Поставщик</th>
+                    <th className="px-4 py-2 text-right">Количество</th>
+                    <th className="px-4 py-2 text-right">Цена за ед. (сум)</th>
+                    <th className="px-4 py-2 text-right">Цена за {row.base_unit_name  || "ед."} (сум)</th>
+                    <th className="px-4 py-2 text-left">Дата поступления</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockData.filter((stock: Stock) => (parseFloat(String(stock.quantity || 0)) + parseFloat(String(stock.extra_quantity || 0))) > 0).map((stock: Stock, index: number) => (
+                    <tr key={stock.id || index} className="border-b hover:bg-gray-100">
+                      <td className="px-4 py-2">{stock.stock_name || stock.id}</td>
+                      <td className="px-4 py-2">
+                        {stock.stock_entry?.supplier?.name || 
+                         stock.supplier?.name || 
+                         "—"}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {stock.purchase_unit_quantity ? parseFloat(parseFloat(String(stock.purchase_unit_quantity)).toFixed(2)).toString() : "0"} {stock.purchase_unit?.short_name || ""}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {stock.base_unit_in_uzs
+                          ? parseFloat(stock.base_unit_in_uzs).toLocaleString()
+                          : "—"} сум
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {stock.base_unit_in_uzs
+                          ? parseFloat(stock.base_unit_in_uzs).toLocaleString()
+                          : "—"} сум
+                      </td>
+                      <td className="px-4 py-2">
+                        {stock.date_of_arrived
+                          ? new Date(stock.date_of_arrived).toLocaleDateString("ru-RU")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Show message if no data */}
+        {(!stockData || stockData.length === 0) && (!row.available_units || row.available_units.length === 0) && (
+          <div className="text-center text-gray-500">
+            Нет данных для отображения
+          </div>
+        )}
       </div>
     );
   };
@@ -978,10 +1096,10 @@ export default function ProductsPage() {
 
           <Button
             variant="default"
-            disabled={Object.keys(priceEdits).length === 0}
+            disabled={Object.keys(priceEdits).length === 0 && Object.keys(unitPriceEdits).length === 0}
             onClick={handleSavePrices}
           >
-            {t("buttons.save")} ({Object.keys(priceEdits).length})
+            {t("buttons.save")} ({Object.keys(priceEdits).length + Object.keys(unitPriceEdits).length})
           </Button>
           {/*<Button*/}
           {/*  variant="secondary"*/}
@@ -1098,8 +1216,6 @@ export default function ProductsPage() {
           priceEdits,
           handlePriceChange,
           handleCurrencyPriceChange,
-          debtCurrencySelections,
-          handleDebtCurrencyChange,
         )}
         isLoading={isLoading}
         onEdit={handleEdit}

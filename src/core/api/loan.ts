@@ -21,8 +21,9 @@ export async function createLoan(sponsorId: number, data: { total_amount: number
   return response.data;
 }
 
-export async function fetchLoans(sponsorId: number, currency: string, is_paid?: boolean): Promise<Loan[]> {
-  const params: any = { currency };
+export async function fetchLoans(sponsorId: number, currency?: string, is_paid?: boolean): Promise<Loan[]> {
+  const params: any = {};
+  if (currency) params.currency_code = currency;
   if (typeof is_paid === 'boolean') params.is_paid = is_paid;
   const response = await api.get(`/sponsors/${sponsorId}/loans`, { params });
   return response.data.results;
