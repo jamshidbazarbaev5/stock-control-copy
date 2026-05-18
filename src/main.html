@@ -1,0 +1,2248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test 2 — Варианты UI · Smart Sawda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, p, table { margin: 0; padding: 0; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --surface-soft: #f6f4ee;
+    --surface-muted: #efece4;
+    --hover: #e9e6dc;
+    --border: #e4e0d3;
+    --border-strong: #cfcabc;
+    --text: #1c1b18;
+    --text-secondary: #6b6862;
+    --text-tertiary: #a09c92;
+    --info: #1d5fa3;
+    --info-bg: #e8f0fa;
+    --success: #1d7d5e;
+    --success-bg: #e1f1ea;
+    --danger: #b53b3b;
+    --danger-bg: #fbe9e6;
+    --warning: #a06b1d;
+    --warning-bg: #f9eed7;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 4px 18px rgba(28, 27, 24, 0.08);
+    --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ============ APP LAYOUT ============ */
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 18px 12px;
+    position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--text); color: var(--surface); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+  .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.2px; }
+  .brand-sub { font-size: 11px; color: var(--text-tertiary); margin-top: -2px; }
+  .nav-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.8px; padding: 12px 10px 4px; font-weight: 500; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radius); color: var(--text-secondary); cursor: pointer; margin: 1px 0; font-size: 13.5px; transition: background 0.12s, color 0.12s; }
+  .nav-item:hover { background: var(--surface-soft); color: var(--text); }
+  .nav-item.active { background: var(--surface-muted); color: var(--text); font-weight: 500; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; stroke-width: 1.6; }
+  .sidebar-footer { margin-top: auto; padding: 14px 8px 4px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--success-bg); color: var(--success); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; }
+  .user-name { font-size: 13px; font-weight: 500; }
+  .user-role { font-size: 11px; color: var(--text-tertiary); }
+
+  /* ============ MAIN ============ */
+  .main { padding: 24px 32px 48px; min-width: 0; }
+  .breadcrumbs { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .breadcrumbs a { color: var(--text-secondary); text-decoration: none; }
+  .breadcrumbs a:hover { color: var(--text); }
+  .breadcrumbs .sep { color: var(--text-tertiary); }
+  .breadcrumbs .current { color: var(--text); font-weight: 500; }
+
+  /* ============ CLIENT CARD ============ */
+  .client-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 22px; margin-bottom: 16px; display: flex; align-items: center; gap: 18px; }
+  .avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--info-bg); color: var(--info); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
+  .client-info { flex: 1; min-width: 0; }
+  .client-name { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 2px; }
+  .client-meta { color: var(--text-secondary); font-size: 13px; }
+  .client-meta .dot { margin: 0 7px; color: var(--text-tertiary); }
+  .balance { text-align: right; padding: 0 8px 0 14px; border-left: 1px solid var(--border); }
+  .balance-label { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 2px; font-weight: 500; }
+  .balance-amount { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--danger); letter-spacing: -0.5px; }
+  .balance-amount .currency { font-size: 13px; color: var(--text-secondary); font-weight: 400; margin-left: 3px; }
+  .balance-line { line-height: 1.15; }
+  .balance-line + .balance-line { margin-top: 1px; }
+  .balance-line + .balance-line .balance-amount { font-size: 18px; color: var(--text); opacity: 0.85; }
+
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; background: var(--text); color: var(--surface); border: 1px solid var(--text); transition: opacity 0.15s, transform 0.05s; white-space: nowrap; }
+  .btn:hover { opacity: 0.88; }
+  .btn:active { transform: scale(0.98); }
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--surface-soft); opacity: 1; }
+  .btn svg { width: 14px; height: 14px; stroke-width: 2; }
+
+  /* ============ VIEW SWITCHER ============ */
+  .view-switcher {
+    display: inline-flex;
+    background: var(--surface-muted);
+    border-radius: var(--radius);
+    padding: 3px;
+    margin-bottom: 16px;
+    gap: 2px;
+  }
+  .view-switcher button {
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .view-switcher button:hover { color: var(--text); }
+  .view-switcher button.active {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .view-switcher button svg { width: 14px; height: 14px; stroke-width: 1.8; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ============ TOOLBAR (shared) ============ */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; }
+  .tab { padding: 7px 12px; border-radius: var(--radius); font-size: 13px; color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; transition: background 0.12s; }
+  .tab:hover { background: var(--surface-soft); }
+  .tab.active { background: var(--surface); color: var(--text); font-weight: 500; border-color: var(--border-strong); }
+  .tab .count { background: var(--surface-muted); padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  /* Compact tabs for narrow areas (Split list) */
+  .tab-compact { padding: 5px 9px; font-size: 12px; }
+  .split-filter-row { padding: 8px 12px 10px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .split-tabs { flex-wrap: wrap; gap: 4px; }
+
+  /* Period dropdown — compact replacement for date pills */
+  .period-wrap { position: relative; }
+  .period-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text);
+    transition: background 0.12s;
+    white-space: nowrap;
+  }
+  .period-btn:hover { background: var(--surface-soft); }
+  .period-btn svg { width: 14px; height: 14px; stroke-width: 1.8; flex-shrink: 0; }
+  .period-btn .period-label {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .period-btn .period-default { color: var(--text-secondary); font-weight: 400; }
+  .period-btn .chevron-mini { width: 11px; height: 11px; color: var(--text-tertiary); }
+
+  .period-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 6px;
+    min-width: 260px;
+    z-index: 30;
+    display: none;
+  }
+  .period-popover.open { display: block; }
+  .period-preset {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+    width: 100%;
+    text-align: left;
+  }
+  .period-preset:hover { background: var(--surface-soft); }
+  .period-preset.active { background: var(--surface-muted); font-weight: 500; }
+  .period-preset .check { color: var(--text); width: 14px; height: 14px; }
+  .period-divider { height: 1px; background: var(--border); margin: 6px 0; }
+  .period-custom-section { padding: 4px 10px 6px; }
+  .period-custom-section .section-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .period-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .period-custom-row label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    width: 20px;
+  }
+  .period-custom-row input[type="date"] {
+    flex: 1;
+    padding: 6px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: 12.5px;
+    background: var(--surface);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .period-custom-row input[type="date"]:focus { outline: none; border-color: var(--text); }
+  .period-custom-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  /* Currency badge */
+  .currency-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    margin-left: 4px;
+    vertical-align: 1px;
+    letter-spacing: 0.3px;
+    font-family: var(--font-mono);
+  }
+  .currency-badge.usd { background: #f0e8d8; color: #6b5a1c; }
+  .currency-conversion {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tab.danger .count { background: var(--danger-bg); color: var(--danger); }
+  .tab.warning .count { background: var(--warning-bg); color: var(--warning); }
+  .toolbar-spacer { flex: 1; }
+  .search { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 7px 10px; width: 240px; transition: border-color 0.15s; }
+  .search:focus-within { border-color: var(--text); }
+  .search input { border: none; outline: none; flex: 1; font: inherit; font-size: 13px; background: transparent; color: var(--text); }
+  .search input::placeholder { color: var(--text-tertiary); }
+  .search svg { width: 14px; height: 14px; color: var(--text-tertiary); flex-shrink: 0; }
+
+  .columns-wrap { position: relative; }
+  .columns-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); font-size: 13px; color: var(--text); }
+  .columns-btn:hover { background: var(--surface-soft); }
+  .columns-btn svg { width: 14px; height: 14px; stroke-width: 1.8; }
+  .columns-popover { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px; min-width: 220px; z-index: 20; display: none; }
+  .columns-popover.open { display: block; }
+  .columns-popover-title { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 10px 4px; font-weight: 500; }
+  .columns-popover label { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: var(--radius); font-size: 13px; cursor: pointer; }
+  .columns-popover label:hover { background: var(--surface-soft); }
+  .columns-popover input[type="checkbox"] { margin: 0; width: 14px; height: 14px; accent-color: var(--text); }
+
+  /* Common chips */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 1.5; }
+  .badge-open { background: var(--info-bg); color: var(--info); }
+  .badge-overdue { background: var(--danger-bg); color: var(--danger); }
+  .badge-closed { background: var(--success-bg); color: var(--success); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+
+  /* =============================================
+     VIEW 1: LEDGER
+     ============================================= */
+  .ledger-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  .ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ledger thead { background: var(--surface-soft); position: sticky; top: 0; z-index: 2; }
+  .ledger th { text-align: left; font-weight: 500; font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; padding: 11px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-soft); }
+  .ledger th.right { text-align: right; }
+  .ledger td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .ledger td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  .ledger td.tabular { font-variant-numeric: tabular-nums; }
+  .ledger tbody tr:last-child td { border-bottom: none; }
+  .ledger tr.row-sale { background: var(--surface); }
+  .ledger tr.row-payment { background: var(--surface-soft); }
+  .ledger tbody tr:hover { background: var(--hover); }
+  .ledger tbody tr.row-payment td:first-child { padding-left: 36px; color: var(--text-secondary); position: relative; }
+  .ledger tbody tr.row-payment td:first-child::before { content: '↳'; position: absolute; left: 18px; color: var(--text-tertiary); font-size: 14px; }
+  .ledger tr.month-divider td { background: var(--surface-muted); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.8px; padding: 7px 16px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .op-name { font-weight: 500; color: var(--text); }
+  .row-payment .op-name { font-weight: 400; color: var(--text-secondary); }
+  .row-sale.row-closed .op-name { color: var(--text-secondary); font-weight: 400; }
+  .sale-id { font-family: var(--font-mono); color: var(--text-tertiary); font-size: 12px; margin-left: 7px; letter-spacing: -0.2px; }
+  .badge-inline { margin-left: 7px; vertical-align: 1px; }
+  .items-link { color: var(--info); cursor: pointer; text-decoration: none; font-size: 13px; border-bottom: 1px dotted transparent; transition: border-color 0.15s; }
+  .items-link:hover { border-bottom-color: var(--info); }
+  .text-muted { color: var(--text-tertiary); }
+  .amount-positive { font-weight: 500; }
+  .amount-negative { color: var(--success); font-weight: 500; }
+  .row-closed .amount-positive { color: var(--text-secondary); font-weight: 400; }
+  .balance-cell { color: var(--text-secondary); font-weight: 400; }
+  .balance-cell.has-debt { color: var(--text); font-weight: 500; }
+  .balance-cell.zero { color: var(--text-tertiary); }
+  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-soft); }
+  .pagination-info { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .ledger.hide-due .col-due { display: none; }
+  .ledger.hide-cashier .col-cashier { display: none; }
+  .ledger.hide-store .col-store { display: none; }
+
+  /* =============================================
+     VIEW 2: CARDS
+     ============================================= */
+  .cards-list { display: flex; flex-direction: column; gap: 12px; }
+  .month-header { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; padding: 14px 4px 0; }
+  .month-header:first-child { padding-top: 0; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .card:hover { border-color: var(--border-strong); }
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+  }
+  .card.card-open::before { background: var(--info); }
+  .card.card-overdue::before { background: var(--danger); }
+  .card.card-closed::before { background: var(--text-tertiary); opacity: 0.3; }
+  .card-header {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .card-date {
+    text-align: center;
+    line-height: 1.1;
+  }
+  .card-date .day { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+  .card-date .month-short { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .card-info { min-width: 0; }
+  .card-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; margin-bottom: 4px; flex-wrap: wrap; }
+  .card-title .sale-id { margin-left: 0; font-size: 13px; }
+  .card-meta { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+  .card-meta .dot { margin: 0 6px; color: var(--text-tertiary); }
+  .card-meta .items-link { font-size: 13px; }
+  .card-amounts { text-align: right; font-variant-numeric: tabular-nums; }
+  .card-total { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .card-remainder { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .card-remainder.has-debt { color: var(--danger); font-weight: 500; }
+  .card-progress {
+    height: 4px;
+    background: var(--surface-muted);
+    overflow: hidden;
+  }
+  .card-progress-fill {
+    height: 100%;
+    background: var(--info);
+    transition: width 0.3s;
+  }
+  .card-overdue .card-progress-fill { background: var(--danger); }
+  .card-closed .card-progress-fill { background: var(--success); }
+  .card-body { display: none; border-top: 1px solid var(--border); background: var(--surface-soft); }
+  .card.expanded .card-body { display: block; }
+  .card.expanded .chevron { transform: rotate(90deg); }
+  .chevron { color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
+  .chevron svg { width: 16px; height: 16px; }
+  .card-section { padding: 14px 20px; }
+  .card-section + .card-section { border-top: 1px solid var(--border); }
+  .card-section-title { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 500; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .timeline { position: relative; }
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 60px 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .timeline-date { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .timeline-label { color: var(--text); }
+  .timeline-amount { font-variant-numeric: tabular-nums; font-weight: 500; }
+  .timeline-amount.positive { color: var(--text); }
+  .timeline-amount.negative { color: var(--success); }
+  .timeline-balance { font-variant-numeric: tabular-nums; color: var(--text-tertiary); font-size: 12px; min-width: 80px; text-align: right; }
+  .card-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 14px 20px; background: var(--surface-soft); border-top: 1px solid var(--border); }
+  .info-cell-label { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; margin-bottom: 4px; }
+  .info-cell-value { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* =============================================
+     VIEW 3: SPLIT-PANE
+     ============================================= */
+  .split { display: grid; grid-template-columns: 380px 1fr; gap: 16px; min-height: 600px; }
+  .split-list-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
+  .split-list-toolbar { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--surface-soft); }
+  .split-list { flex: 1; overflow-y: auto; max-height: 700px; }
+  .split-month { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 16px; background: var(--surface-soft); border-bottom: 1px solid var(--border); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  .split-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: start; }
+  .split-item:hover { background: var(--surface-soft); }
+  .split-item.selected { background: var(--info-bg); }
+  .split-item.selected:hover { background: var(--info-bg); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+  .status-dot.open { background: var(--info); }
+  .status-dot.overdue { background: var(--danger); }
+  .status-dot.closed { background: var(--text-tertiary); opacity: 0.5; }
+  .split-item-title { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .split-item-date { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .split-item-id { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+  .split-item-meta { font-size: 12px; color: var(--text-secondary); }
+  .split-item-meta.overdue { color: var(--danger); }
+  .split-item-amounts { text-align: right; font-variant-numeric: tabular-nums; }
+  .split-item-total { font-size: 14px; font-weight: 500; }
+  .split-item-rem { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .split-item-rem.has-debt { color: var(--danger); font-weight: 500; }
+
+  .split-detail-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .detail-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .detail-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail-meta { font-size: 13px; color: var(--text-secondary); }
+  .detail-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-bottom: 1px solid var(--border); }
+  .detail-stat { padding: 16px 24px; border-right: 1px solid var(--border); }
+  .detail-stat:last-child { border-right: none; }
+  .detail-stat-label { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; margin-bottom: 4px; }
+  .detail-stat-value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+  .detail-stat-value.danger { color: var(--danger); }
+  .detail-stat-value.success { color: var(--success); }
+  .detail-stat-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .detail-section { padding: 18px 24px; border-bottom: 1px solid var(--border); }
+  .detail-section:last-child { border-bottom: none; }
+  .detail-section-title { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 500; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .detail-items { display: flex; flex-direction: column; gap: 0; }
+  .detail-item-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 16px; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .detail-item-row:last-child { border-bottom: none; }
+  .detail-item-row .name { font-weight: 500; }
+  .detail-item-row .qty, .detail-item-row .price, .detail-item-row .sub { font-variant-numeric: tabular-nums; text-align: right; min-width: 80px; }
+  .detail-item-row .qty { color: var(--text-secondary); }
+  .detail-item-row .price { color: var(--text-secondary); }
+  .detail-item-row .sub { font-weight: 500; }
+  .detail-timeline { display: flex; flex-direction: column; gap: 0; position: relative; }
+  .timeline-event { display: grid; grid-template-columns: 16px 70px 1fr auto; gap: 14px; padding: 8px 0; align-items: center; font-size: 13px; position: relative; }
+  .timeline-marker { width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; z-index: 1; }
+  .timeline-marker.sale { background: var(--text-tertiary); }
+  .timeline-marker.payment { background: var(--success); }
+  .timeline-marker.closing { background: var(--success); box-shadow: 0 0 0 3px var(--success-bg); }
+  .timeline-line { position: absolute; left: 7px; top: 14px; bottom: 14px; width: 1px; background: var(--border-strong); }
+
+  /* ============ MODAL ============ */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(28, 27, 24, 0.5); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 100; animation: fadeIn 0.15s ease-out; }
+  .modal-backdrop.open { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal { background: var(--surface); border-radius: var(--radius-lg); width: 640px; max-width: 92vw; max-height: 84vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow); animation: modalIn 0.18s ease-out; }
+  @keyframes modalIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-header { padding: 16px 22px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .modal-title { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+  .modal-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .modal-close { color: var(--text-secondary); font-size: 22px; line-height: 1; padding: 4px 10px; border-radius: var(--radius); margin: -4px -8px 0 0; }
+  .modal-close:hover { background: var(--surface-soft); color: var(--text); }
+  .modal-body { flex: 1; overflow-y: auto; }
+  .items-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .items-table th { text-align: left; font-weight: 500; font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.6px; padding: 10px 22px; background: var(--surface-soft); border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+  .items-table th.right { text-align: right; }
+  .items-table td { padding: 11px 22px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .items-table td.name { font-variant-numeric: normal; font-weight: 500; }
+  .items-table td.right { text-align: right; }
+  .items-table tfoot td { font-weight: 600; background: var(--surface-soft); border-bottom: none; border-top: 1px solid var(--border); }
+
+  /* =============================================
+     VIEW 4: PAYMENTS ONLY (calm)
+     ============================================= */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    margin-bottom: 3px;
+  }
+  .section-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .quiet-chart {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .quiet-chart-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+
+  /* Method colors (used in tags) */
+  .m-cash { background: #1d7d5e; }
+  .m-card { background: #1d5fa3; }
+  .m-click { background: #a06b1d; }
+  .m-transfer { background: #6b6862; }
+  .m-currency { background: #b53b3b; }
+  .m-payme { background: #4d3a8c; }
+  .m-uzumnasiya { background: #c44d8c; }
+
+  .method-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 9px 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+  }
+  .method-tag::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+  }
+  .method-tag.m-cash { background: var(--success-bg); color: var(--success); }
+  .method-tag.m-cash::before { background: var(--success); }
+  .method-tag.m-card { background: var(--info-bg); color: var(--info); }
+  .method-tag.m-card::before { background: var(--info); }
+  .method-tag.m-click { background: var(--warning-bg); color: var(--warning); }
+  .method-tag.m-click::before { background: var(--warning); }
+  .method-tag.m-currency { background: var(--danger-bg); color: var(--danger); }
+  .method-tag.m-currency::before { background: var(--danger); }
+
+  /* Monthly chart */
+  .monthly-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .month-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 110px;
+    gap: 14px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .month-row-label {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .month-row-bar-wrap {
+    height: 14px;
+    background: var(--surface-soft);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .month-row-bar {
+    height: 100%;
+    background: var(--text);
+    opacity: 0.45;
+    border-radius: 3px;
+    transition: width 0.3s, opacity 0.15s;
+    min-width: 1px;
+  }
+  .month-row:hover .month-row-bar { opacity: 0.6; }
+  .month-row-bar.empty { background: transparent; }
+  .month-row-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .month-row-amount.zero { color: var(--text-tertiary); font-weight: 400; }
+
+  /* Calmer table styles */
+  .payments-table tr.row-payment-only { background: var(--surface); }
+  .payments-table tr.row-payment-only:hover { background: var(--hover); cursor: pointer; }
+  .payments-table tr.row-payment-only td:first-child::before { content: none; }
+  .payments-table tr.row-payment-only td:first-child { padding-left: 16px; }
+  .applied-to-id { font-family: var(--font-mono); font-size: 13px; color: var(--info); cursor: pointer; font-weight: 500; }
+  .applied-to-id:hover { text-decoration: underline; }
+
+  .row-chevron { display: inline-block; color: var(--text-tertiary); transition: transform 0.2s; }
+  .row-chevron svg { width: 14px; height: 14px; }
+  .payment-row.expanded .row-chevron { transform: rotate(180deg); }
+  .payment-row.expanded { background: var(--surface-soft) !important; }
+
+  /* Inline meta line in payment table cells */
+  .row-meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Manual debt indicator */
+  .manual-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+  }
+  .debt-id-mono {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .debt-meta-line {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .debt-meta-link {
+    color: var(--info);
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .debt-meta-link:hover { text-decoration: underline; }
+
+  /* Expanded detail row */
+  .payment-detail { padding: 18px 20px; }
+  .payment-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px 20px;
+    margin-bottom: 16px;
+  }
+  .detail-field-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .detail-field-value { font-size: 13px; font-weight: 500; }
+  .detail-field-value.mono { font-family: var(--font-mono); font-weight: 400; font-size: 12px; }
+  .detail-field-value.tabular { font-variant-numeric: tabular-nums; }
+  .payment-detail-comment {
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .payment-detail-comment .detail-field-value { font-style: italic; font-weight: 400; }
+  .payment-detail-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .btn-sm { padding: 6px 11px; font-size: 12px; gap: 5px; }
+  .btn-sm svg { width: 13px; height: 13px; stroke-width: 1.8; }
+
+  .month-row-amount.zero {
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+  .month-row-count {
+    text-align: right;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+  }
+
+  /* Method colors */
+  .m-cash { background: #1d7d5e; }
+  .m-card { background: #1d5fa3; }
+  .m-click { background: #a06b1d; }
+  .m-transfer { background: #6b6862; }
+  .m-currency { background: #b53b3b; }
+  .m-payme { background: #4d3a8c; }
+  .m-uzumnasiya { background: #c44d8c; }
+
+  .method-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 9px 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+  }
+  .method-tag::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+  }
+  .method-tag.m-cash { background: var(--success-bg); color: var(--success); }
+  .method-tag.m-cash::before { background: var(--success); }
+  .method-tag.m-card { background: var(--info-bg); color: var(--info); }
+  .method-tag.m-card::before { background: var(--info); }
+  .method-tag.m-click { background: var(--warning-bg); color: var(--warning); }
+  .method-tag.m-click::before { background: var(--warning); }
+  .method-tag.m-currency { background: var(--danger-bg); color: var(--danger); }
+  .method-tag.m-currency::before { background: var(--danger); }
+
+  .payments-table tr.row-payment-only { background: var(--surface); }
+  .payments-table tr.row-payment-only:hover { background: var(--hover); }
+  .payments-table tr.row-payment-only td:first-child::before { content: none; }
+  .payments-table tr.row-payment-only td:first-child { padding-left: 16px; }
+
+  .date-with-time { display: flex; flex-direction: column; line-height: 1.2; }
+  .date-with-time .date-main { font-variant-numeric: tabular-nums; }
+  .date-with-time .date-time { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+  .applied-to {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+    gap: 2px;
+  }
+  .applied-to-id { font-family: var(--font-mono); font-size: 13px; color: var(--info); cursor: pointer; font-weight: 500; }
+  .applied-to-id:hover { text-decoration: underline; }
+  .applied-to-meta { font-size: 11px; color: var(--text-tertiary); }
+
+  .effect-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .effect-closed { background: var(--success-bg); color: var(--success); }
+  .effect-closed::before { content: '✓'; font-weight: 700; }
+  .effect-partial { background: var(--surface-muted); color: var(--text-secondary); }
+  .effect-deposit { background: var(--info-bg); color: var(--info); }
+
+  /* Payment row interaction */
+  .payment-row { cursor: pointer; }  .row-chevron svg { width: 14px; height: 14px; color: var(--text-tertiary); transition: transform 0.2s; }
+  .payment-row.expanded .row-chevron svg { transform: rotate(180deg); }
+  .payment-row.expanded { background: var(--surface-soft) !important; }
+  .comment-icon { width: 13px; height: 13px; color: var(--text-tertiary); margin-left: 6px; vertical-align: -1px; }
+
+  /* Inline comment under method */
+  .row-comment {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  /* Receipt number micro-text */
+  .receipt-num {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+    letter-spacing: -0.2px;
+  }
+
+  /* On-time vs late dot next to amount */
+  .ontime-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .ontime-dot.ontime { background: var(--success); }
+  .ontime-dot.late { background: var(--danger); }
+
+
+  /* Expanded detail panel */
+  .payment-detail {
+    padding: 18px 22px 16px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .payment-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px 28px;
+    margin-bottom: 14px;
+  }
+  .detail-field-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .detail-field-value {
+    font-size: 13.5px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .detail-field-value.mono { font-family: var(--font-mono); font-size: 12.5px; }
+  .detail-field-value.tabular { font-variant-numeric: tabular-nums; }
+  .payment-detail-comment {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .payment-detail-comment .detail-field-value {
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-top: 4px;
+  }
+  .payment-detail-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .btn-sm { padding: 6px 11px; font-size: 12px; gap: 5px; }
+  .btn-sm svg { width: 13px; height: 13px; stroke-width: 1.8; }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .main { padding: 16px; }
+    .client-card { flex-wrap: wrap; }
+    .balance { width: 100%; text-align: left; border-left: none; padding: 0; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+    .split { grid-template-columns: 1fr; }
+    .detail-stats { grid-template-columns: repeat(2, 1fr); }
+    .card-info-grid { grid-template-columns: repeat(2, 1fr); }
+    .payment-detail-grid { grid-template-columns: repeat(2, 1fr); }
+    .section-header { flex-wrap: wrap; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">SS</div>
+      <div>
+        <div class="brand-name">Smart Sawda</div>
+        <div class="brand-sub">Нокис район</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-label">Главное</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Дашборд
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+        Продажи
+      </div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><circle cx="17" cy="7" r="3"/></svg>
+        Клиенты
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        Долги
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4a2 2 0 001-1.7z"/></svg>
+        Склад
+      </div>
+      <div class="nav-label">Анализ</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 17l6-6 4 4 8-8"/></svg>
+        Отчёты
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-avatar">ПП</div>
+      <div>
+        <div class="user-name">Петя Петров</div>
+        <div class="user-role">Администратор</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="breadcrumbs">
+      <a href="#">Клиенты</a>
+      <span class="sep">/</span>
+      <span class="current">Test 2</span>
+    </div>
+
+    <!-- Client header -->
+    <div class="client-card">
+      <div class="avatar">T2</div>
+      <div class="client-info">
+        <div class="client-name">Test 2</div>
+        <div class="client-meta">Физ.лицо<span class="dot">·</span>+998 96 847 64 47<span class="dot">·</span>последняя покупка 02.03.2026</div>
+      </div>
+      <div class="balance" id="clientBalance">
+        <!-- Populated by JS: shows UZS + USD if both exist -->
+      </div>
+      <button class="btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
+        Принять оплату
+      </button>
+    </div>
+
+    <!-- View switcher -->
+    <div class="view-switcher" id="viewSwitcher">
+      <button data-view="ledger" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        Ленточный
+      </button>
+      <button data-view="cards">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/></svg>
+        Карточки
+      </button>
+      <button data-view="split">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+        Разделённый
+      </button>
+      <button data-view="payments">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>
+        Только платежи
+      </button>
+    </div>
+
+    <!-- ============ VIEW 1: LEDGER ============ -->
+    <div class="view view-ledger active" id="view-ledger">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Все операции</div>
+          <div class="section-subtitle" id="ledgerSubtitle">—</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="tabs" data-tabs="ledger">
+          <div class="tab active" data-filter="all">Все <span class="count">9</span></div>
+          <div class="tab warning" data-filter="open">Открытые <span class="count">3</span></div>
+          <div class="tab danger" data-filter="overdue">Просрочка <span class="count">1</span></div>
+          <div class="tab" data-filter="closed">Закрытые <span class="count">5</span></div>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <div class="period-wrap" data-period-target="ledger">
+          <button class="period-btn" data-period-btn>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span class="period-label" data-period-label><span class="period-default">Всё время</span></span>
+            <svg class="chevron-mini" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="text" id="ledgerSearch" placeholder="Поиск (№, сумма, дата, март...)">
+        </div>
+        <div class="columns-wrap">
+          <button class="columns-btn" id="columnsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>
+            Колонки
+          </button>
+          <div class="columns-popover" id="columnsPopover">
+            <div class="columns-popover-title">Дополнительные колонки</div>
+            <label><input type="checkbox" data-col="due"> Срок оплаты</label>
+            <label><input type="checkbox" data-col="cashier"> Кассир</label>
+            <label><input type="checkbox" data-col="store"> Магазин</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="ledger-wrap">
+        <div class="table-scroll">
+          <table class="ledger hide-due hide-cashier hide-store" id="ledger">
+            <thead>
+              <tr>
+                <th style="width: 96px;">Дата</th>
+                <th>Операция</th>
+                <th class="col-due" style="width: 130px;">Срок</th>
+                <th style="width: 130px;">Товары</th>
+                <th class="col-cashier" style="width: 140px;">Кассир</th>
+                <th class="col-store" style="width: 200px;">Магазин</th>
+                <th class="right" style="width: 130px;">Сумма</th>
+                <th class="right" style="width: 130px;">Остаток</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="ledgerPaginationInfo">—</span>
+          <button class="btn btn-secondary">Загрузить ещё 20</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ VIEW 2: CARDS ============ -->
+    <div class="view view-cards" id="view-cards">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Долги</div>
+          <div class="section-subtitle" id="cardsSubtitle">—</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="tabs" data-tabs="cards">
+          <div class="tab active" data-filter="all">Все <span class="count">4</span></div>
+          <div class="tab warning" data-filter="open">Открытые <span class="count">1</span></div>
+          <div class="tab danger" data-filter="overdue">Просрочка <span class="count">1</span></div>
+          <div class="tab" data-filter="closed">Закрытые <span class="count">2</span></div>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <div class="period-wrap" data-period-target="cards">
+          <button class="period-btn" data-period-btn>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span class="period-label" data-period-label><span class="period-default">Всё время</span></span>
+            <svg class="chevron-mini" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="text" id="cardsSearch" placeholder="Поиск (№, сумма, дата...)">
+        </div>
+      </div>
+      <div class="cards-list" id="cardsList"></div>
+      <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <button class="btn btn-secondary">Загрузить ещё 10 долгов</button>
+      </div>
+    </div>
+
+    <!-- ============ VIEW 3: SPLIT-PANE ============ -->
+    <div class="view view-split" id="view-split">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Все долги</div>
+          <div class="section-subtitle" id="splitSubtitle">—</div>
+        </div>
+        <div class="period-wrap" data-period-target="split">
+          <button class="period-btn" data-period-btn>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span class="period-label" data-period-label><span class="period-default">Всё время</span></span>
+            <svg class="chevron-mini" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="split">
+        <div class="split-list-wrap">
+          <div class="split-list-toolbar">
+            <div class="search" style="width: 100%;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+              <input type="text" id="splitSearch" placeholder="Поиск...">
+            </div>
+          </div>
+          <div class="split-filter-row">
+            <div class="tabs split-tabs" data-tabs="split">
+              <div class="tab tab-compact active" data-filter="all">Все</div>
+              <div class="tab tab-compact warning" data-filter="open">Открытые</div>
+              <div class="tab tab-compact danger" data-filter="overdue">Просрочка</div>
+              <div class="tab tab-compact" data-filter="closed">Закрытые</div>
+            </div>
+          </div>
+          <div class="split-list" id="splitList"></div>
+        </div>
+        <div class="split-detail-wrap" id="splitDetail"></div>
+      </div>
+    </div>
+
+    <!-- ============ VIEW 4: PAYMENTS ONLY ============ -->
+    <div class="view view-payments" id="view-payments">
+      <!-- Quiet section header -->
+      <div class="section-header">
+        <div>
+          <div class="section-title">Платежи</div>
+          <div class="section-subtitle" id="paymentsSubtitle">—</div>
+        </div>
+        <button class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Excel
+        </button>
+      </div>
+
+      <!-- One chart -->
+      <div class="quiet-chart">
+        <div class="quiet-chart-label">По месяцам</div>
+        <div class="monthly-chart" id="monthlyChart"></div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="tabs" data-tabs="payments" id="paymentTabs"></div>
+        <div class="toolbar-spacer"></div>
+        <div class="period-wrap" data-period-target="payments">
+          <button class="period-btn" data-period-btn>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span class="period-label" data-period-label><span class="period-default">Всё время</span></span>
+            <svg class="chevron-mini" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="text" id="paymentsSearch" placeholder="Поиск (№, сумма, дата, март...)">
+        </div>
+      </div>
+
+      <!-- Calm table -->
+      <div class="ledger-wrap">
+        <div class="table-scroll">
+          <table class="ledger payments-table">
+            <thead>
+              <tr>
+                <th style="width: 110px;">Дата</th>
+                <th style="width: 150px;">Способ</th>
+                <th class="right" style="width: 140px;">Сумма</th>
+                <th>Долг</th>
+                <th class="right" style="width: 130px;">Остаток долга</th>
+                <th style="width: 32px;"></th>
+              </tr>
+            </thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info" id="paymentsPaginationInfo">—</span>
+          <button class="btn btn-secondary">Загрузить ещё 20</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ MODAL (used by ledger + cards) ============ -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">Товары</div>
+        <div class="modal-subtitle" id="modalSubtitle">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Товар</th>
+            <th class="right">Кол-во</th>
+            <th class="right">Цена</th>
+            <th class="right">Сумма</th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3">Итого</td>
+            <td class="right" id="itemsTotal">0</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ MOCK DATA ============
+// Each sale/debt has a `currency`: 'UZS' or 'USD'.
+// Payments inherit the debt's currency. UZS debts paid in UZS, USD debts paid in USD.
+const groups = [
+  {
+    sale: { id: 5847501, date: '2026-03-02', amount: 800000, remainder: 350000, balance_after: 1030000, items_count: 5, due_date: '2026-05-15', status: 'open', seller: 'DESKTOPUSER', store: 'Нокис район склад магазин', currency: 'UZS' },
+    payments: [
+      { date: '2026-03-10', time: '11:42', amount: 300000, method: 'Наличные', worker: 'root', register: 'jamshid', shift_id: 102, receipt_no: 'CHK-2026-03-10-0034', balance_after: 730000, closes: false, comment: 'Принёс часть долга, обещал остаток до конца месяца', currency: 'UZS' },
+      { date: '2026-03-25', time: '18:30', amount: 150000, method: 'Карта', worker: 'root', register: 'jamshid', shift_id: 102, receipt_no: 'CHK-2026-03-25-0091', balance_after: 580000, closes: false, comment: '', currency: 'UZS' }
+    ],
+    items: [
+      { name: 'Кругляк 14 лик 6м', qty: 10, unit: 'шт', price: 30000 },
+      { name: 'Половой 0.18×118×6', qty: 8, unit: 'шт', price: 30000 },
+      { name: 'Доска обрезная 25×150', qty: 12, unit: 'м', price: 15000 },
+      { name: 'Брус 50×50', qty: 6, unit: 'шт', price: 12000 },
+      { name: 'Гвозди оцинкованные 70мм', qty: 3, unit: 'кг', price: 18000 }
+    ]
+  },
+  // USD debt — partially paid
+  {
+    sale: { id: 5847440, date: '2026-02-05', amount: 500, remainder: 200, balance_after: 500, items_count: 2, due_date: '2026-04-05', status: 'open', seller: 'DESKTOPUSER', store: 'Нокис район склад магазин', currency: 'USD', usd_rate_at_creation: 12200 },
+    payments: [
+      { date: '2026-02-20', time: '15:20', amount: 300, method: 'Валюта', worker: 'root', register: 'jamshid', shift_id: 95, receipt_no: 'CHK-2026-02-20-0045', balance_after: 200, closes: false, comment: 'Часть в долларах', currency: 'USD', usd_rate_at_payment: 12200, amount_in_uzs: 3660000 }
+    ],
+    items: [
+      { name: 'Импортный электроинструмент', qty: 1, unit: 'шт', price: 350 },
+      { name: 'Аксессуары и насадки', qty: 1, unit: 'комплект', price: 150 }
+    ]
+  },
+  {
+    sale: { id: 5847379, date: '2025-12-15', amount: 220000, remainder: 0, balance_after: 450000, items_count: 2, due_date: '2026-01-10', status: 'closed', seller: 'DESKTOPUSER', store: 'Нокис район склад магазин', currency: 'UZS' },
+    payments: [{ date: '2025-12-15', time: '18:20', amount: 220000, method: 'Наличные', worker: 'root', register: 'jamshid', shift_id: 38, receipt_no: 'CHK-2025-12-15-0212', balance_after: 230000, closes: true, comment: '', currency: 'UZS' }],
+    items: [
+      { name: 'Кругляк 14 лик 6м', qty: 4, unit: 'шт', price: 10000 },
+      { name: 'Половой 0.18×118×6', qty: 6, unit: 'шт', price: 30000 }
+    ]
+  },
+  {
+    sale: { id: 5847301, date: '2025-12-08', amount: 85000, remainder: 0, balance_after: 315000, items_count: 1, due_date: '2026-01-08', status: 'closed', seller: 'DESKTOPUSER', store: 'Нокис район склад магазин', currency: 'UZS' },
+    payments: [{ date: '2025-12-12', time: '14:08', amount: 85000, method: 'Click', worker: 'root', register: 'jamshid', shift_id: 38, receipt_no: 'CHK-2025-12-12-0178', balance_after: 230000, closes: true, comment: 'Оплачено через Click мобильное', currency: 'UZS' }],
+    items: [{ name: 'Цемент М400 50кг', qty: 5, unit: 'мешок', price: 17000 }]
+  },
+  {
+    sale: { id: 5847234, date: '2025-10-10', amount: 350000, remainder: 230000, balance_after: 350000, items_count: 3, due_date: '2025-10-25', status: 'overdue', seller: 'DESKTOPUSER', store: 'Нокис район склад магазин' },
+    payments: [{ date: '2025-10-20', time: '10:15', amount: 120000, method: 'Наличные', worker: 'root', register: 'jamshid', shift_id: 35, receipt_no: 'CHK-2025-10-20-0089', balance_after: 230000, closes: false, comment: '' }],
+    items: [
+      { name: 'Профнастил С8 0.4мм', qty: 8, unit: 'м²', price: 25000 },
+      { name: 'Саморез кровельный 4.8×35', qty: 100, unit: 'шт', price: 500 },
+      { name: 'Уголок монтажный 50×50', qty: 20, unit: 'шт', price: 5000 }
+    ]
+  },
+  // Manual debt — no sale linked. Created directly by the shop owner.
+  {
+    sale: null,
+    debt: {
+      id: 105,
+      total_amount: 200000,
+      remainder: 100000,
+      currency: 'UZS',
+      due_date: '2026-04-30',
+      created_at: '2026-03-15',
+      is_paid: false,
+      comment: 'Взял наличными для расчёта с поставщиком, обещал вернуть к концу апреля',
+      seller: 'root',
+      store: 'Нокис район склад магазин'
+    },
+    payments: [
+      { date: '2026-03-22', time: '12:00', amount: 100000, method: 'Наличные', worker: 'root', currency: 'UZS' }
+    ],
+    items: null
+  }
+];
+
+// ============ FORMATTERS ============
+const fmt = n => Math.abs(Math.round(n)).toLocaleString('ru-RU').replace(/,/g, ' ').replace(/\u00A0/g, ' ');
+
+// Amount with currency suffix. Uses 2 decimals for USD when not a round number.
+const fmtMoney = (n, currency) => {
+  currency = currency || 'UZS';
+  if (currency === 'USD') {
+    const rounded = Math.round(Math.abs(n) * 100) / 100;
+    const hasDecimals = rounded % 1 !== 0;
+    const formatted = hasDecimals
+      ? rounded.toFixed(2).replace('.', ',')
+      : fmt(rounded);
+    return `$${formatted}`;
+  }
+  return `${fmt(n)}`;
+};
+
+const currencyUnit = c => c === 'USD' ? '$' : 'сум';
+
+const fmtDate = s => { const [y, m, d] = s.split('-'); return `${d}.${m}.${y}`; };
+const monthsLong = ['ЯНВАРЬ','ФЕВРАЛЬ','МАРТ','АПРЕЛЬ','МАЙ','ИЮНЬ','ИЮЛЬ','АВГУСТ','СЕНТЯБРЬ','ОКТЯБРЬ','НОЯБРЬ','ДЕКАБРЬ'];
+const monthsShort = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const monthName = s => { const [y, m] = s.split('-'); return `${monthsLong[parseInt(m, 10) - 1]} ${y}`; };
+const monthShort = s => { const m = parseInt(s.split('-')[1], 10); return monthsShort[m - 1]; };
+const monthKey = s => s.substring(0, 7);
+const plural = (n, forms) => {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return forms[0];
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
+  return forms[2];
+};
+const overdueDays = s => {
+  const today = new Date();
+  const due = new Date(s);
+  return Math.max(0, Math.floor((today - due) / 86400000));
+};
+
+// ============ TOTALS HELPERS ============
+// Compute lifetime totals once. Used by all subtitle headers.
+function computeOverallTotals() {
+  let debtCount = 0;
+  const totalByCur = {};      // overall debt amount issued
+  const paymentsByCur = {};   // total paid back
+  const remainderByCur = {};  // still owed
+  for (const g of groups) {
+    debtCount++;
+    if (g.sale) {
+      const c = g.sale.currency || 'UZS';
+      totalByCur[c] = (totalByCur[c] || 0) + g.sale.amount;
+      remainderByCur[c] = (remainderByCur[c] || 0) + g.sale.remainder;
+    } else {
+      const c = g.debt.currency || 'UZS';
+      totalByCur[c] = (totalByCur[c] || 0) + g.debt.total_amount;
+      remainderByCur[c] = (remainderByCur[c] || 0) + g.debt.remainder;
+    }
+    for (const p of g.payments) {
+      const c = p.currency || (g.sale ? (g.sale.currency || 'UZS') : (g.debt.currency || 'UZS'));
+      paymentsByCur[c] = (paymentsByCur[c] || 0) + p.amount;
+    }
+  }
+  return { debtCount, totalByCur, paymentsByCur, remainderByCur };
+}
+
+// Format "1 655 000 сум, $500" — comma separates currencies of the same metric.
+// Returns "0" when nothing.
+function fmtTotalsLine(byCurrency) {
+  const parts = Object.entries(byCurrency)
+    .filter(([_, v]) => v > 0)
+    .map(([c, v]) => fmtMoney(v, c) + (c === 'USD' ? '' : ' сум'));
+  return parts.length ? parts.join(', ') : '0';
+}
+
+// ============ FILTER STATE ============
+const filterState = {
+  ledger: { filter: 'all', search: '', dateRange: 'all', dateFrom: null, dateTo: null },
+  cards: { filter: 'all', search: '', dateRange: 'all', dateFrom: null, dateTo: null },
+  split: { filter: 'all', search: '', selected: 5847501, dateRange: 'all', dateFrom: null, dateTo: null },
+  payments: { filter: 'all', search: '', dateRange: 'all', dateFrom: null, dateTo: null }
+};
+
+function getFilteredGroups(viewKey) {
+  const f = filterState[viewKey];
+  // Sale-centric views (Ledger, Cards, Split) show only debts with a linked sale.
+  // Manual debts appear in the Payments view.
+  let v = groups.filter(g => g.sale !== null);
+  if (f.filter && f.filter !== 'all') v = v.filter(g => g.sale.status === f.filter);
+  if (f.dateRange && f.dateRange !== 'all') {
+    v = v.filter(g => {
+      const range = resolveDateRange(f);
+      if (!range) return true;
+      return g.sale.date >= range[0] && g.sale.date <= range[1];
+    });
+  }
+  if (f.search) {
+    v = applyTextSearch(v, f.search, g => [
+      String(g.sale.id),
+      String(g.sale.amount),
+      g.sale.date,
+      fmtDate(g.sale.date),
+      monthName(g.sale.date),
+      monthShort(g.sale.date),
+      g.sale.currency || 'UZS'
+    ]);
+  }
+  return [...v].sort((a, b) => b.sale.date.localeCompare(a.sale.date));
+}
+
+// ============ VIEW 1: LEDGER ============
+function renderLedger() {
+  // Lifetime overall subtitle (always reflects all data, ignores filters)
+  const t = computeOverallTotals();
+  document.getElementById('ledgerSubtitle').textContent =
+    `${t.debtCount} ${plural(t.debtCount, ['долг','долга','долгов'])} · всего ${fmtTotalsLine(t.totalByCur)} · оплачено ${fmtTotalsLine(t.paymentsByCur)} · остаток ${fmtTotalsLine(t.remainderByCur)}`;
+
+  const visible = getFilteredGroups('ledger');
+  const tbody = document.getElementById('ledgerBody');
+  if (visible.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding: 60px 20px; text-align: center; color: var(--text-secondary);">Ничего не найдено</td></tr>`;
+    document.getElementById('ledgerPaginationInfo').textContent = 'Нет операций';
+    return;
+  }
+  let html = '', lastMonth = null, totalRows = 0;
+  for (const g of visible) {
+    const m = monthKey(g.sale.date);
+    if (m !== lastMonth) {
+      html += `<tr class="month-divider"><td colspan="8">${monthName(g.sale.date)}</td></tr>`;
+      lastMonth = m;
+    }
+    const s = g.sale;
+    const isOverdue = s.status === 'overdue', isClosed = s.status === 'closed', isOpen = s.status === 'open';
+    let badgeHtml = '';
+    if (isOverdue) {
+      const d = overdueDays(s.due_date);
+      badgeHtml = `<span class="badge badge-overdue badge-inline">Просрочен ${d} ${plural(d, ['день','дня','дней'])}</span>`;
+    } else if (isOpen) {
+      badgeHtml = `<span class="badge badge-open badge-inline">Открыт</span>`;
+    }
+    const itemsLabel = `${s.items_count} ${plural(s.items_count, ['товар','товара','товаров'])}`;
+    html += `<tr class="row-sale ${isClosed ? 'row-closed' : ''}" data-sale-id="${s.id}">
+      <td class="tabular">${fmtDate(s.date)}</td>
+      <td><span class="op-name">Долг</span><span class="sale-id">№${s.id}</span>${badgeHtml}</td>
+      <td class="col-due tabular">${s.due_date ? `до ${fmtDate(s.due_date)}` : '<span class="text-muted">—</span>'}</td>
+      <td><a class="items-link" onclick="showItems(${s.id})">${itemsLabel} →</a></td>
+      <td class="col-cashier">${s.seller}</td>
+      <td class="col-store">${s.store}</td>
+      <td class="right tabular amount-positive">+${fmtMoney(s.amount, s.currency)}</td>
+      <td class="right tabular balance-cell ${s.balance_after > 0 ? 'has-debt' : 'zero'}">${fmt(s.balance_after)}</td>
+    </tr>`;
+    totalRows++;
+    for (const p of g.payments) {
+      const closedBadge = p.closes ? `<span class="badge badge-closed badge-inline">Закрыт</span>` : '';
+      html += `<tr class="row-payment">
+        <td class="tabular">${fmtDate(p.date)}</td>
+        <td><span class="op-name">Оплата · ${p.method}</span>${closedBadge}</td>
+        <td class="col-due"><span class="text-muted">—</span></td>
+        <td><span class="text-muted">—</span></td>
+        <td class="col-cashier">${p.worker}</td>
+        <td class="col-store"><span class="text-muted">—</span></td>
+        <td class="right tabular amount-negative">−${fmtMoney(p.amount, p.currency || (p.is_manual ? "UZS" : "UZS"))}</td>
+        <td class="right tabular balance-cell ${p.balance_after > 0 ? 'has-debt' : 'zero'}">${fmt(p.balance_after)}</td>
+      </tr>`;
+      totalRows++;
+    }
+  }
+  tbody.innerHTML = html;
+  // Filtered totals — what's visible right now
+  const fTotal = {}, fPaid = {}, fRem = {};
+  for (const g of visible) {
+    const c = g.sale.currency || 'UZS';
+    fTotal[c] = (fTotal[c] || 0) + g.sale.amount;
+    fRem[c] = (fRem[c] || 0) + g.sale.remainder;
+    for (const p of g.payments) {
+      const pc = p.currency || c;
+      fPaid[pc] = (fPaid[pc] || 0) + p.amount;
+    }
+  }
+  const f = filterState.ledger;
+  const isFiltered = f.filter !== 'all' || f.dateRange !== 'all' || f.search;
+  const totalsSuffix = isFiltered
+    ? ` · всего ${fmtTotalsLine(fTotal)} · оплачено ${fmtTotalsLine(fPaid)} · остаток ${fmtTotalsLine(fRem)}`
+    : '';
+  document.getElementById('ledgerPaginationInfo').textContent =
+    `${totalRows} ${plural(totalRows, ['операция','операции','операций'])} · ${visible.length} ${plural(visible.length, ['долг','долга','долгов'])}${totalsSuffix}`;
+}
+
+// ============ VIEW 2: CARDS ============
+function renderCards() {
+  const t = computeOverallTotals();
+  document.getElementById('cardsSubtitle').textContent =
+    `${t.debtCount} ${plural(t.debtCount, ['долг','долга','долгов'])} · всего ${fmtTotalsLine(t.totalByCur)} · оплачено ${fmtTotalsLine(t.paymentsByCur)} · остаток ${fmtTotalsLine(t.remainderByCur)}`;
+
+  const visible = getFilteredGroups('cards');
+  const list = document.getElementById('cardsList');
+  if (visible.length === 0) {
+    list.innerHTML = `<div style="padding: 60px 20px; text-align: center; color: var(--text-secondary); background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border);">Ничего не найдено</div>`;
+    return;
+  }
+  let html = '', lastMonth = null;
+  visible.forEach((g, idx) => {
+    const m = monthKey(g.sale.date);
+    if (m !== lastMonth) {
+      html += `<div class="month-header">${monthName(g.sale.date)}</div>`;
+      lastMonth = m;
+    }
+    const s = g.sale;
+    const isOverdue = s.status === 'overdue', isClosed = s.status === 'closed', isOpen = s.status === 'open';
+    const cardClass = isOverdue ? 'card-overdue' : (isOpen ? 'card-open' : 'card-closed');
+    const expandedClass = idx === 0 ? 'expanded' : '';
+    let badgeHtml = '';
+    if (isOverdue) {
+      const d = overdueDays(s.due_date);
+      badgeHtml = `<span class="badge badge-overdue">Просрочен ${d} ${plural(d, ['день','дня','дней'])}</span>`;
+    } else if (isOpen) badgeHtml = `<span class="badge badge-open">Открыт</span>`;
+    else if (isClosed) badgeHtml = `<span class="badge badge-closed">Закрыт</span>`;
+
+    const paid = s.amount - s.remainder;
+    const progressPct = s.amount > 0 ? Math.round((paid / s.amount) * 100) : 0;
+    const itemsLabel = `${s.items_count} ${plural(s.items_count, ['товар','товара','товаров'])}`;
+    const [y, mo, d] = s.date.split('-');
+
+    html += `<div class="card ${cardClass} ${expandedClass}" data-sale-id="${s.id}">
+      <div class="card-header" onclick="toggleCard(${s.id})">
+        <div class="card-date">
+          <div class="day">${d}</div>
+          <div class="month-short">${monthShort(s.date)}</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">
+            <span>Долг</span>
+            <span class="sale-id">№${s.id}</span>
+            ${badgeHtml}
+          </div>
+          <div class="card-meta">
+            <a class="items-link" onclick="event.stopPropagation(); showItems(${s.id})">${itemsLabel} →</a>
+            <span class="dot">·</span>
+            <span>${s.seller}</span>
+            ${s.due_date ? `<span class="dot">·</span><span>срок ${fmtDate(s.due_date)}</span>` : ''}
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div class="card-amounts">
+            <div class="card-total">${fmtMoney(s.amount, s.currency)}</div>
+            <div class="card-remainder ${s.remainder > 0 ? 'has-debt' : ''}">${s.remainder > 0 ? `остаток ${fmtMoney(s.remainder, s.currency)}` : 'оплачен'}</div>
+          </div>
+          <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+      </div>
+      <div class="card-progress">
+        <div class="card-progress-fill" style="width: ${progressPct}%"></div>
+      </div>
+      <div class="card-body">
+        <div class="card-info-grid">
+          <div><div class="info-cell-label">Сумма</div><div class="info-cell-value">${fmtMoney(s.amount, s.currency)}</div></div>
+          <div><div class="info-cell-label">Оплачено</div><div class="info-cell-value" style="color: var(--success)">${fmt(paid)}</div></div>
+          <div><div class="info-cell-label">Остаток</div><div class="info-cell-value" style="color: ${s.remainder > 0 ? 'var(--danger)' : 'var(--text-tertiary)'}">${fmtMoney(s.remainder, s.currency)}</div></div>
+          <div><div class="info-cell-label">Срок</div><div class="info-cell-value">${s.due_date ? fmtDate(s.due_date) : '—'}</div></div>
+        </div>
+        <div class="card-section">
+          <div class="card-section-title">История платежей <span style="color: var(--text-secondary); font-weight: 400;">${g.payments.length}</span></div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <div class="timeline-date">${fmtDate(s.date)}</div>
+              <div class="timeline-label">Долг открыт · ${s.seller}</div>
+              <div class="timeline-amount positive">+${fmtMoney(s.amount, s.currency)}</div>
+              <div class="timeline-balance">${fmtMoney(s.amount, s.currency)}</div>
+            </div>
+            ${g.payments.map((p, i) => {
+              const cumulativePaid = g.payments.slice(0, i + 1).reduce((sum, x) => sum + x.amount, 0);
+              const localBalance = s.amount - cumulativePaid;
+              return `<div class="timeline-row">
+                <div class="timeline-date">${fmtDate(p.date)}</div>
+                <div class="timeline-label">Оплата · ${p.method} · ${p.worker}${p.closes ? ' <span class="badge badge-closed" style="margin-left: 4px;">Закрыт</span>' : ''}</div>
+                <div class="timeline-amount negative">−${fmtMoney(p.amount, p.currency || (p.is_manual ? "UZS" : "UZS"))}</div>
+                <div class="timeline-balance">${fmt(localBalance)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function toggleCard(saleId) {
+  document.querySelector(`.card[data-sale-id="${saleId}"]`)?.classList.toggle('expanded');
+}
+
+// ============ VIEW 3: SPLIT-PANE ============
+function renderSplit() {
+  const t = computeOverallTotals();
+  document.getElementById('splitSubtitle').textContent =
+    `${t.debtCount} ${plural(t.debtCount, ['долг','долга','долгов'])} · всего ${fmtTotalsLine(t.totalByCur)} · оплачено ${fmtTotalsLine(t.paymentsByCur)} · остаток ${fmtTotalsLine(t.remainderByCur)}`;
+
+  const visible = getFilteredGroups('split');
+  const list = document.getElementById('splitList');
+  let html = '', lastMonth = null;
+  for (const g of visible) {
+    const m = monthKey(g.sale.date);
+    if (m !== lastMonth) {
+      html += `<div class="split-month">${monthName(g.sale.date)}</div>`;
+      lastMonth = m;
+    }
+    const s = g.sale;
+    const sel = s.id === filterState.split.selected ? 'selected' : '';
+    let metaText, metaClass = '';
+    if (s.status === 'overdue') {
+      const d = overdueDays(s.due_date);
+      metaText = `просрочен ${d} ${plural(d, ['день','дня','дней'])}`;
+      metaClass = 'overdue';
+    } else if (s.status === 'open') {
+      metaText = `срок ${fmtDate(s.due_date)} · ${s.items_count} ${plural(s.items_count, ['товар','товара','товаров'])}`;
+    } else {
+      metaText = `закрыт · ${s.items_count} ${plural(s.items_count, ['товар','товара','товаров'])}`;
+    }
+    html += `<div class="split-item ${sel}" onclick="selectSplitSale(${s.id})">
+      <div class="status-dot ${s.status}"></div>
+      <div>
+        <div class="split-item-title">
+          <span class="split-item-date">${fmtDate(s.date)}</span>
+          <span class="split-item-id">№${s.id}</span>
+        </div>
+        <div class="split-item-meta ${metaClass}">${metaText}</div>
+      </div>
+      <div class="split-item-amounts">
+        <div class="split-item-total">${fmtMoney(s.amount, s.currency)}</div>
+        <div class="split-item-rem ${s.remainder > 0 ? 'has-debt' : ''}">${s.remainder > 0 ? `−${fmtMoney(s.remainder, s.currency)}` : '✓'}</div>
+      </div>
+    </div>`;
+  }
+  if (visible.length === 0) html = `<div style="padding: 40px 20px; text-align: center; color: var(--text-secondary);">Ничего не найдено</div>`;
+  list.innerHTML = html;
+  renderSplitDetail();
+}
+
+function renderSplitDetail() {
+  const g = groups.find(g => g.sale && g.sale.id === filterState.split.selected);
+  const detail = document.getElementById('splitDetail');
+  if (!g) {
+    detail.innerHTML = `<div style="padding: 80px 20px; text-align: center; color: var(--text-secondary);">Выберите долг слева</div>`;
+    return;
+  }
+  const s = g.sale;
+  const isOverdue = s.status === 'overdue', isClosed = s.status === 'closed', isOpen = s.status === 'open';
+  let badgeHtml = '';
+  if (isOverdue) {
+    const d = overdueDays(s.due_date);
+    badgeHtml = `<span class="badge badge-overdue">Просрочен ${d} ${plural(d, ['день','дня','дней'])}</span>`;
+  } else if (isOpen) badgeHtml = `<span class="badge badge-open">Открыт</span>`;
+  else if (isClosed) badgeHtml = `<span class="badge badge-closed">Закрыт</span>`;
+
+  const paid = s.amount - s.remainder;
+  let totalItems = 0;
+
+  detail.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">Долг №${s.id} ${badgeHtml}</div>
+        <div class="detail-meta">${fmtDate(s.date)} · ${s.seller} · ${s.store}</div>
+      </div>
+      <button class="btn">+ Оплата</button>
+    </div>
+    <div class="detail-stats">
+      <div class="detail-stat"><div class="detail-stat-label">Сумма</div><div class="detail-stat-value">${fmtMoney(s.amount, s.currency)}</div><div class="detail-stat-sub">${currencyUnit(s.currency)}</div></div>
+      <div class="detail-stat"><div class="detail-stat-label">Оплачено</div><div class="detail-stat-value success">${fmt(paid)}</div><div class="detail-stat-sub">${Math.round((paid/s.amount)*100)}%</div></div>
+      <div class="detail-stat"><div class="detail-stat-label">Остаток</div><div class="detail-stat-value ${s.remainder > 0 ? 'danger' : ''}">${fmtMoney(s.remainder, s.currency)}</div><div class="detail-stat-sub">${currencyUnit(s.currency)}</div></div>
+      <div class="detail-stat"><div class="detail-stat-label">Срок</div><div class="detail-stat-value" style="font-size: 14px;">${fmtDate(s.due_date)}</div><div class="detail-stat-sub">${isOverdue ? 'просрочен' : (isClosed ? 'закрыт' : 'активный')}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Товары <span style="color: var(--text-secondary); font-weight: 400;">${s.items_count}</span></div>
+      <div class="detail-items">
+        ${g.items.map(it => {
+          const sub = it.qty * it.price;
+          totalItems += sub;
+          return `<div class="detail-item-row">
+            <div class="name">${it.name}</div>
+            <div class="qty">${it.qty} ${it.unit}</div>
+            <div class="price">× ${fmt(it.price)}</div>
+            <div class="sub">${fmt(sub)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">История <span style="color: var(--text-secondary); font-weight: 400;">${g.payments.length + 1}</span></div>
+      <div class="detail-timeline">
+        <div class="timeline-line"></div>
+        <div class="timeline-event">
+          <div class="timeline-marker sale"></div>
+          <div class="timeline-date">${fmtDate(s.date)}</div>
+          <div class="timeline-label">Долг открыт</div>
+          <div class="timeline-amount positive" style="font-variant-numeric: tabular-nums;">+${fmtMoney(s.amount, s.currency)}</div>
+        </div>
+        ${g.payments.map(p => `<div class="timeline-event">
+          <div class="timeline-marker ${p.closes ? 'closing' : 'payment'}"></div>
+          <div class="timeline-date">${fmtDate(p.date)}</div>
+          <div class="timeline-label">Оплата · ${p.method} · ${p.worker}${p.closes ? ' <span class="badge badge-closed" style="margin-left: 6px;">Закрыт</span>' : ''}</div>
+          <div class="timeline-amount negative" style="font-variant-numeric: tabular-nums;">−${fmtMoney(p.amount, p.currency || (p.is_manual ? "UZS" : "UZS"))}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function selectSplitSale(id) {
+  filterState.split.selected = id;
+  renderSplit();
+}
+
+// ============ VIEW 4: PAYMENTS ONLY ============
+// Method ID for CSS classes — handles both Russian and English method names
+const methodKey = m => {
+  const map = { 'Наличные': 'cash', 'Карта': 'card', 'Click': 'click', 'Перечисление': 'transfer', 'Валюта': 'currency', 'Payme': 'payme', 'UzumNasiya': 'uzumnasiya' };
+  return map[m] || 'transfer';
+};
+
+function getAllPayments() {
+  const result = [];
+  for (const g of groups) {
+    const isManual = !g.sale;
+    const debtId = isManual ? g.debt.id : g.sale.id;
+    const debtCreated = isManual ? g.debt.created_at : g.sale.date;
+    const debtTotal = isManual ? g.debt.total_amount : g.sale.amount;
+    const debtRemainder = isManual ? g.debt.remainder : g.sale.remainder;
+    const debtDueDate = isManual ? g.debt.due_date : g.sale.due_date;
+    const debtIsPaid = isManual ? g.debt.is_paid : (g.sale.remainder === 0);
+    const debtComment = isManual ? g.debt.comment : null;
+    const itemsCount = isManual ? 0 : g.sale.items_count;
+    const debtCurrency = isManual ? (g.debt.currency || 'UZS') : (g.sale.currency || 'UZS');
+
+    g.payments.forEach((p, idx) => {
+      const daysAfter = Math.floor((new Date(p.date) - new Date(debtCreated)) / 86400000);
+      result.push({
+        ...p,
+        id_key: `${isManual ? 'm' : 's'}${debtId}-${idx}`,
+        is_manual: isManual,
+        debt_id: debtId,
+        debt_created: debtCreated,
+        debt_total: debtTotal,
+        debt_remainder: debtRemainder,
+        debt_due_date: debtDueDate,
+        debt_is_paid: debtIsPaid,
+        debt_comment: debtComment,
+        debt_currency: debtCurrency,
+        items_count: itemsCount,
+        sale_id: isManual ? null : g.sale.id,
+        store_name: isManual ? g.debt.store : g.sale.store,
+        days_after: daysAfter
+      });
+    });
+  }
+  return result.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+}
+
+function getFilteredPayments() {
+  const f = filterState.payments;
+  let v = getAllPayments();
+  if (f.filter && f.filter !== 'all') {
+    v = v.filter(p => methodKey(p.method) === f.filter);
+  }
+  v = applyDateFilter(v, f, 'date');
+  if (f.search) {
+    v = applyTextSearch(v, f.search, p => [
+      String(p.debt_id),
+      p.sale_id ? String(p.sale_id) : '',
+      String(p.amount),
+      p.method,
+      p.worker,
+      p.date,                                // 2026-03-22
+      fmtDate(p.date),                       // 22.03.2026
+      monthName(p.date),                     // МАРТ 2026
+      monthShort(p.date),                    // мар
+      p.currency || 'UZS',                   // USD/UZS
+      p.debt_comment || ''                   // manual debt description
+    ]);
+  }
+  return v;
+}
+
+// ============ DATE FILTERING ============
+// Returns ISO yyyy-mm-dd for "today" minus N days
+function isoDaysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().substring(0, 10);
+}
+
+function todayISO() { return new Date().toISOString().substring(0, 10); }
+
+// Compute date bounds [from, to] inclusive based on range key
+function resolveDateRange(state) {
+  const today = todayISO();
+  switch (state.dateRange) {
+    case 'today': return [today, today];
+    case 'week': return [isoDaysAgo(6), today];
+    case 'month': return [isoDaysAgo(29), today];
+    case '3months': return [isoDaysAgo(89), today];
+    case 'custom':
+      return [state.dateFrom || '0000-00-00', state.dateTo || '9999-12-31'];
+    default: return null; // 'all' or unset
+  }
+}
+
+function applyDateFilter(items, state, dateField) {
+  const range = resolveDateRange(state);
+  if (!range) return items;
+  return items.filter(item => {
+    const d = item[dateField];
+    return d >= range[0] && d <= range[1];
+  });
+}
+
+// Generic text search supporting date queries
+function applyTextSearch(items, query, getHaystackParts) {
+  const q = query.toLowerCase().trim();
+  if (!q) return items;
+  return items.filter(item => {
+    const parts = getHaystackParts(item);
+    return parts.some(p => p && p.toString().toLowerCase().includes(q));
+  });
+}
+
+function renderPayments() {
+  const all = getAllPayments();
+  if (all.length === 0) return;
+
+  const count = all.length;
+  const last = all[0];
+
+  // Per-currency totals — never sum across currencies
+  const t = computeOverallTotals();
+  document.getElementById('paymentsSubtitle').textContent =
+    `${count} ${plural(count, ['платёж','платежа','платежей'])} · оплачено ${fmtTotalsLine(t.paymentsByCur)} · остаток ${fmtTotalsLine(t.remainderByCur)}`;
+
+  // Method aggregation for tabs
+  const methods = {};
+  all.forEach(p => {
+    const k = methodKey(p.method);
+    if (!methods[k]) methods[k] = { name: p.method, amount: 0, count: 0 };
+    methods[k].amount += p.amount;
+    methods[k].count += 1;
+  });
+  const sortedMethods = Object.entries(methods).sort((a, b) => b[1].amount - a[1].amount);
+
+  const tabs = document.getElementById('paymentTabs');
+  let tabsHtml = `<div class="tab ${filterState.payments.filter === 'all' ? 'active' : ''}" data-filter="all">Все <span class="count">${count}</span></div>`;
+  for (const [k, m] of sortedMethods) {
+    tabsHtml += `<div class="tab ${filterState.payments.filter === k ? 'active' : ''}" data-filter="${k}">${m.name} <span class="count">${m.count}</span></div>`;
+  }
+  tabs.innerHTML = tabsHtml;
+  tabs.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      filterState.payments.filter = t.dataset.filter;
+      renderPayments();
+    });
+  });
+
+  // Monthly chart
+  const firstDate = all[all.length - 1].date;
+  const lastDate = all[0].date;
+  let cy = parseInt(firstDate.substring(0, 4));
+  let cm = parseInt(firstDate.substring(5, 7));
+  const endY = parseInt(lastDate.substring(0, 4));
+  const endM = parseInt(lastDate.substring(5, 7));
+  const buckets = [];
+  while (cy < endY || (cy === endY && cm <= endM)) {
+    buckets.push({ key: `${cy}-${String(cm).padStart(2, '0')}`, year: cy, month: cm, amount: 0, count: 0 });
+    cm++; if (cm > 12) { cm = 1; cy++; }
+  }
+  for (const p of all) {
+    const b = buckets.find(x => x.key === monthKey(p.date));
+    if (b) { b.amount += p.amount; b.count += 1; }
+  }
+  const maxAmount = Math.max(...buckets.map(b => b.amount), 1);
+  const monthsShortLower = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+  document.getElementById('monthlyChart').innerHTML = [...buckets].reverse().map(b => {
+    const pct = (b.amount / maxAmount) * 100;
+    const label = `${monthsShortLower[b.month - 1]} ${String(b.year).slice(2)}`;
+    return `<div class="month-row">
+      <div class="month-row-label">${label}</div>
+      <div class="month-row-bar-wrap">
+        <div class="month-row-bar ${b.amount === 0 ? 'empty' : ''}" style="width: ${pct}%"></div>
+      </div>
+      <div class="month-row-amount ${b.amount === 0 ? 'zero' : ''}">${b.amount > 0 ? fmt(b.amount) : '—'}</div>
+    </div>`;
+  }).join('');
+
+  // Table
+  const visible = getFilteredPayments();
+  const body = document.getElementById('paymentsBody');
+  if (visible.length === 0) {
+    body.innerHTML = `<tr><td colspan="6" style="padding: 60px 20px; text-align: center; color: var(--text-secondary);">Нет платежей</td></tr>`;
+    document.getElementById('paymentsPaginationInfo').textContent = 'Нет платежей';
+    return;
+  }
+
+  let html = '', lastMonth = null;
+  for (const p of visible) {
+    const m = monthKey(p.date);
+    if (m !== lastMonth) {
+      html += `<tr class="month-divider"><td colspan="6">${monthName(p.date)}</td></tr>`;
+      lastMonth = m;
+    }
+    const k = methodKey(p.method);
+    const payCurrency = p.currency || 'UZS';
+    const debtCurrency = p.debt_currency || 'UZS';
+
+    // "Долг" cell — different content for sale-linked vs manual
+    let debtCell;
+    if (p.is_manual) {
+      const truncated = p.debt_comment && p.debt_comment.length > 60
+        ? p.debt_comment.substring(0, 58) + '…'
+        : (p.debt_comment || 'без описания');
+      debtCell = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="manual-tag">Ручной</span>
+          <span class="debt-id-mono">№${p.debt_id}</span>
+          ${debtCurrency !== 'UZS' ? `<span class="currency-badge ${debtCurrency.toLowerCase()}">${debtCurrency}</span>` : ''}
+        </div>
+        <div class="debt-meta-line" title="${(p.debt_comment || '').replace(/"/g, '&quot;')}">«${truncated}»</div>
+      `;
+    } else {
+      debtCell = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <a class="applied-to-id" onclick="event.stopPropagation(); showItems(${p.sale_id})">Долг №${p.sale_id}</a>
+          ${debtCurrency !== 'UZS' ? `<span class="currency-badge ${debtCurrency.toLowerCase()}">${debtCurrency}</span>` : ''}
+        </div>
+        <div class="debt-meta-line">
+          <a class="debt-meta-link" onclick="event.stopPropagation(); showItems(${p.sale_id})">${p.items_count} ${plural(p.items_count, ['товар','товара','товаров'])} →</a>
+          <span style="color: var(--text-tertiary);"> · всего ${fmtMoney(p.debt_total, debtCurrency)} ${debtCurrency === 'UZS' ? 'сум' : ''}</span>
+        </div>
+      `;
+    }
+
+    // Conversion sub-line (when payment currency != UZS, show UZS equivalent)
+    const conversionLine = (payCurrency === 'USD' && p.amount_in_uzs)
+      ? `<div class="currency-conversion">≈ ${fmt(p.amount_in_uzs)} сум · курс ${fmt(p.usd_rate_at_payment)}</div>`
+      : '';
+
+    html += `<tr class="row-payment-only payment-row" data-pay-id="${p.id_key}" onclick="togglePaymentDetail('${p.id_key}')">
+      <td class="tabular">
+        <div>${fmtDate(p.date)}</div>
+        <div class="row-meta">${p.time || ''}</div>
+      </td>
+      <td>
+        <span class="method-tag m-${k}">${p.method}</span>
+      </td>
+      <td class="right tabular" style="white-space: nowrap;">
+        <div style="font-weight: 600;">${fmtMoney(p.amount, payCurrency)}</div>
+        ${conversionLine}
+      </td>
+      <td>${debtCell}</td>
+      <td class="right tabular" style="white-space: nowrap; font-weight: 500; ${p.debt_remainder === 0 ? 'color: var(--text-tertiary); font-weight: 400;' : ''}">${fmtMoney(p.debt_remainder, debtCurrency)}</td>
+      <td style="text-align: center;">
+        <span class="row-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </td>
+    </tr>
+    <tr class="payment-detail-row" id="detail-${p.id_key}" style="display: none;">
+      <td colspan="6" style="padding: 0; background: var(--surface-soft); border-top: 1px solid var(--border);">
+        <div class="payment-detail">
+          <div class="payment-detail-grid">
+            <div><div class="detail-field-label">Время оплаты</div><div class="detail-field-value">${fmtDate(p.date)} в ${p.time || '—'}</div></div>
+            <div><div class="detail-field-label">Кассир</div><div class="detail-field-value">${p.worker}</div></div>
+            <div><div class="detail-field-label">Магазин</div><div class="detail-field-value">${p.store_name || '—'}</div></div>
+            <div><div class="detail-field-label">Тип долга</div><div class="detail-field-value">${p.is_manual ? 'Ручной' : 'Из продажи'}</div></div>
+            <div><div class="detail-field-label">№ долга</div><div class="detail-field-value mono">${p.debt_id}</div></div>
+            ${p.is_manual ? '' : `<div><div class="detail-field-label">№ продажи</div><div class="detail-field-value mono">${p.sale_id}</div></div>`}
+            <div><div class="detail-field-label">Сумма долга</div><div class="detail-field-value tabular">${fmtMoney(p.debt_total, p.debt_currency)} ${currencyUnit(p.debt_currency)}</div></div>
+            <div><div class="detail-field-label">Остаток долга</div><div class="detail-field-value tabular">${fmtMoney(p.debt_remainder, p.debt_currency)} ${currencyUnit(p.debt_currency)}</div></div>
+            <div><div class="detail-field-label">Срок оплаты</div><div class="detail-field-value">${p.debt_due_date ? fmtDate(p.debt_due_date) : '—'}</div></div>
+            <div><div class="detail-field-label">Создан</div><div class="detail-field-value">${fmtDate(p.debt_created)}</div></div>
+            ${p.currency && p.currency !== 'UZS' ? `
+              <div><div class="detail-field-label">Валюта</div><div class="detail-field-value">${p.currency}</div></div>
+              <div><div class="detail-field-label">Курс на момент</div><div class="detail-field-value tabular">${fmt(p.usd_rate_at_payment || 0)}</div></div>
+              <div><div class="detail-field-label">В UZS</div><div class="detail-field-value tabular">${fmt(p.amount_in_uzs || p.amount)} сум</div></div>
+            ` : ''}
+          </div>
+          ${p.is_manual && p.debt_comment ? `
+            <div class="payment-detail-comment">
+              <div class="detail-field-label">Описание долга</div>
+              <div class="detail-field-value" style="font-style: italic;">«${p.debt_comment}»</div>
+            </div>
+          ` : ''}
+          <div class="payment-detail-actions">
+            ${p.is_manual
+              ? `<button class="btn btn-secondary btn-sm">Открыть долг №${p.debt_id}</button>`
+              : `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); showItems(${p.sale_id})">Открыть долг №${p.sale_id}</button>`}
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }
+  body.innerHTML = html;
+  // Filtered totals when any filter is active
+  const fp = filterState.payments;
+  const isFiltered = fp.filter !== 'all' || fp.dateRange !== 'all' || fp.search;
+  let visibleSums = '';
+  if (isFiltered && visible.length) {
+    const byCur = {};
+    visible.forEach(p => { const c = p.currency || 'UZS'; byCur[c] = (byCur[c] || 0) + p.amount; });
+    visibleSums = ` · оплачено ${fmtTotalsLine(byCur)}`;
+  }
+  document.getElementById('paymentsPaginationInfo').textContent =
+    `${visible.length} из ${count} ${plural(count, ['платежа','платежей','платежей'])}${visibleSums}`;
+}
+
+function togglePaymentDetail(idKey) {
+  const row = document.getElementById('detail-' + idKey);
+  const triggerRow = document.querySelector(`.payment-row[data-pay-id="${idKey}"]`);
+  if (!row || !triggerRow) return;
+  const isOpen = row.style.display !== 'none';
+  // Close all other open rows
+  document.querySelectorAll('.payment-detail-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.payment-row').forEach(r => r.classList.remove('expanded'));
+  if (!isOpen) {
+    row.style.display = '';
+    triggerRow.classList.add('expanded');
+  }
+}
+
+// ============ MODAL ============
+function showItems(saleId) {
+  const g = groups.find(g => g.sale && g.sale.id === saleId);
+  if (!g) return;
+  document.getElementById('modalTitle').textContent = `Товары · Долг №${saleId}`;
+  document.getElementById('modalSubtitle').textContent = `${fmtDate(g.sale.date)} · ${g.sale.seller} · ${fmt(g.sale.amount)} сум`;
+  let total = 0;
+  document.getElementById('itemsBody').innerHTML = g.items.map(it => {
+    const sub = it.qty * it.price;
+    total += sub;
+    return `<tr><td class="name">${it.name}</td><td class="right">${it.qty} ${it.unit}</td><td class="right">${fmt(it.price)}</td><td class="right">${fmt(sub)}</td></tr>`;
+  }).join('');
+  document.getElementById('itemsTotal').textContent = fmt(total);
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+// ============ INTERACTIONS ============
+// View switcher
+document.getElementById('viewSwitcher').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    document.querySelectorAll('#viewSwitcher button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + view).classList.add('active');
+  });
+});
+
+// Tabs (per-view)
+document.querySelectorAll('[data-tabs]').forEach(tabsEl => {
+  const viewKey = tabsEl.dataset.tabs;
+  tabsEl.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      tabsEl.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      filterState[viewKey].filter = t.dataset.filter;
+      if (viewKey === 'ledger') renderLedger();
+      else if (viewKey === 'cards') renderCards();
+      else if (viewKey === 'split') renderSplit();
+    });
+  });
+});
+
+// Search inputs
+document.getElementById('ledgerSearch').addEventListener('input', e => { filterState.ledger.search = e.target.value.trim(); renderLedger(); });
+document.getElementById('cardsSearch').addEventListener('input', e => { filterState.cards.search = e.target.value.trim(); renderCards(); });
+document.getElementById('splitSearch').addEventListener('input', e => { filterState.split.search = e.target.value.trim(); renderSplit(); });
+document.getElementById('paymentsSearch').addEventListener('input', e => { filterState.payments.search = e.target.value.trim(); renderPayments(); });
+
+// ============ PERIOD DROPDOWN HANDLERS ============
+const renderForView = { ledger: renderLedger, cards: renderCards, split: renderSplit, payments: renderPayments };
+
+const PRESETS = [
+  { key: 'all',     label: 'Всё время' },
+  { key: 'today',   label: 'Сегодня' },
+  { key: 'week',    label: 'Эта неделя' },
+  { key: 'month',   label: 'Этот месяц' },
+  { key: '3months', label: 'Последние 3 месяца' }
+];
+
+function buildPeriodPopover(viewKey) {
+  const f = filterState[viewKey];
+  const presetsHtml = PRESETS.map(p => `
+    <button class="period-preset ${f.dateRange === p.key ? 'active' : ''}" data-preset="${p.key}">
+      <span>${p.label}</span>
+      ${f.dateRange === p.key ? '<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+    </button>
+  `).join('');
+
+  return `
+    ${presetsHtml}
+    <div class="period-divider"></div>
+    <div class="period-custom-section">
+      <div class="section-label">Свой период</div>
+      <div class="period-custom-row">
+        <label>С</label>
+        <input type="date" data-period-from value="${f.dateFrom || ''}">
+      </div>
+      <div class="period-custom-row">
+        <label>По</label>
+        <input type="date" data-period-to value="${f.dateTo || ''}">
+      </div>
+      <div class="period-custom-actions">
+        <button class="btn btn-secondary btn-sm" data-period-clear>Сбросить</button>
+        <button class="btn btn-sm" data-period-apply>Применить</button>
+      </div>
+    </div>
+  `;
+}
+
+function updatePeriodLabel(viewKey) {
+  const wrap = document.querySelector(`[data-period-target="${viewKey}"]`);
+  if (!wrap) return;
+  const labelEl = wrap.querySelector('[data-period-label]');
+  const f = filterState[viewKey];
+  if (f.dateRange === 'all') {
+    labelEl.innerHTML = '<span class="period-default">Всё время</span>';
+    return;
+  }
+  if (f.dateRange === 'custom') {
+    labelEl.textContent = `${fmtDate(f.dateFrom)} — ${fmtDate(f.dateTo)}`;
+    return;
+  }
+  const preset = PRESETS.find(p => p.key === f.dateRange);
+  labelEl.textContent = preset ? preset.label : '—';
+}
+
+document.querySelectorAll('[data-period-target]').forEach(wrap => {
+  const viewKey = wrap.dataset.periodTarget;
+  const btn = wrap.querySelector('[data-period-btn]');
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    let popover = wrap.querySelector('.period-popover');
+    // Close any other open popovers
+    document.querySelectorAll('.period-popover.open').forEach(p => {
+      if (p !== popover) p.classList.remove('open');
+    });
+    if (popover) {
+      popover.classList.toggle('open');
+      return;
+    }
+    popover = document.createElement('div');
+    popover.className = 'period-popover open';
+    popover.innerHTML = buildPeriodPopover(viewKey);
+    wrap.appendChild(popover);
+    popover.addEventListener('click', e => e.stopPropagation());
+
+    // Wire preset buttons
+    popover.querySelectorAll('[data-preset]').forEach(pb => {
+      pb.addEventListener('click', () => {
+        filterState[viewKey].dateRange = pb.dataset.preset;
+        filterState[viewKey].dateFrom = null;
+        filterState[viewKey].dateTo = null;
+        updatePeriodLabel(viewKey);
+        popover.classList.remove('open');
+        // Rebuild popover so check marks update on next open
+        popover.innerHTML = buildPeriodPopover(viewKey);
+        wirePopover(popover, viewKey);
+        renderForView[viewKey]();
+      });
+    });
+    wirePopover(popover, viewKey);
+  });
+});
+
+function wirePopover(popover, viewKey) {
+  popover.querySelectorAll('[data-preset]').forEach(pb => {
+    pb.onclick = () => {
+      filterState[viewKey].dateRange = pb.dataset.preset;
+      filterState[viewKey].dateFrom = null;
+      filterState[viewKey].dateTo = null;
+      updatePeriodLabel(viewKey);
+      popover.classList.remove('open');
+      popover.innerHTML = buildPeriodPopover(viewKey);
+      wirePopover(popover, viewKey);
+      renderForView[viewKey]();
+    };
+  });
+  const applyBtn = popover.querySelector('[data-period-apply]');
+  const clearBtn = popover.querySelector('[data-period-clear]');
+  if (applyBtn) applyBtn.onclick = () => {
+    const from = popover.querySelector('[data-period-from]').value;
+    const to = popover.querySelector('[data-period-to]').value;
+    if (!from || !to) { alert('Заполните обе даты'); return; }
+    filterState[viewKey].dateRange = 'custom';
+    filterState[viewKey].dateFrom = from;
+    filterState[viewKey].dateTo = to;
+    updatePeriodLabel(viewKey);
+    popover.classList.remove('open');
+    popover.innerHTML = buildPeriodPopover(viewKey);
+    wirePopover(popover, viewKey);
+    renderForView[viewKey]();
+  };
+  if (clearBtn) clearBtn.onclick = () => {
+    filterState[viewKey].dateRange = 'all';
+    filterState[viewKey].dateFrom = null;
+    filterState[viewKey].dateTo = null;
+    updatePeriodLabel(viewKey);
+    popover.classList.remove('open');
+    popover.innerHTML = buildPeriodPopover(viewKey);
+    wirePopover(popover, viewKey);
+    renderForView[viewKey]();
+  };
+}
+
+// Close popovers on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('.period-popover.open').forEach(p => p.classList.remove('open'));
+});
+
+// Column toggle (ledger only)
+const colsBtn = document.getElementById('columnsBtn');
+const colsPopover = document.getElementById('columnsPopover');
+const ledger = document.getElementById('ledger');
+colsBtn.addEventListener('click', e => { e.stopPropagation(); colsPopover.classList.toggle('open'); });
+document.addEventListener('click', e => { if (!colsPopover.contains(e.target) && e.target !== colsBtn) colsPopover.classList.remove('open'); });
+colsPopover.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+  cb.addEventListener('change', () => { ledger.classList.toggle('hide-' + cb.dataset.col, !cb.checked); });
+});
+
+// Modal close
+document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============ CLIENT HEADER BALANCE (multi-currency) ============
+function renderClientBalance() {
+  // Sum remainders by currency across all open debts
+  const totals = {};
+  for (const g of groups) {
+    const isOpen = g.sale ? g.sale.remainder > 0 : !g.debt.is_paid;
+    if (!isOpen) continue;
+    const cur = g.sale ? (g.sale.currency || 'UZS') : (g.debt.currency || 'UZS');
+    const rem = g.sale ? g.sale.remainder : g.debt.remainder;
+    totals[cur] = (totals[cur] || 0) + rem;
+  }
+  const currencies = Object.keys(totals);
+  const el = document.getElementById('clientBalance');
+  if (currencies.length === 0) {
+    el.innerHTML = `<div class="balance-label">Остаток долга</div><div class="balance-amount" style="color: var(--text-tertiary);">0<span class="currency">сум</span></div>`;
+    return;
+  }
+  // Stack currencies vertically. Each is its own line — never mixed, never converted.
+  const html = currencies.map(c => `
+    <div class="balance-line">
+      <span class="balance-amount">${c === 'USD' ? '$' : ''}${fmt(totals[c])}<span class="currency">${c === 'USD' ? '' : 'сум'}</span></span>
+    </div>
+  `).join('');
+  el.innerHTML = `<div class="balance-label">Остаток долга</div>${html}`;
+}
+
+// ============ INITIAL RENDER ============
+renderClientBalance();
+renderLedger();
+renderCards();
+renderSplit();
+renderPayments();
+</script>
+
+</body>
+</html>

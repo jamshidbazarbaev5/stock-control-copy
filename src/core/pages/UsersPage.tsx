@@ -81,17 +81,7 @@ const userFields = (t: any, stores: any[] = []) => [
       label: store.name,
     })),
   },
-  {
-    name: "is_active",
-    label: t("forms.status"),
-    type: "select",
-    placeholder: t("placeholders.select_status"),
-    required: true,
-    options: [
-      { value: true, label: t("common.active") },
-      { value: false, label: t("common.inactive") },
-    ],
-  },
+ 
   {
     name: "is_mobile_user",
     label: t("forms.is_mobile_user"),
@@ -260,21 +250,7 @@ export default function UsersPage() {
       accessorKey: "store_read",
       cell: (user: ExtendedUser) => user.store_read?.name || "-",
     },
-    {
-      header: t("forms.status"),
-      accessorKey: "is_active",
-      cell: (user: ExtendedUser) => (
-        <span
-          className={`text-xs px-2 py-1 rounded-full font-medium ${
-            user.is_active
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {user.is_active ? t("common.active") : t("common.inactive")}
-        </span>
-      ),
-    },
+   
     {
       header: t("forms.is_mobile_user"),
       accessorKey: "is_mobile_user",

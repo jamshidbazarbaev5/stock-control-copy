@@ -219,7 +219,7 @@ export default function ExpensesPage() {
       <ResourceTable
         columns={columns}
         data={expenses}
-        onDelete={currentUser?.is_superuser ? handleDelete : undefined}
+        onDelete={handleDelete}
         onEdit={currentUser?.is_superuser ? handleEdit : undefined}
         isLoading={isLoading}
         currentPage={currentPage}

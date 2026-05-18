@@ -1,16 +1,21 @@
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGetDebtPayments } from '../api/debt';
 import { Card } from '@/components/ui/card';
-import { DollarSign, Store, User2, Calendar, CreditCard } from 'lucide-react';
+import { DollarSign, Store, User2, Calendar, CreditCard, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 
 export default function DebtPaymentsPage() {
   const { t } = useTranslation();
   const { id: debtId } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const clientId = searchParams.get('clientId');
   const { data: payments, isLoading } = useGetDebtPayments(Number(debtId));
 
-  if (isLoading) {
+  if (isLoading || !clientId) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-5xl">
         <Skeleton className="h-12 w-1/3 mb-8" />
@@ -44,10 +49,29 @@ export default function DebtPaymentsPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl animate-in fade-in duration-500">
-      <h1 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent mb-8">
-        <DollarSign className="w-10 h-10 text-emerald-500" />
-        {t('pages.debt_payments')}
-      </h1>
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: t("navigation.clients") || "Клиенты", href: "/clients" },
+          { label: t("pages.debt_details") || "Информация о долге", href: `/debts/${clientId}` },
+          { label: t('pages.debt_payments') || "История платежей" },
+        ]}
+      />
+
+      <div className="flex items-center gap-3 mb-8">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(`/debts/${clientId}`)}
+          className="shrink-0"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h1 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent">
+          <DollarSign className="w-10 h-10 text-emerald-500" />
+          {t('pages.debt_payments')}
+        </h1>
+      </div>
 
       <div className="grid grid-cols-1 gap-4">
         {payments?.map((payment, index) => (

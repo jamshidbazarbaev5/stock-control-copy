@@ -1,199 +1,1183 @@
-import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
-import { useGetDebtsHistory, useCreateDebtPayment, useGetDebtPayments, useDeleteDebtPayment, type DebtsTotals } from "../api/debt";
-import { Card } from "@/components/ui/card";
+import { useState, useMemo, Fragment, type JSX } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import api from "../api/api";
+import {
+  useCreateDebtPayment,
+  useDeleteDebtPayment,
+  type ClientDebtsDetailedResponse,
+  type ClientPaymentsDetailedNewResponse,
+  type DetailedDebt,
+  debtApi,
+} from "../api/debt";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { ResourceForm } from "../helpers/ResourceForm";
 import {
-  Phone,
-  MapPin,
-  DollarSign,
-  Package,
-  ShoppingCart,
-  History,
-  MoreVertical,
-  CheckCircle2,
-  AlertCircle,
-  Receipt,
+  ArrowLeft,
+  ChevronRight,
   ChevronDown,
-  ChevronUp,
+  Search,
+  LayoutList,
+  LayoutGrid,
+  Columns,
+  CreditCard,
+  Package,
+  X,
+  Loader2,
   Trash2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { ResourceForm } from "../helpers/ResourceForm";
-import { ResourceTable } from "../helpers/ResourseTable";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
-import api from "../api/api";
+import "./DebtDetailsPage.css";
 
-interface PaymentFormData {
-  amount: number;
-  payment_method: string;
-  usd_rate_at_payment?: number;
-  target_debt_currency?: "UZS" | "USD";
+// ============ HELPERS ============
+const MONTHS_RU = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+const MONTHS_FULL = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+
+function fmt(n: number | string): string {
+  const num = typeof n === "string" ? parseFloat(n) : n;
+  if (!num && num !== 0) return "0";
+  return Math.abs(Math.round(num)).toLocaleString("ru-RU");
 }
 
+function fmtDecimal(n: number | string): string {
+  const num = typeof n === "string" ? parseFloat(n) : n;
+  if (!num && num !== 0) return "0";
+  const s = Math.abs(num).toFixed(2);
+  const [int, dec] = s.split(".");
+  return parseInt(int).toLocaleString("ru-RU") + (dec !== "00" ? "." + dec : "");
+}
+
+function fmtQuantity(n: number | string): string {
+  const num = typeof n === "string" ? parseFloat(n) : n;
+  if (!num && num !== 0) return "0";
+  // Remove trailing zeros after decimal point
+  return parseFloat(num.toFixed(4)).toString();
+}
+
+function fmtDate(d: string): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  return `${String(dt.getDate()).padStart(2, "0")}.${String(dt.getMonth() + 1).padStart(2, "0")}.${dt.getFullYear()}`;
+}
+
+function fmtTime(d: string): string {
+  if (!d) return "";
+  const dt = new Date(d);
+  return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+}
+
+function getMonthKey(d: string): string {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthLabel(d: string): string {
+  const dt = new Date(d);
+  return `${MONTHS_FULL[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+
+function getShortMonthLabel(key: string): string {
+  const [y, m] = key.split("-");
+  return `${MONTHS_RU[parseInt(m) - 1]} ${y}`;
+}
+
+function statusLabel(s: string): string {
+  const map: Record<string, string> = { open: "Открыт", overdue: "Просрочен", closed: "Закрыт" };
+  return map[s] || s;
+}
+
+function methodCls(m: string): string {
+  const map: Record<string, string> = {
+    "Наличные": "m-cash",
+    "Карта": "m-card",
+    "Click": "m-click",
+    "Payme": "m-click",
+    "Валюта": "m-currency",
+    "Перечисление": "m-card",
+    "UzumNasiya": "m-click",
+  };
+  return map[m] || "";
+}
+
+function pluralPayments(n: number): string {
+  const mod = n % 10;
+  const mod100 = n % 100;
+  if (mod === 1 && mod100 !== 11) return `${n} платёж`;
+  if (mod >= 2 && mod <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} платежа`;
+  return `${n} платежей`;
+}
+
+function getPaymentProgress(debt: DetailedDebt): number {
+  const totalUzs = parseFloat(debt.total_amount_uzs) || 0;
+  const totalUsd = parseFloat(debt.total_amount_usd) || 0;
+  const remUzs = parseFloat(debt.remainder_uzs) || 0;
+  const remUsd = parseFloat(debt.remainder_usd) || 0;
+  if (totalUsd > 0) {
+    const paid = totalUsd - remUsd;
+    return totalUsd > 0 ? Math.min(100, Math.round((paid / totalUsd) * 100)) : 0;
+  }
+  const paid = totalUzs - remUzs;
+  return totalUzs > 0 ? Math.min(100, Math.round((paid / totalUzs) * 100)) : 0;
+}
+
+function initials(name: string): string {
+  return name.split(" ").map(w => w.charAt(0)).join("").substring(0, 2).toUpperCase();
+}
+
+function groupByMonth<T>(items: T[], dateGetter: (item: T) => string): Array<{ month: string; label: string; items: T[] }> {
+  const groups: Record<string, T[]> = {};
+  const order: string[] = [];
+  for (const item of items) {
+    const key = getMonthKey(dateGetter(item));
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(item);
+  }
+  return order.map(key => ({
+    month: key,
+    label: getMonthLabel(groups[key][0] ? dateGetter(groups[key][0]) : ""),
+    items: groups[key],
+  }));
+}
+
+// ============ MAIN COMPONENT ============
 export default function DebtDetailsPage() {
-  const { t } = useTranslation();
   const { id: clientId } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedDebt, setSelectedDebt] = useState<{
-    id: number;
-    remainder: number;
-    remainder_usd?: number;
-    hasUsdDebt?: boolean;
-  } | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
-  const [storeData, setStoreData] = useState<any>(null);
-  const [clientInfo, setClientInfo] = useState<any>(null);
 
-  const { data: debtsData, isLoading } = useGetDebtsHistory(
-    Number(clientId),
-    currentPage,
-  );
-  const createPayment = useCreateDebtPayment();
-
-  const deleteDebt = useMutation({
-    mutationFn: async (debtId: number) => {
-      await api.delete(`/debts/${debtId}/`);
-    },
-    onSuccess: () => {
-      toast.success("Долг успешно удалён");
-      queryClient.invalidateQueries({ queryKey: ["debtsHistory", Number(clientId), currentPage] });
-    },
-    onError: () => {
-      toast.error("Ошибка при удалении долга");
-    },
+  // Restore last active view from localStorage
+  const [activeView, setActiveView] = useState<"ledger" | "cards" | "split" | "payments">(() => {
+    const saved = localStorage.getItem(`debtDetailsView_${clientId}`);
+    return (saved as any) || "cards";
   });
 
-  const debts = debtsData?.results || [];
-  const totalCount = (debtsData as any)?.count || 0;
-  const totals: DebtsTotals | undefined = (debtsData as any)?.totals;
+  // Debts filters
+  const [debtsStatus, setDebtsStatus] = useState("all");
+  const [debtsSearch, setDebtsSearch] = useState("");
+  const [debtsDateFrom, setDebtsDateFrom] = useState("");
+  const [debtsDateTo, setDebtsDateTo] = useState("");
+  const [debtsPage, setDebtsPage] = useState(1);
 
-  // Fetch store data when debts are loaded
-  useEffect(() => {
-    if (debts.length > 0) {
-      const client = debts[0]?.client_read;
-      setClientInfo(client);
-      
-      // If client type is Магазин, fetch the linked store
-      if (client?.type === "Магазин" && client?.linked_store) {
-        const fetchStoreData = async () => {
-          try {
-            const response = await api.get(
-              `/store/${client.linked_store}/`
-            );
-            // Handle both direct response and nested data structure
-            const storeInfo = response?.data || response;
-            setStoreData(storeInfo);
-            console.log("Store data fetched:", storeInfo);
-          } catch (error) {
-            console.error("Failed to fetch store data:", error);
-          }
-        };
-        fetchStoreData();
+  // Payments filters
+  const [paymentsMethod, setPaymentsMethod] = useState("all");
+  const [paymentsSearch, setPaymentsSearch] = useState("");
+  const [paymentsDateFrom, setPaymentsDateFrom] = useState("");
+  const [paymentsDateTo, setPaymentsDateTo] = useState("");
+  const [paymentsPage, setPaymentsPage] = useState(1);
+
+  // UI state
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [expandedPayments, setExpandedPayments] = useState<Set<number>>(new Set());
+  const [selectedSplitId, setSelectedSplitId] = useState<number | null>(null);
+  const [itemsModal, setItemsModal] = useState<DetailedDebt | null>(null);
+  const [itemsModalDebtId, setItemsModalDebtId] = useState<number | null>(null);
+  const [paymentDebtId, setPaymentDebtId] = useState<number | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
+
+  // ======== API QUERIES ========
+  const { data: debtsData, isLoading: debtsLoading } = useQuery<ClientDebtsDetailedResponse>({
+    queryKey: ["clientDebtsDetailed", clientId, debtsPage, debtsStatus, debtsDateFrom, debtsDateTo, debtsSearch],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page: debtsPage.toString() });
+      if (debtsStatus !== "all") p.append("status", debtsStatus);
+      if (debtsDateFrom) p.append("date_from", debtsDateFrom);
+      if (debtsDateTo) p.append("date_to", debtsDateTo);
+      if (debtsSearch) p.append("search", debtsSearch);
+      const res = await api.get(`debts/clients/${clientId}/debts/detailed/?${p}`);
+      return res.data;
+    },
+    enabled: !!clientId,
+  });
+
+  const { data: paymentsData, isLoading: _paymentsLoading } = useQuery<ClientPaymentsDetailedNewResponse>({
+    queryKey: ["clientPaymentsDetailedNew", clientId, paymentsPage, paymentsMethod, paymentsDateFrom, paymentsDateTo, paymentsSearch],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page: paymentsPage.toString() });
+      if (paymentsMethod !== "all") p.append("method", paymentsMethod);
+      if (paymentsDateFrom) p.append("date_from", paymentsDateFrom);
+      if (paymentsDateTo) p.append("date_to", paymentsDateTo);
+      if (paymentsSearch) p.append("search", paymentsSearch);
+      const res = await api.get(`debts/clients/${clientId}/payments/detailed/?${p}`);
+      return res.data;
+    },
+    enabled: !!clientId,
+  });
+
+  const createPayment = useCreateDebtPayment();
+  const deletePayment = useDeleteDebtPayment();
+
+  // Fetch items for modal when itemsModalDebtId is set
+  const { data: itemsDataFromApi, isLoading: itemsLoadingFromApi } = useQuery({
+    queryKey: ["debtItems", itemsModalDebtId],
+    queryFn: () => debtApi.getDebtItems(itemsModalDebtId!),
+    enabled: !!itemsModalDebtId,
+  });
+
+  // ======== DERIVED DATA ========
+  const client = debtsData?.client || paymentsData?.client;
+  const counts = debtsData?.totals?.counts;
+  const debts = debtsData?.results || [];
+  const allPayments = paymentsData?.results || [];
+
+  const selectedDebt = useMemo(() => {
+    if (!selectedSplitId && debts.length) return debts[0];
+    return debts.find(d => d.id === selectedSplitId) || null;
+  }, [selectedSplitId, debts]);
+
+  const monthlyChart = useMemo(() => {
+    const byMonth: Record<string, number> = {};
+    for (const p of allPayments) {
+      const key = getMonthKey(p.paid_at);
+      byMonth[key] = (byMonth[key] || 0) + (p.amount_in_uzs || parseFloat(p.amount) || 0);
+    }
+    const entries = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0]));
+    const max = Math.max(...entries.map(e => e[1]), 1);
+    return entries.map(([k, v]) => ({
+      label: getShortMonthLabel(k),
+      amount: v,
+      pct: Math.round((v / max) * 100),
+    }));
+  }, [allPayments]);
+
+  // ======== HANDLERS ========
+  const toggleCard = (id: number) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePaymentRow = (id: number) => {
+    setExpandedPayments(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handlePaymentSubmit = async (data: any) => {
+    if (!paymentDebtId) return;
+    try {
+      await createPayment.mutateAsync({ debt: paymentDebtId, ...data });
+      queryClient.invalidateQueries({ queryKey: ["clientDebtsDetailed"] });
+      queryClient.invalidateQueries({ queryKey: ["clientPaymentsDetailedNew"] });
+      toast.success("Платеж создан");
+      setPaymentDebtId(null);
+    } catch {
+      toast.error("Ошибка создания платежа");
+    }
+  };
+
+  const handleDeletePayment = async (debtId: number, paymentId: number) => {
+    if (!confirm("Вы уверены, что хотите удалить этот платеж?")) return;
+    
+    try {
+      await deletePayment.mutateAsync({ debtId, paymentId });
+      queryClient.invalidateQueries({ queryKey: ["clientDebtsDetailed"] });
+      queryClient.invalidateQueries({ queryKey: ["clientPaymentsDetailedNew"] });
+      toast.success("Платеж удален");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Ошибка удаления платежа");
+    }
+  };
+
+  // ======== RENDER: CLIENT CARD ========
+  const renderClientCard = () => {
+    if (!client) return null;
+    const rem = debtsData?.totals?.remainder_by_currency || {};
+    return (
+      <div className="client-card">
+        <div className="avatar">{initials(client.name)}</div>
+        <div className="client-info">
+          <div className="client-name">{client.name}</div>
+          <div className="client-meta">
+            {(client as any).phone && <span>{(client as any).phone}</span>}
+            {(client as any).type && <><span className="dot">·</span><span>{(client as any).type}</span></>}
+            {(client as any).last_purchase_date && (
+              <><span className="dot">·</span><span>Посл. покупка: {fmtDate((client as any).last_purchase_date)}</span></>
+            )}
+          </div>
+        </div>
+        <div className="balance">
+          <div className="balance-label">Остаток долга</div>
+          {Object.keys(rem).length === 0 ? (
+            <div className="balance-amount" style={{ color: "var(--text-tertiary)" }}>0<span className="currency">сум</span></div>
+          ) : (
+            Object.entries(rem).map(([cur, val]) => (
+              <div key={cur} className="balance-line">
+                <span className="balance-amount">
+                  {cur === "USD" ? "$" : ""}{cur === "USD" ? fmtDecimal(val) : fmt(val)}
+                  <span className="currency">{cur === "USD" ? "" : " сум"}</span>
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ======== RENDER: VIEW SWITCHER ========
+  const views: [string, string, JSX.Element][] = [
+    ["ledger", "Книга", <LayoutList key="l" />],
+    ["cards", "Карточки", <LayoutGrid key="c" />],
+    ["split", "Разделение", <Columns key="s" />],
+    ["payments", "Платежи", <CreditCard key="p" />],
+  ];
+
+  const renderViewSwitcher = () => (
+    <div className="view-switcher">
+      {views.map(([key, label, icon]) => (
+        <button
+          key={key}
+          className={activeView === key ? "active" : ""}
+          onClick={() => {
+            const newView = key as any;
+            setActiveView(newView);
+            localStorage.setItem(`debtDetailsView_${clientId}`, newView);
+          }}
+        >
+          {icon} {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // ======== RENDER: DEBTS TOOLBAR ========
+  const renderDebtsToolbar = () => (
+    <div className="toolbar">
+      <div className="tabs">
+        {[
+          { key: "all", label: "Все", count: counts?.all },
+          { key: "open", label: "Открытые", count: counts?.open },
+          { key: "overdue", label: "Просроченные", count: counts?.overdue, cls: "danger" },
+          { key: "closed", label: "Закрытые", count: counts?.closed },
+        ].map(t => (
+          <button
+            key={t.key}
+            className={`tab ${debtsStatus === t.key ? "active" : ""} ${t.cls || ""}`}
+            onClick={() => { setDebtsStatus(t.key); setDebtsPage(1); }}
+          >
+            {t.label}
+            {t.count !== undefined && <span className="count">{t.count}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="toolbar-spacer" />
+      <div className="dd-search">
+        <Search />
+        <input
+          placeholder="Поиск..."
+          value={debtsSearch}
+          onChange={e => { setDebtsSearch(e.target.value); setDebtsPage(1); }}
+        />
+        {debtsSearch && (
+          <button style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }} onClick={() => setDebtsSearch("")}>
+            <X style={{ width: 14, height: 14, color: "var(--text-tertiary)" }} />
+          </button>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          type="date"
+          value={debtsDateFrom}
+          onChange={e => { setDebtsDateFrom(e.target.value); setDebtsPage(1); }}
+          className="period-btn"
+        />
+        <input
+          type="date"
+          value={debtsDateTo}
+          onChange={e => { setDebtsDateTo(e.target.value); setDebtsPage(1); }}
+          className="period-btn"
+        />
+      </div>
+    </div>
+  );
+
+  // ======== RENDER: PAGINATION ========
+  const renderPagination = (page: number, totalPages: number, count: number, setPage: (p: number) => void) => {
+    if (!totalPages || totalPages <= 1) return null;
+    return (
+      <div className="pagination">
+        <span className="pagination-info">Показано {Math.min(20, count)} из {count}</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button className="btn btn-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)} style={{ padding: "6px 12px" }}>Назад</button>
+          <span style={{ padding: "7px 12px", fontSize: 13, color: "var(--text-secondary)" }}>{page} / {totalPages}</span>
+          <button className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)} style={{ padding: "6px 12px" }}>Далее</button>
+        </div>
+      </div>
+    );
+  };
+
+  // ======== RENDER: BADGE ========
+  const renderBadge = (status: string, daysOverdue?: number) => {
+    const cls = status === "overdue" ? "badge-overdue" : status === "closed" ? "badge-closed" : "badge-open";
+    return (
+      <span className={`badge ${cls}`}>
+        {statusLabel(status)}
+        {status === "overdue" && daysOverdue ? ` · ${daysOverdue}д` : ""}
+      </span>
+    );
+  };
+
+  // ======== VIEW: LEDGER ========
+  const renderLedger = () => {
+    type LedgerRow =
+      | { type: "month"; label: string }
+      | { type: "debt"; debt: DetailedDebt }
+      | { type: "payment"; debt: DetailedDebt; payment: DetailedDebt["payments"][0] };
+    const rows: LedgerRow[] = [];
+    const monthGroups = groupByMonth(debts, d => d.created_at);
+    for (const g of monthGroups) {
+      rows.push({ type: "month", label: g.label });
+      for (const debt of g.items) {
+        rows.push({ type: "debt", debt });
+        for (const p of debt.payments) {
+          rows.push({ type: "payment", debt, payment: p });
+        }
       }
     }
-  }, [debts]);
 
-  const handleRowClick = (row: any) => {
-    if (row.id === expandedRowId) {
-      setExpandedRowId(null);
-    } else {
-      setExpandedRowId(row.id || null);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("ru-RU", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
-  const formatCurrency = (amount: number | string | undefined) => {
-    return new Intl.NumberFormat("ru-RU").format(Number(amount) || 0);
-  };
-
-  const goToPaymentHistory = (debtId: number) => {
-    navigation(`/debts/${debtId}/payments`);
-  };
-
-  const getAvailableBalance = () => {
-    if (clientInfo?.type !== "Магазин" || !storeData?.budgets || !selectedPaymentMethod) {
-      return 0;
-    }
-
-    const budget = storeData.budgets.find(
-      (b: any) => b.budget_type === selectedPaymentMethod
+    return (
+      <>
+        {renderDebtsToolbar()}
+        <div className="ledger-wrap">
+          <div className="table-scroll">
+            <table className="ledger">
+              <thead>
+                <tr>
+                  <th style={{ width: 90 }}>Дата</th>
+                  <th>Операция</th>
+                  <th>Магазин</th>
+                  <th>Продавец</th>
+                  <th className="right">Сумма</th>
+                  <th className="right">Остаток</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 40, color: "var(--text-tertiary)" }}>Нет данных</td></tr>
+                )}
+                {rows.map((row, i) => {
+                  if (row.type === "month") {
+                    return <tr key={`m-${i}`} className="month-divider"><td colSpan={7}>{row.label}</td></tr>;
+                  }
+                  if (row.type === "debt") {
+                    const d = row.debt;
+                    const hasUsd = parseFloat(d.total_amount_usd) > 0;
+                    return (
+                      <tr
+                        key={`d-${d.id}`}
+                        className={`row-sale ${d.status === "closed" ? "row-closed" : ""}`}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td className="tabular">{fmtDate(d.created_at)}</td>
+                        <td>
+                          <span className="op-name">Долг</span>
+                          <span 
+                            className="sale-id"
+                            style={{ cursor: "pointer", textDecoration: "underline", color: "var(--info)" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setItemsModalDebtId(d.id);
+                            }}
+                          >
+                            {d.sale_id ? `№${d.sale_id}` : `#${d.id}`}
+                          </span>
+                          <span className="badge-inline">{renderBadge(d.status, d.days_overdue)}</span>
+                        </td>
+                        <td>{d.store_name || "—"}</td>
+                        <td>{d.seller_name || "—"}</td>
+                        <td className="right amount-positive">
+                          {hasUsd ? `$${fmtDecimal(d.total_amount_usd)}` : `${fmt(d.total_amount_uzs)} сум`}
+                          {hasUsd && parseFloat(d.total_amount_uzs) > 0 && (
+                            <div className="currency-conversion">≈ {fmt(d.total_amount_uzs)} сум</div>
+                          )}
+                        </td>
+                        <td className="right">
+                          {hasUsd ? (
+                            <span style={{ color: parseFloat(d.remainder_usd) > 0 ? "var(--danger)" : "var(--success)", fontWeight: 500 }}>
+                              ${fmtDecimal(d.remainder_usd)}
+                            </span>
+                          ) : (
+                            <span style={{ color: parseFloat(d.remainder_uzs) > 0 ? "var(--danger)" : "var(--success)", fontWeight: 500 }}>
+                              {fmt(d.remainder_uzs)} сум
+                            </span>
+                          )}
+                        </td>
+                        <td>{renderBadge(d.status)}</td>
+                      </tr>
+                    );
+                  }
+                  if (row.type === "payment") {
+                    const p = row.payment;
+                    return (
+                      <tr key={`p-${p.id}-${i}`} className="row-payment">
+                        <td className="tabular">{fmtDate(p.paid_at)}</td>
+                        <td>
+                          <span className="op-name">Оплата</span>
+                          <span className="sale-id">{p.method}</span>
+                        </td>
+                        <td className="text-muted">—</td>
+                        <td>{p.worker_name || "—"}</td>
+                        <td className="right amount-negative">
+                          −{p.currency === "USD" ? `$${fmtDecimal(p.amount)}` : `${fmt(p.amount)} сум`}
+                        </td>
+                        <td className="right text-muted">—</td>
+                        <td><span className={`method-tag ${methodCls(p.method)}`}>{p.method}</span></td>
+                      </tr>
+                    );
+                  }
+                  return null;
+                })}
+              </tbody>
+            </table>
+          </div>
+          {renderPagination(debtsPage, debtsData?.total_pages || 1, debtsData?.count || 0, setDebtsPage)}
+        </div>
+      </>
     );
-    return budget ? Number(budget.amount) : 0;
   };
 
-  const handlePaymentClick = (debt: {
-    id: number;
-    remainder: string | number;
-    remainder_usd?: string | number;
-    total_amount_usd?: string | number;
-  }) => {
-    const hasUsdDebt = debt.total_amount_usd && Number(debt.total_amount_usd) > 0;
-    setSelectedDebt({
-      id: debt.id,
-      remainder: Number(debt.remainder),
-      remainder_usd: debt.remainder_usd ? Number(debt.remainder_usd) : undefined,
-      hasUsdDebt: !!hasUsdDebt,
-    });
-    setSelectedPaymentMethod("");
-    setIsPaymentModalOpen(true);
+  // ======== VIEW: CARDS ========
+  const renderCards = () => {
+    const monthGroups = groupByMonth(debts, d => d.created_at);
+    return (
+      <>
+        {renderDebtsToolbar()}
+        <div className="cards-list">
+          {monthGroups.length === 0 && (
+            <div style={{ textAlign: "center", padding: 60, color: "var(--text-tertiary)" }}>Нет данных</div>
+          )}
+          {monthGroups.map(g => (
+            <div key={g.month}>
+              <div className="month-header">{g.label}</div>
+              {g.items.map(debt => {
+                const isExpanded = expandedCards.has(debt.id);
+                const hasUsd = parseFloat(debt.total_amount_usd) > 0;
+                const progress = getPaymentProgress(debt);
+                const dt = new Date(debt.created_at);
+
+                return (
+                  <div key={debt.id} className={`card card-${debt.status} ${isExpanded ? "expanded" : ""}`}>
+                    <div className="card-header" onClick={() => toggleCard(debt.id)}>
+                      <div className="card-date">
+                        <div className="day">{dt.getDate()}</div>
+                        <div className="month-short">{MONTHS_RU[dt.getMonth()]}</div>
+                      </div>
+                      <div className="card-info">
+                        <div className="card-title">
+                          {debt.is_manual ? "Ручной долг" : "Долг"}
+                          {debt.sale_id && (
+                            <span 
+                              className="sale-id"
+                              style={{ cursor: "pointer", textDecoration: "underline", color: "var(--info)" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setItemsModalDebtId(debt.id);
+                              }}
+                            >
+                              №{debt.sale_id}
+                            </span>
+                          )}
+                          {renderBadge(debt.status, debt.days_overdue)}
+                        </div>
+                        <div className="card-meta-line">
+                          {debt.store_name && <span>{debt.store_name}</span>}
+                          {debt.seller_name && <><span className="dot">·</span><span>{debt.seller_name}</span></>}
+                          {debt.items_count > 0 && <><span className="dot">·</span><span>{debt.items_count} поз.</span></>}
+                          {debt.payments.length > 0 && <><span className="dot">·</span><span>{pluralPayments(debt.payments.length)}</span></>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div className="card-amounts">
+                          <div className="card-total">
+                            {hasUsd ? `$${fmtDecimal(debt.total_amount_usd)}` : `${fmt(debt.total_amount_uzs)} сум`}
+                          </div>
+                          <div className={`card-remainder ${(parseFloat(debt.remainder_uzs) > 0 || parseFloat(debt.remainder_usd) > 0) ? "has-debt" : ""}`}>
+                            ост: {hasUsd ? `$${fmtDecimal(debt.remainder_usd)}` : `${fmt(debt.remainder_uzs)} сум`}
+                          </div>
+                        </div>
+                        <ChevronRight className="chevron" style={{ width: 18, height: 18 }} />
+                      </div>
+                    </div>
+                    <div className="card-progress">
+                      <div className="card-progress-fill" style={{ width: `${progress}%` }} />
+                    </div>
+
+                    {isExpanded && (
+                      <div className="card-body">
+                        <div className="card-info-grid">
+                          <div>
+                            <div className="info-cell-label">Сумма (UZS)</div>
+                            <div className="info-cell-value">{fmt(debt.total_amount_uzs)}</div>
+                          </div>
+                          <div>
+                            <div className="info-cell-label">Сумма (USD)</div>
+                            <div className="info-cell-value">{parseFloat(debt.total_amount_usd) > 0 ? `$${fmtDecimal(debt.total_amount_usd)}` : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="info-cell-label">Срок</div>
+                            <div className="info-cell-value">{fmtDate(debt.due_date)}</div>
+                          </div>
+                          <div>
+                            <div className="info-cell-label">Курс USD</div>
+                            <div className="info-cell-value">{debt.usd_rate_at_creation ? fmt(debt.usd_rate_at_creation) : "—"}</div>
+                          </div>
+                        </div>
+
+                        {debt.payments.length > 0 && (
+                          <div className="card-section">
+                            <div className="card-section-title">История платежей ({debt.payments.length})</div>
+                            {debt.payments.map(p => (
+                              <div key={p.id} className="timeline-row">
+                                <span className="timeline-date">{fmtDate(p.paid_at)}</span>
+                                <span className="timeline-label">
+                                  <span className={`method-tag ${methodCls(p.method)}`}>{p.method}</span>
+                                  <span style={{ marginLeft: 8, color: "var(--text-secondary)", fontSize: 12 }}>{p.worker_name}</span>
+                                  {p.comment && (
+                                    <span style={{ marginLeft: 8, color: "var(--text-tertiary)", fontSize: 11, fontStyle: "italic" }}>
+                                      · {p.comment}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="timeline-amount negative">
+                                  −{p.currency === "USD" ? `$${fmtDecimal(p.amount)}` : `${fmt(p.amount)} сум`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {debt.items.length > 0 && (
+                          <div className="card-section">
+                            <div className="card-section-title">
+                              <span>Товары ({debt.items.length})</span>
+                              <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => { setItemsModal(debt); setItemsModalDebtId(debt.id); }}>
+                                <Package style={{ width: 12, height: 12 }} /> Подробнее
+                              </button>
+                            </div>
+                            {debt.items.slice(0, 3).map(item => (
+                              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
+                                <span>{item.name} <span style={{ color: "var(--text-tertiary)" }}>× {fmtQuantity(item.qty)} {item.unit}</span></span>
+                                <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{fmt(item.subtotal)} сум</span>
+                              </div>
+                            ))}
+                            {debt.items.length > 3 && (
+                              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>...и ещё {debt.items.length - 3}</div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="card-section" style={{ display: "flex", gap: 8 }}>
+                          {debt.status !== "closed" && (
+                            <button className="btn" onClick={() => setPaymentDebtId(debt.id)}>
+                              <CreditCard /> Принять оплату
+                            </button>
+                          )}
+                          {debt.items.length > 0 && (
+                            <button className="btn btn-secondary" onClick={() => { setItemsModal(debt); setItemsModalDebtId(debt.id); }}>
+                              <Package /> Товары
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          {renderPagination(debtsPage, debtsData?.total_pages || 1, debtsData?.count || 0, setDebtsPage)}
+        </div>
+      </>
+    );
   };
 
-  const handlePaymentSubmit = async (data: PaymentFormData) => {
-    if (!selectedDebt) return;
+  // ======== VIEW: SPLIT ========
+  const renderSplit = () => {
+    const monthGroups = groupByMonth(debts, d => d.created_at);
+    const det = selectedDebt;
 
-    try {
-      await createPayment.mutateAsync({
-        debt: selectedDebt.id,
-        ...data,
-      });
+    return (
+      <>
+        {renderDebtsToolbar()}
+        <div className="split">
+          <div className="split-list-wrap">
+            <div className="split-list">
+              {monthGroups.length === 0 && (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>Нет данных</div>
+              )}
+              {monthGroups.map(g => (
+                <div key={g.month}>
+                  <div className="split-month">{g.label}</div>
+                  {g.items.map(d => {
+                    const hasUsd = parseFloat(d.total_amount_usd) > 0;
+                    return (
+                      <div
+                        key={d.id}
+                        className={`split-item ${det?.id === d.id ? "selected" : ""}`}
+                        onClick={() => setSelectedSplitId(d.id)}
+                      >
+                        <div className={`status-dot ${d.status}`} />
+                        <div>
+                          <div className="split-item-title">
+                            <span className="split-item-date">{fmtDate(d.created_at)}</span>
+                            <span className="split-item-id">{d.sale_id ? `№${d.sale_id}` : `#${d.id}`}</span>
+                          </div>
+                          <div className={`split-item-meta ${d.status === "overdue" ? "overdue" : ""}`}>
+                            {d.store_name || "—"}
+                            {d.status === "overdue" && ` · ${d.days_overdue}д просрочки`}
+                          </div>
+                        </div>
+                        <div className="split-item-amounts">
+                          <div className="split-item-total">{hasUsd ? `$${fmtDecimal(d.total_amount_usd)}` : fmt(d.total_amount_uzs)}</div>
+                          <div className={`split-item-rem ${(parseFloat(d.remainder_uzs) > 0 || parseFloat(d.remainder_usd) > 0) ? "has-debt" : ""}`}>
+                            ост: {hasUsd ? `$${fmtDecimal(d.remainder_usd)}` : fmt(d.remainder_uzs)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {renderPagination(debtsPage, debtsData?.total_pages || 1, debtsData?.count || 0, setDebtsPage)}
+          </div>
 
-      await queryClient.invalidateQueries({
-        queryKey: ["debtsHistory", Number(clientId), currentPage],
-      });
+          <div className="split-detail-wrap">
+            {det ? (
+              <>
+                <div className="detail-header">
+                  <div>
+                    <div className="detail-title">
+                      {det.is_manual ? "Ручной долг" : "Долг"} 
+                      <span 
+                        style={{ cursor: "pointer", textDecoration: "underline", color: "var(--info)", fontFamily: "var(--font-mono)", fontSize: "16px" }}
+                        onClick={() => setItemsModalDebtId(det.id)}
+                      >
+                        {det.sale_id && `№${det.sale_id}`}
+                      </span>
+                      {renderBadge(det.status, det.days_overdue)}
+                    </div>
+                    <div className="detail-meta">
+                      {det.store_name}{det.seller_name && ` · ${det.seller_name}`} · {fmtDate(det.created_at)}
+                    </div>
+                  </div>
+                  {det.status !== "closed" && (
+                    <button className="btn" onClick={() => setPaymentDebtId(det.id)}>
+                      <CreditCard /> Оплата
+                    </button>
+                  )}
+                </div>
 
-      toast.success(t("messages.success.payment_created"));
-      setIsPaymentModalOpen(false);
-      setSelectedDebt(null);
-      window.location.reload();
-    } catch (error) {
-      toast.error(t("messages.error.payment_failed"));
-    }
+                <div className="detail-stats">
+                  <div className="detail-stat">
+                    <div className="detail-stat-label">Сумма (UZS)</div>
+                    <div className="detail-stat-value">{fmt(det.total_amount_uzs)}</div>
+                  </div>
+                  <div className="detail-stat">
+                    <div className="detail-stat-label">Сумма (USD)</div>
+                    <div className="detail-stat-value">{parseFloat(det.total_amount_usd) > 0 ? `$${fmtDecimal(det.total_amount_usd)}` : "—"}</div>
+                  </div>
+                  <div className="detail-stat">
+                    <div className="detail-stat-label">Остаток (UZS)</div>
+                    <div className={`detail-stat-value ${parseFloat(det.remainder_uzs) > 0 ? "dd-danger" : "dd-success"}`}>{fmt(det.remainder_uzs)}</div>
+                  </div>
+                  <div className="detail-stat">
+                    <div className="detail-stat-label">Остаток (USD)</div>
+                    <div className={`detail-stat-value ${parseFloat(det.remainder_usd) > 0 ? "dd-danger" : "dd-success"}`}>
+                      {parseFloat(det.remainder_usd) > 0 ? `$${fmtDecimal(det.remainder_usd)}` : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="detail-section">
+                  <div className="detail-section-title">
+                    <span>Хронология</span>
+                    <span style={{ fontWeight: 400 }}>{pluralPayments(det.payments.length)}</span>
+                  </div>
+                  <div className="detail-timeline" style={{ position: "relative" }}>
+                    {det.payments.length > 0 && <div className="timeline-line" />}
+                    <div className="timeline-event">
+                      <div className="timeline-marker sale" />
+                      <div style={{ color: "var(--text-secondary)", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{fmtDate(det.created_at)}</div>
+                      <div style={{ fontSize: 13 }}>Продажа {det.sale_id && `№${det.sale_id}`}</div>
+                      <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, fontSize: 13 }}>
+                        {parseFloat(det.total_amount_usd) > 0 ? `$${fmtDecimal(det.total_amount_usd)}` : `${fmt(det.total_amount_uzs)} сум`}
+                      </div>
+                    </div>
+                    {det.payments.map(p => (
+                      <div key={p.id} className="timeline-event">
+                        <div className={`timeline-marker ${p.closes_debt ? "closing" : "payment"}`} />
+                        <div style={{ color: "var(--text-secondary)", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{fmtDate(p.paid_at)}</div>
+                        <div style={{ fontSize: 13 }}>
+                          <span className={`method-tag ${methodCls(p.method)}`}>{p.method}</span>
+                          <span style={{ marginLeft: 8, color: "var(--text-secondary)", fontSize: 12 }}>{p.worker_name}</span>
+                          {p.comment && (
+                            <div style={{ marginTop: 4, color: "var(--text-tertiary)", fontSize: 11, fontStyle: "italic" }}>
+                              {p.comment}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, fontSize: 13, color: "var(--success)" }}>
+                          −{p.currency === "USD" ? `$${fmtDecimal(p.amount)}` : `${fmt(p.amount)} сум`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {det.items.length > 0 && (
+                  <div className="detail-section">
+                    <div className="detail-section-title">
+                      <span>Товары ({det.items.length})</span>
+                    </div>
+                    {det.items.map(item => (
+                      <div key={item.id} className="detail-item-row">
+                        <span className="name">{item.name}</span>
+                        <span className="qty">{fmtQuantity(item.qty)} {item.unit}</span>
+                        <span className="price">{fmtDecimal(item.price)}</span>
+                        <span className="sub">{fmtDecimal(item.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="detail-section">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, fontSize: 13 }}>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Задаток</div>
+                      <div style={{ fontWeight: 500 }}>{parseFloat(det.deposit) > 0 ? `${fmt(det.deposit)} (${det.deposit_payment_method})` : "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Курс USD</div>
+                      <div style={{ fontWeight: 500 }}>{det.usd_rate_at_creation ? `${fmt(det.usd_rate_at_creation)} сум` : "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Срок оплаты</div>
+                      <div style={{ fontWeight: 500 }}>{fmtDate(det.due_date)}</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: 60, textAlign: "center", color: "var(--text-tertiary)" }}>Выберите долг из списка</div>
+            )}
+          </div>
+        </div>
+      </>
+    );
   };
 
-  const navigation = useNavigate();
+  // ======== VIEW: PAYMENTS ========
+  const renderPayments = () => {
+    const totals = paymentsData?.totals;
+    const methods = totals?.by_method || {};
+    const methodKeys = ["all", ...Object.keys(methods)];
+    const filteredPayments = paymentsMethod === "all"
+      ? allPayments
+      : allPayments.filter(p => p.method === paymentsMethod);
 
+    return (
+      <>
+        <div className="section-header">
+          <div>
+            <div className="section-title">Платежи</div>
+            <div className="section-subtitle">
+              Всего: {totals?.payment_count || 0}
+              {totals?.paid_by_currency && Object.entries(totals.paid_by_currency).map(([cur, val]) => (
+                <span key={cur} style={{ marginLeft: 12 }}>
+                  {cur === "USD" ? `$${fmtDecimal(val)}` : `${fmt(val)} сум`}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="dd-search">
+              <Search />
+              <input
+                placeholder="Поиск..."
+                value={paymentsSearch}
+                onChange={e => { setPaymentsSearch(e.target.value); setPaymentsPage(1); }}
+              />
+              {paymentsSearch && (
+                <button style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }} onClick={() => setPaymentsSearch("")}>
+                  <X style={{ width: 14, height: 14, color: "var(--text-tertiary)" }} />
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input type="date" value={paymentsDateFrom} onChange={e => { setPaymentsDateFrom(e.target.value); setPaymentsPage(1); }} className="period-btn" />
+              <input type="date" value={paymentsDateTo} onChange={e => { setPaymentsDateTo(e.target.value); setPaymentsPage(1); }} className="period-btn" />
+            </div>
+          </div>
+        </div>
 
+        {monthlyChart.length > 0 && (
+          <div className="quiet-chart">
+            <div className="quiet-chart-label">По месяцам</div>
+            {monthlyChart.map((m, i) => (
+              <div key={i} className="month-row">
+                <div className="month-row-label">{m.label}</div>
+                <div className="month-row-bar-wrap">
+                  <div className="month-row-bar" style={{ width: `${m.pct}%` }} />
+                </div>
+                <div className={`month-row-amount ${m.amount === 0 ? "zero" : ""}`}>{fmt(m.amount)} сум</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="toolbar">
+          <div className="tabs">
+            {methodKeys.map(k => {
+              const info = k === "all" ? null : methods[k];
+              const label = k === "all" ? "Все" : k;
+              const count = k === "all" ? (totals?.payment_count || 0) : (info?.count || 0);
+              return (
+                <button
+                  key={k}
+                  className={`tab ${paymentsMethod === k ? "active" : ""}`}
+                  onClick={() => { setPaymentsMethod(k); setPaymentsPage(1); }}
+                >
+                  {label}
+                  <span className="count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="ledger-wrap">
+          <div className="table-scroll">
+            <table className="ledger">
+              <thead>
+                <tr>
+                  <th style={{ width: 24 }}></th>
+                  <th style={{ width: 90 }}>Дата</th>
+                  <th className="right">Сумма</th>
+                  <th>Способ</th>
+                  <th>Долг</th>
+                  <th>Сотрудник</th>
+                  <th>Эффект</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 40, color: "var(--text-tertiary)" }}>Нет платежей</td></tr>
+                )}
+                {filteredPayments.map((p:any, idx) => {
+                  const isExp = expandedPayments.has(p.id);
+                  return (
+                    <Fragment key={p.id}>
+                      <tr
+                        className={`payment-row ${isExp ? "expanded" : ""}`}
+                        onClick={() => togglePaymentRow(p.id)}
+                        style={{ background: idx % 2 === 0 ? "var(--surface)" : "var(--surface-soft)" }}
+                      >
+                        <td>
+                          <span className="row-chevron">
+                            <ChevronDown style={{ width: 14, height: 14, transition: "transform 0.2s", transform: isExp ? "rotate(180deg)" : "rotate(0)" }} />
+                          </span>
+                        </td>
+                        <td>
+                          <div className="date-with-time">
+                            <span className="date-main">{fmtDate(p.paid_at)}</span>
+                            <span className="date-time">{fmtTime(p.paid_at)}</span>
+                          </div>
+                        </td>
+                        <td className="right" style={{ fontWeight: 500, color: "var(--success)" }}>
+                          {p.currency === "USD" ? `$${fmtDecimal(p.amount)}` : `${fmt(p.amount)} сум`}
+                          {p.amount_in_uzs && p.currency === "USD" && (
+                            <div className="currency-conversion">≈ {fmt(p.amount_in_uzs)} сум</div>
+                          )}
+                        </td>
+                        <td><span className={`method-tag ${methodCls(p.method)}`}>{p.method}</span></td>
+                        <td>
+                          <div className="applied-to">
+                            <span 
+                              className="applied-to-id" 
+                              style={{ cursor: "pointer", textDecoration: "underline" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setItemsModalDebtId(p.debt.id);
+                              }}
+                            >
+                              {p.debt.sale_id ? `Продажа №${p.debt.sale_id}` : `Долг #${p.debt.id}`}
+                            </span>
+                            <span className="applied-to-meta">{p.debt.store_name} · срок {fmtDate(p.debt.due_date)}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: "var(--text-secondary)" }}>{p.worker_name || "—"}</td>
+                        <td>
+                          {p.closes_debt ? (
+                            <span className="effect-badge effect-closed">Закрыл</span>
+                          ) : (
+                            <span className="effect-badge effect-partial">Частично</span>
+                          )}
+                        </td>
+                      </tr>
+                      {isExp && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: 0 }}>
+                            <div className="payment-detail">
+                              <div className="payment-detail-grid">
+                                <div>
+                                  <div className="detail-field-label">Сумма платежа</div>
+                                  <div className="detail-field-value tabular-val">
+                                    {p.currency === "USD" ? `$${fmtDecimal(p.amount)}` : `${fmt(p.amount)} сум`}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Сумма в UZS</div>
+                                  <div className="detail-field-value tabular-val">{p.amount_in_uzs ? `${fmt(p.amount_in_uzs)} сум` : "—"}</div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Курс USD</div>
+                                  <div className="detail-field-value tabular-val">{p.usd_rate_at_payment ? fmt(p.usd_rate_at_payment) : "—"}</div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Валюта долга</div>
+                                  <div className="detail-field-value">{p.target_debt_currency}</div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Остаток долга (UZS)</div>
+                                  <div className="detail-field-value tabular-val" style={{ color: parseFloat(p.debt.remainder_uzs) > 0 ? "var(--danger)" : "var(--success)" }}>
+                                    {fmt(p.debt.remainder_uzs)} сум
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Остаток долга (USD)</div>
+                                  <div className="detail-field-value tabular-val" style={{ color: parseFloat(p.debt.remainder_usd) > 0 ? "var(--danger)" : "var(--success)" }}>
+                                    {parseFloat(p.debt.remainder_usd) > 0 ? `$${fmtDecimal(p.debt.remainder_usd)}` : "—"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Задаток</div>
+                                  <div className="detail-field-value tabular-val">
+                                    {parseFloat(p.debt.deposit) > 0 ? `${fmt(p.debt.deposit)} (${p.debt.deposit_payment_method})` : "—"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-field-label">Товаров в долге</div>
+                                  <div className="detail-field-value">{p.debt.items_count}</div>
+                                </div>
+                              </div>
+                              {p.comment && (
+                                <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-soft)", borderRadius: "var(--radius)", fontSize: 13 }}>
+                                  <div style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Комментарий</div>
+                                  <div style={{ color: "var(--text)", fontStyle: "italic" }}>{p.comment}</div>
+                                </div>
+                              )}
+                              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ padding: "6px 12px", fontSize: 12, color: "var(--danger)", borderColor: "var(--danger)" }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePayment(p.debt.id, p.id);
+                                  }}
+                                  disabled={deletePayment.isPending}
+                                >
+                                  <Trash2 style={{ width: 14, height: 14 }} />
+                                  {deletePayment.isPending ? "Удаление..." : "Удалить платеж"}
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {renderPagination(paymentsPage, paymentsData?.total_pages || 1, paymentsData?.count || 0, setPaymentsPage)}
+        </div>
+      </>
+    );
+  };
+
+  // ======== ITEMS MODAL ========
+  const renderItemsModal = () => {
+    const debtId = itemsModalDebtId || itemsModal?.id;
+    if (!debtId) return null;
+
+    const items = itemsDataFromApi?.results || [];
+    const total = items.reduce((s: number, i: any) => s + parseFloat(i.subtotal || 0), 0);
+    const debt = itemsModal || { id: itemsDataFromApi?.debt_id, sale_id: itemsDataFromApi?.sale_id };
+
+    return (
+      <div className="modal-backdrop" onClick={() => { setItemsModal(null); setItemsModalDebtId(null); }}>
+        <div className="dd-modal" onClick={e => e.stopPropagation()}>
+          <div className="dd-modal-header">
+            <div>
+              <div className="dd-modal-title">
+                Товары — {debt?.sale_id ? `Продажа №${debt.sale_id}` : `Долг #${debtId}`}
+              </div>
+              {itemsModal && <div className="dd-modal-subtitle">{itemsModal.store_name} · {fmtDate(itemsModal.created_at)}</div>}
+            </div>
+            <button className="dd-modal-close" onClick={() => { setItemsModal(null); setItemsModalDebtId(null); }}>×</button>
+          </div>
+          <div className="dd-modal-body">
+            {itemsLoadingFromApi ? (
+              <div style={{ textAlign: "center", padding: 40 }}>
+                <Loader2 className="dd-spinner" />
+              </div>
+            ) : items.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "var(--text-tertiary)" }}>
+                Нет товаров
+              </div>
+            ) : (
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th>Наименование</th>
+                    <th className="right">Кол-во</th>
+                    <th className="right">Цена</th>
+                    <th className="right">Итого</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="name-cell">{item.name}</td>
+                      <td className="right">{fmtQuantity(item.qty)} {item.unit}</td>
+                      <td className="right">{fmtDecimal(item.price || 0)}</td>
+                      <td className="right" style={{ fontWeight: 500 }}>{fmtDecimal(item.subtotal || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "right" }}>Итого</td>
+                    <td className="right">{fmtDecimal(total)} сум</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ======== PAYMENT DIALOG FIELDS ========
   const paymentFields = [
     {
       name: "target_debt_currency",
-      label: t("forms.target_debt_currency") || "Валюта долга",
+      label: "Валюта долга",
       type: "select",
-      placeholder: t("placeholders.select_currency") || "Выберите валюту",
+      placeholder: "Выберите валюту",
       required: true,
       options: [
         { value: "UZS", label: "UZS" },
@@ -202,632 +1186,68 @@ export default function DebtDetailsPage() {
     },
     {
       name: "amount",
-      label:
-        selectedPaymentMethod === "Валюта"
-          ? t("forms.amount") + " (USD)"
-          : t("forms.amount"),
+      label: selectedPaymentMethod === "Валюта" ? "Сумма (USD)" : "Сумма",
       type: "number",
-      placeholder: t("placeholders.enter_amount"),
+      placeholder: "Введите сумму",
       required: true,
     },
     {
       name: "payment_method",
-      label: t("forms.payment_method"),
+      label: "Способ оплаты",
       type: "select",
-      placeholder: t("placeholders.select_payment_method"),
+      placeholder: "Выберите способ",
       required: true,
       options: [
-        { value: "Наличные", label: t("payment.cash") },
-        { value: "Click", label: t("payment.click") },
-        { value: "Карта", label: t("payment.card") },
-        { value: "Перечисление", label: t("payment.per") },
-        { value: "Валюта", label: t("forms.currency") || "Валюта" },
+        { value: "Наличные", label: "Наличные" },
+        { value: "Click", label: "Click" },
+        { value: "Карта", label: "Карта" },
+        { value: "Перечисление", label: "Перечисление" },
+        { value: "Валюта", label: "Валюта" },
       ],
-      onChange: (value: string) => setSelectedPaymentMethod(value),
+      onChange: (val: string) => setSelectedPaymentMethod(val),
     },
     {
       name: "usd_rate_at_payment",
-      label: t("forms.usd_rate_at_payment") || "Курс USD при оплате",
+      label: "Курс USD при оплате",
       type: "number",
-      placeholder: t("placeholders.enter_usd_rate") || "Введите курс USD",
+      placeholder: "Введите курс",
       required: true,
     },
   ];
 
-  const PaymentHistorySection = ({ debtId }: { debtId: number }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const { data: payments, isLoading } = useGetDebtPayments(debtId);
-    const deletePayment = useDeleteDebtPayment();
-
-    const paymentCount = payments?.length || 0;
-
-    const handleDeletePayment = async (paymentId: number) => {
-      if (!confirm(t("messages.confirm_delete_payment") || "Вы уверены, что хотите удалить этот платеж?")) {
-        return;
-      }
-      try {
-        await deletePayment.mutateAsync({ debtId, paymentId });
-        toast.success(t("messages.success.payment_deleted") || "Платеж успешно удален");
-      } catch (error) {
-        toast.error(t("messages.error.payment_delete_failed") || "Ошибка при удалении платежа");
-      }
-    };
-
+  // ======== LOADING STATE ========
+  if (debtsLoading && !debtsData && !paymentsData) {
     return (
-      <div className="bg-card rounded-lg border overflow-hidden">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(!isOpen);
-          }}
-          className="w-full bg-muted/50 px-4 py-2 border-b flex items-center justify-between hover:bg-muted/70 transition-colors"
-        >
-          <h4 className="text-sm font-semibold flex items-center gap-2 text-blue-700">
-            <Receipt className="w-4 h-4" />
-            {t("forms.payment_history") || "История платежей"}
-            {paymentCount > 0 && (
-              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">
-                {paymentCount}
-              </span>
-            )}
-          </h4>
-          {isOpen ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
-
-        {isOpen && (
-          <>
-            {isLoading ? (
-              <div className="p-4">
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : !payments || payments.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">
-                {t("messages.no_payments_yet") || "Нет платежей"}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
-                        {t("forms.payment_date") || "Дата"}
-                      </th>
-                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">
-                        {t("forms.amount") || "Сумма"}
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
-                        {t("forms.payment_method") || "Способ оплаты"}
-                      </th>
-                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">
-                        {t("forms.usd_rate") || "Курс USD"}
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-muted-foreground">
-                        {t("forms.worker") || "Сотрудник"}
-                      </th>
-                      <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16">
-                        {t("common.actions") || ""}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((payment: any) => (
-                      <tr key={payment.id} className="border-b hover:bg-muted/20">
-                        <td className="py-2 px-4">
-                          {new Date(payment.paid_at).toLocaleDateString("ru-RU")}
-                        </td>
-                        <td className="text-right py-2 px-4 font-semibold text-emerald-600">
-                          {formatCurrency(payment.amount)}
-                        </td>
-                        <td className="py-2 px-4">{payment.payment_method}</td>
-                        <td className="text-right py-2 px-4">
-                          {payment.usd_rate_at_payment ? formatCurrency(payment.usd_rate_at_payment) : "-"}
-                        </td>
-                        <td className="py-2 px-4">{payment.worker_read?.name || "-"}</td>
-                        <td className="text-center py-2 px-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePayment(payment.id);
-                            }}
-                            disabled={deletePayment.isPending}
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
-
-  const renderExpandedRow = (debt: any) => {
-    return (
-      <div className="bg-muted/30 border-t">
-        {/* Payment Summary - 3x3 Grid */}
-        <div className="p-4">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Row 1 */}
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.total_amount_uzs") || "Общая сумма (UZS)"}
-              </div>
-              <div className="font-semibold text-emerald-600">
-                {formatCurrency(debt.total_amount_uzs)} UZS
-              </div>
-            </div>
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.total_amount_usd") || "Общая сумма (USD)"}
-              </div>
-              <div className="font-semibold text-blue-600">
-                {(debt as any).total_amount_usd && Number((debt as any).total_amount_usd) > 0
-                  ? `${formatCurrency((debt as any).total_amount_usd)} $`
-                  : "-"}
-              </div>
-            </div>
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.usd_rate_at_creation") || "Курс USD при создании"}
-              </div>
-              <div className="font-semibold">
-                {debt.usd_rate_at_creation ? `${formatCurrency(debt.usd_rate_at_creation)} UZS` : "-"}
-              </div>
-            </div>
-            {/* Row 2 */}
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.deposit") || "Задаток"}
-              </div>
-              <div className="font-semibold">{formatCurrency(debt.deposit)}</div>
-            </div>
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.remainder_uzs") || "Остаток (UZS)"}
-              </div>
-              <div
-                className={`font-semibold ${
-                  Number(debt.remainder_uzs) <= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {formatCurrency(debt.remainder_uzs)} UZS
-              </div>
-            </div>
-            <div className="bg-card rounded-lg p-3 border">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("forms.remainder_usd") || "Остаток (USD)"}
-              </div>
-              <div
-                className={`font-semibold ${
-                  Number((debt as any).remainder_usd) <= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {(debt as any).remainder_usd && Number((debt as any).remainder_usd) > 0
-                  ? `${formatCurrency((debt as any).remainder_usd)} $`
-                  : "-"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sale Items Table */}
-        <div className="p-4 pt-0">
-          <div className="bg-card rounded-lg border overflow-hidden">
-            <div className="bg-muted/50 px-4 py-2 border-b">
-              <h4 className="text-sm font-semibold flex items-center gap-2 text-emerald-700">
-                <ShoppingCart className="w-4 h-4" />
-                {t("forms.sale_items")}
-              </h4>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">
-                      {t("forms.product")}
-                    </th>
-                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-20">
-                      {t("forms.quantity")}
-                    </th>
-                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-24">
-                      {t("forms.price_per_unit")}
-                    </th>
-                    <th className="text-right py-2 px-4 font-medium text-muted-foreground w-24">
-                      {t("forms.subtotal")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {debt.sale_read?.sale_items?.map((item: any) => (
-                    <tr key={item.id} className="border-b hover:bg-muted/20">
-                      <td className="py-2 px-4">
-                        <div className="flex items-start gap-2">
-                          <Package className="w-4 h-4 text-emerald-500 mt-0.5" />
-                          <div>
-                            <div className="font-medium">{item.product_read.product_name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.product_read?.category_read?.category_name}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="text-right py-2 px-4">{item.quantity}</td>
-                      <td className="text-right py-2 px-4">
-                        {formatCurrency(item.price_per_unit)}
-                      </td>
-                      <td className="text-right py-2 px-4 font-medium">
-                        {formatCurrency(item.subtotal)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-muted/40 font-semibold">
-                    <td colSpan={3} className="text-right py-3 px-4">
-                      {t("forms.total_amount")}
-                    </td>
-                    <td className="text-right py-3 px-4 text-emerald-600">
-                      {formatCurrency(debt.total_amount)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment History */}
-        <div className="p-4 pt-0">
-          {/* Sale Charges Section */}
-          {debt.sale_read?.sale_charges?.length > 0 && (
-            <div className="bg-card rounded-lg border overflow-hidden mb-4">
-              <div className="bg-muted/50 px-4 py-2 border-b">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-orange-700">
-                  <Package className="w-4 h-4" />
-                  {t("forms.sale_charges") || "Доп. начисления"}
-                </h4>
-              </div>
-              <div className="p-4">
-                <div className="space-y-2">
-                  {debt.sale_read.sale_charges.map((charge: any) => (
-                    <div
-                      key={charge.id}
-                      className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded px-3 py-2"
-                    >
-                      <span className="text-sm text-gray-700">
-                        {charge.charge_type_name || `Тип #${charge.charge_type}`}
-                      </span>
-                      <span className="font-semibold text-orange-700">
-                        {formatCurrency(charge.amount)} UZS
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center bg-orange-100 rounded px-3 py-2 font-semibold text-orange-800 border-t-2 border-orange-300 mt-2">
-                    <span>Итого начислений:</span>
-                    <span>
-                      {formatCurrency(
-                        debt.sale_read.sale_charges.reduce(
-                          (sum: number, c: any) => sum + parseFloat(c.amount || 0),
-                          0
-                        )
-                      )}{" "}
-                      UZS
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <PaymentHistorySection debtId={debt.id} />
-        </div>
-      </div>
-    );
-  };
-
-  const columns = [
-    
-   {   
-    header: t("common.sale_id"),
-      accessorKey: "sale_id",
-      cell: (row: any) => (row?.sale_read?.sale_id),
-    },
-    {
-      header: t("common.date"),
-      accessorKey: "created_at",
-      cell: (row: any) => formatDate(row.created_at),
-    },
-    {
-      header: t("forms.due_date"),
-      accessorKey: "due_date",
-      cell: (row: any) => formatDate(row.due_date),
-    },
-    {
-      header: t("common.total_amount") + " (UZS)",
-      accessorKey: "total_amount_uzs",
-      cell: (row: any) => (
-        <span className="font-semibold text-emerald-600">
-          {formatCurrency(row.total_amount_uzs)} UZS
-        </span>
-      ),
-    },
-    {
-      header: t("common.total_amount") + " (USD)",
-      accessorKey: "total_amount_usd",
-      cell: (row: any) =>
-        row.total_amount_usd && Number(row.total_amount_usd) > 0 ? (
-          <span className="font-semibold text-blue-600">
-            {formatCurrency(row.total_amount_usd)} $
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        ),
-    },
-    {
-      header: t("forms.remainder_uzs"),
-      accessorKey: "remainder_uzs",
-      cell: (row: any) => (
-        <span
-          className={`font-semibold ${
-            Number(row.remainder_uzs) < 0 ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {formatCurrency(row.remainder_uzs)}
-        </span>
-      ),
-    },
-    {
-      header: t("forms.remainder_usd"),
-      accessorKey: "remainder_usd",
-      cell: (row: any) =>
-        row.remainder_usd && Number(row.remainder_usd) > 0 ? (
-          <span
-            className={`font-semibold ${
-              Number(row.remainder_usd) < 0 ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {formatCurrency(row.remainder_usd)} $
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        ),
-    },
-    {
-      header: t("common.status"),
-      accessorKey: "is_paid",
-      cell: (row: any) => (
-        <span
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-            row.is_paid
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {row.is_paid ? (
-            <CheckCircle2 className="w-3 h-3" />
-          ) : (
-            <AlertCircle className="w-3 h-3" />
-          )}
-          {row.is_paid ? t("common.paid") : t("common.unpaid")}
-        </span>
-      ),
-    },
-    {
-      header: t("common.actions"),
-      accessorKey: "actions",
-      cell: (row: any) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                goToPaymentHistory(row.id);
-              }}
-            >
-              <History className="w-4 h-4 mr-2" />
-              {t("forms.payment_history")}
-            </DropdownMenuItem>
-            {!row.is_paid && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePaymentClick({
-                    id: row.id,
-                    remainder: Number(row.remainder),
-                    remainder_usd: (row as any).remainder_usd,
-                    total_amount_usd: (row as any).total_amount_usd,
-                  });
-                }}
-              >
-                <DollarSign className="w-4 h-4 mr-2" />
-                {t("forms.add_payment")}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              className="text-red-600 focus:text-red-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm("Вы уверены, что хотите удалить этот долг?")) {
-                  deleteDebt.mutate(row.id);
-                }
-              }}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              {t("common.delete") || "Удалить"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-6">
-        <Skeleton className="h-8 w-64 mb-6" />
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+      <div className="dd" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
+        <Loader2 className="dd-spinner" />
       </div>
     );
   }
 
-  if (!Array.isArray(debts) || debts.length === 0) {
-    return (
-      <div className="container mx-auto py-16 px-4 text-center">
-        <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-muted-foreground">
-          {t("common.no_data")}
-        </h2>
-        <p className="text-muted-foreground mt-2">
-          {debts[0]?.client_read?.name || ""}
-        </p>
-      </div>
-    );
-  }
-
+  // ======== MAIN RENDER ========
   return (
-    <div className="container mx-auto py-4 sm:py-6 md:py-8 px-2 sm:px-4">
-      {/* Header with client info */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-emerald-500/10 p-2 rounded-lg">
-            <DollarSign className="w-6 h-6 text-emerald-500" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">
-              {t("pages.debt_details")} - {debts[0]?.client_read?.name}
-            </h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Phone className="w-4 h-4" />
-                {debts[0]?.client_read?.phone_number}
-              </span>
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {debts[0]?.client_read?.address}
-              </span>
-            </div>
-          </div>
-        </div>
+    <div className="dd">
+      <div style={{ marginBottom: 16 }}>
+        <button className="btn btn-secondary" onClick={() => navigate(-1)} style={{ padding: "6px 12px" }}>
+          <ArrowLeft style={{ width: 16, height: 16 }} /> Назад
+        </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("common.total_debt")} (UZS)
-          </div>
-          <div className="text-xl font-bold text-emerald-600">
-            {formatCurrency(totals?.total_amount_uzs || 0)} UZS
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("common.total_debt")} (USD)
-          </div>
-          <div className="text-xl font-bold text-blue-600">
-            {formatCurrency(totals?.total_amount_usd || 0)} $
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("common.total_deposit")}
-          </div>
-          <div className="text-xl font-bold">
-            {formatCurrency(totals?.deposit || 0)} UZS
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("dashboard.remaining_debt")} (UZS)
-          </div>
-          <div className="text-xl font-bold text-red-600">
-            {formatCurrency(totals?.remainder_uzs || 0)} UZS
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("dashboard.remaining_debt")} (USD)
-          </div>
-          <div className="text-xl font-bold text-red-600">
-            {formatCurrency(totals?.remainder_usd || 0)} $
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground mb-1">
-            {t("common.paid_debts")}
-          </div>
-          <div className="text-xl font-bold text-emerald-600">
-            {totals?.paid_debts || 0} / {totals?.total_debts || 0}
-          </div>
-        </Card>
-      </div>
+      {renderClientCard()}
+      {renderViewSwitcher()}
 
-      {/* Main Table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="min-w-[800px]">
-            <ResourceTable
-              data={debts}
-              columns={columns}
-              isLoading={isLoading}
-              totalCount={totalCount}
-              pageSize={20}
-              currentPage={currentPage}
-              onPageChange={(newPage) => {
-                setCurrentPage(newPage);
-                setExpandedRowId(null);
-              }}
-              expandedRowRenderer={(row: any) => renderExpandedRow(row)}
-              onRowClick={(row: any) => handleRowClick(row)}
-            />
-          </div>
-        </div>
-      </Card>
+      {activeView === "ledger" && renderLedger()}
+      {activeView === "cards" && renderCards()}
+      {activeView === "split" && renderSplit()}
+      {activeView === "payments" && renderPayments()}
 
-      {/* Payment Dialog */}
-      <Dialog
-        open={isPaymentModalOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            window.location.reload();
-          }
-          setIsPaymentModalOpen(open);
-        }}
-      >
+      {renderItemsModal()}
+
+      <Dialog open={!!paymentDebtId} onOpenChange={(open) => { if (!open) setPaymentDebtId(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("forms.add_payment")}</DialogTitle>
+            <DialogTitle>Принять оплату</DialogTitle>
           </DialogHeader>
-          {clientInfo?.type === "Магазин" && selectedPaymentMethod && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="text-sm text-blue-700">
-                <div className="font-semibold mb-2">{t("forms.available_balance") || "Available Balance"}</div>
-                <div className="text-lg font-bold text-blue-900">
-                  {formatCurrency(getAvailableBalance())}
-                  {selectedPaymentMethod === "Валюта" ? " $" : ""}
-                </div>
-              </div>
-            </div>
-          )}
           <ResourceForm
             fields={paymentFields}
             onSubmit={handlePaymentSubmit}

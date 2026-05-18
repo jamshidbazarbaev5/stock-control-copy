@@ -37,6 +37,7 @@ import ClientsPage from "./core/pages/ClientsPage";
 import CreateClient from "./core/pages/create-client";
 import EditClient from "./core/pages/edit-client";
 import ClientHistoryPage from "./core/pages/ClientHistoryPage";
+// import ClientPaymentHistoryPage from "./core/pages/ClientPaymentHistoryPage";
 import SalesPage from "./core/pages/SalesPage";
 import { Toaster } from "sonner";
 import { ErrorModal } from "./core/components/ErrorModal";
@@ -47,6 +48,7 @@ import CreateStaff from "./core/pages/create-staff";
 import IncomeDetailsPage from "./core/pages/IncomeDetailsPage";
 // import EditSale from "÷./core/pages/edit-sale";
 import DebtDetailsPage from "./core/pages/DebtDetailsPage";
+import SupplierDebtDetailsPage from "./core/pages/SupplierDebtDetailsPage";
 import DeletedPaymentsPage from "./core/pages/DeletedPaymentsPage";
 import CreateSale from "./core/pages/create-sale";
 import ExpenseNamesPage from "./core/pages/ExpenseNamesPage";
@@ -319,6 +321,14 @@ function App() {
                 path="/suppliers/:id"
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
+                    <SupplierDebtDetailsPage />
+                  </PrivateRoute>
+                }
+              />
+               <Route
+                path="/supplierss/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
                     <SupplierDetailPage />
                   </PrivateRoute>
                 }
@@ -387,6 +397,14 @@ function App() {
                   </PrivateRoute>
                 }
               />
+              {/* <Route
+                path="/clients/:clientId/payments"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <ClientPaymentHistoryPage />
+                  </PrivateRoute>
+                }
+              /> */}
               <Route
                 path="/transfers"
                 element={
@@ -433,6 +451,14 @@ function App() {
                 element={
                   <PrivateRoute allowedRoles={["Администратор"]}>
                     <DebtDetailsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/supplier-debts/:id"
+                element={
+                  <PrivateRoute allowedRoles={["Администратор"]}>
+                    <SupplierDebtDetailsPage />
                   </PrivateRoute>
                 }
               />

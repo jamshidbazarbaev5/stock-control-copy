@@ -9,9 +9,10 @@ import { api } from '../api/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical, RotateCcw, ClipboardList } from 'lucide-react';
+import { DollarSign, History, Edit, Package, CheckCircle2, AlertCircle, MoreVertical, RotateCcw, ClipboardList, CreditCard, FileText, Calendar, MessageSquare, ArrowLeft } from 'lucide-react';
 import '../../expanded-row-dark.css';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useGetSupplierPayments, type SupplierPaymentFilters } from '../api/stock-debt-payment';
 import { ResourceTable } from '../helpers/ResourseTable';
 import {
   Dialog,
@@ -28,6 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +49,14 @@ export default function SupplierDetailPage() {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<'entries' | 'payments'>('entries');
+
+  // Payment tab filters
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentDateAfter, setPaymentDateAfter] = useState<string>('');
+  const [paymentDateBefore, setPaymentDateBefore] = useState<string>('');
+  const [filterPaymentType, setFilterPaymentType] = useState<string>('');
+  const [filterStockEntry, setFilterStockEntry] = useState<string>('');
   const [showUnpaidOnly, setShowUnpaidOnly] = useState<string>("all");
 
   // Return dialog state
@@ -56,6 +66,18 @@ export default function SupplierDetailPage() {
   const [returnNote, setReturnNote] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
+  // Supplier payments query
+  const paymentFilters: SupplierPaymentFilters = {
+    page: paymentsPage,
+    payment_date_after: paymentDateAfter || undefined,
+    payment_date_before: paymentDateBefore || undefined,
+    payment_type: filterPaymentType || undefined,
+    stock_entry: filterStockEntry || undefined,
+  };
+  const { data: supplierPaymentsData, isLoading: isLoadingPayments } = useGetSupplierPayments(
+    id || '',
+    paymentFilters,
+  );
   
 
   // Fetch stock entries for this supplier
@@ -423,107 +445,398 @@ export default function SupplierDetailPage() {
     },
   ];
 
-  if (isLoadingEntries) {
-    return (
-      <div className="container mx-auto py-6">
-        <Skeleton className="h-10 w-64 mb-6" />
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </div>
-    );
-  }
+  const paymentTypeLabel = (type: string) => {
+    const map: Record<string, string> = {
+      'Наличные': t('payment_types.cash') || 'Наличные',
+      'Карта': t('payment_types.card') || 'Карта',
+      'Click': 'Click',
+      'Перечисление': t('payment.per') || 'Перечисление',
+      'Валюта': t('common.currency') || 'Валюта',
+    };
+    return map[type] || type;
+  };
+
+  const handleResetPaymentFilters = () => {
+    setPaymentDateAfter('');
+    setPaymentDateBefore('');
+    setFilterPaymentType('');
+    setFilterStockEntry('');
+    setPaymentsPage(1);
+  };
+
+  const supplierPayments = supplierPaymentsData?.results || [];
+  const totalPaymentsCount = supplierPaymentsData?.count || 0;
+  const totalPaymentPages = supplierPaymentsData?.total_pages || 1;
+
+  // Compute summary stats for payments
+  const totalPaidUzs = supplierPayments.reduce((sum, p) => sum + (p.amount_in_uzs || 0), 0);
+  const totalPaidUsd = supplierPayments.reduce((sum, p) => sum + (p.amount_in_usd || 0), 0);
 
   return (
     <div className="container mx-auto py-4 sm:py-6 md:py-8 px-2 sm:px-4">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: t('navigation.suppliers') || "Поставщики", href: "/suppliers" },
+          { label: stockEntries[0]?.supplier.name || t('navigation.suppliers') },
+        ]}
+      />
+
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(-1)}
+          className="shrink-0"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
         <h1 className="text-xl sm:text-2xl font-bold">
-          {stockEntries[0]?.supplier.name || t('navigation.suppliers')} - {t('common.stock_entries')}
+          {stockEntries[0]?.supplier.name || t('navigation.suppliers')}
         </h1>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-base sm:text-lg font-medium">
-            {t("common.filters")}
-          </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetFilters}
-            className="w-auto"
-          >
-            {t("common.reset") || "Сбросить"}
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {currentUser?.is_superuser && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t("forms.store")}</label>
-              <select
-                className="w-full px-3 py-2 border rounded-md"
-                value={selectedStore}
-                onChange={(e) => setSelectedStore(e.target.value)}
-              >
-                <option value="all">{t("forms.all_stores")}</option>
-                {stores.map((store) => (
-                  <option key={store.id} value={store.id?.toString()}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 bg-muted/50 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab('entries')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === 'entries'
+              ? 'bg-background shadow text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          {t('common.stock_entries') || 'Поступления'}
+        </button>
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === 'payments'
+              ? 'bg-background shadow text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          {t('navigation.payments') || 'Платежи'}
+          {totalPaymentsCount > 0 && (
+            <span className="ml-1 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">
+              {totalPaymentsCount}
+            </span>
           )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">{t("forms.start_date")}</label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">{t("forms.end_date")}</label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">{t("common.debt_status")}</label>
-            <select
-              className="w-full px-3 py-2 border rounded-md"
-              value={showUnpaidOnly}
-              onChange={(e) => setShowUnpaidOnly(e.target.value)}
-            >
-              <option value="all">{t("common.all")}</option>
-              <option value="unpaid">{t("common.unpaid_only") || "Только неоплаченные"}</option>
-            </select>
-          </div>
-        </div>
+        </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg mb-4 sm:mb-6">
-        <Card className="overflow-x-auto">
-          <div className="min-w-[320px] sm:min-w-[800px]">
-            <ResourceTable
-              data={stockEntries}
-              columns={columns}
-              isLoading={isLoadingEntries}
-              totalCount={totalCount}
-              pageSize={30}
-              currentPage={currentPage}
-              onPageChange={(newPage) => setCurrentPage(newPage)}
-              expandedRowRenderer={(row: any) => renderExpandedRow(row)}
-              onRowClick={(row: any) => handleRowClick(row)}
-            />
+      {activeTab === 'entries' ? (
+        <>
+          {/* Filters */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base sm:text-lg font-medium">
+                {t("common.filters")}
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResetFilters}
+                className="w-auto"
+              >
+                {t("common.reset") || "Сбросить"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {currentUser?.is_superuser && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{t("forms.store")}</label>
+                  <select
+                    className="w-full px-3 py-2 border rounded-md"
+                    value={selectedStore}
+                    onChange={(e) => setSelectedStore(e.target.value)}
+                  >
+                    <option value="all">{t("forms.all_stores")}</option>
+                    {stores.map((store) => (
+                      <option key={store.id} value={store.id?.toString()}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("forms.start_date")}</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("forms.end_date")}</label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("common.debt_status")}</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-md"
+                  value={showUnpaidOnly}
+                  onChange={(e) => setShowUnpaidOnly(e.target.value)}
+                >
+                  <option value="all">{t("common.all")}</option>
+                  <option value="unpaid">{t("common.unpaid_only") || "Только неоплаченные"}</option>
+                </select>
+              </div>
+            </div>
           </div>
-        </Card>
-      </div>
+
+          <div className="overflow-hidden rounded-lg mb-4 sm:mb-6">
+            <Card className="overflow-x-auto">
+              <div className="min-w-[320px] sm:min-w-[800px]">
+                <ResourceTable
+                  data={stockEntries}
+                  columns={columns}
+                  isLoading={isLoadingEntries}
+                  totalCount={totalCount}
+                  pageSize={30}
+                  currentPage={currentPage}
+                  onPageChange={(newPage) => setCurrentPage(newPage)}
+                  expandedRowRenderer={(row: any) => renderExpandedRow(row)}
+                  onRowClick={(row: any) => handleRowClick(row)}
+                />
+              </div>
+            </Card>
+          </div>
+        </>
+      ) : (
+        /* ===== PAYMENTS TAB ===== */
+        <div className="space-y-4">
+          {/* Payment Filters */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base sm:text-lg font-medium">
+                {t("common.filters")}
+              </h2>
+              <Button variant="outline" size="sm" onClick={handleResetPaymentFilters}>
+                {t("common.reset") || "Сбросить"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("forms.start_date") || "Дата от"}</label>
+                <Input
+                  type="date"
+                  value={paymentDateAfter}
+                  onChange={(e) => { setPaymentDateAfter(e.target.value); setPaymentsPage(1); }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("forms.end_date") || "Дата до"}</label>
+                <Input
+                  type="date"
+                  value={paymentDateBefore}
+                  onChange={(e) => { setPaymentDateBefore(e.target.value); setPaymentsPage(1); }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("forms.payment_method") || "Способ оплаты"}</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-md"
+                  value={filterPaymentType}
+                  onChange={(e) => { setFilterPaymentType(e.target.value); setPaymentsPage(1); }}
+                >
+                  <option value="">{t("common.all") || "Все"}</option>
+                  <option value="Наличные">{t("payment_types.cash") || "Наличные"}</option>
+                  <option value="Карта">{t("payment_types.card") || "Карта"}</option>
+                  <option value="Click">Click</option>
+                  <option value="Перечисление">{t("payment.per") || "Перечисление"}</option>
+                  <option value="Валюта">{t("common.currency") || "Валюта"}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("common.stock_entry_id") || "ID поступления"}</label>
+                <Input
+                  type="number"
+                  placeholder={t("common.stock_entry_id") || "ID поступления"}
+                  value={filterStockEntry}
+                  onChange={(e) => { setFilterStockEntry(e.target.value); setPaymentsPage(1); }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Card className="p-4 border-l-4 border-l-emerald-500">
+              <div className="text-xs text-muted-foreground mb-1">{t("forms.total_payments") || "Всего платежей"}</div>
+              <div className="text-xl font-bold text-emerald-600">{totalPaymentsCount}</div>
+            </Card>
+            <Card className="p-4 border-l-4 border-l-blue-500">
+              <div className="text-xs text-muted-foreground mb-1">{t("common.total") || "Итого"} (UZS)</div>
+              <div className="text-xl font-bold text-blue-600">{formatCurrency(totalPaidUzs)}</div>
+            </Card>
+            <Card className="p-4 border-l-4 border-l-violet-500">
+              <div className="text-xs text-muted-foreground mb-1">{t("common.total") || "Итого"} (USD)</div>
+              <div className="text-xl font-bold text-violet-600">{formatNumber(totalPaidUsd)}</div>
+            </Card>
+          </div>
+
+          {/* Payments Table */}
+          {isLoadingPayments ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : supplierPayments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <CreditCard className="w-14 h-14 mb-4 opacity-30" />
+              <p className="text-lg font-medium">{t("forms.no_payments") || "Платежей не найдено"}</p>
+            </div>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/60 border-b">
+                      <th className="text-left py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{t("forms.payment_date") || "Дата"}</span>
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" />{t("common.stock_entry_id") || "Поступление"}</span>
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        {t("forms.store") || "Магазин"}
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center justify-end gap-1"><DollarSign className="w-3.5 h-3.5" />{t("forms.amount") || "Сумма"}</span>
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        {t("forms.amount") || "Сумма"} (UZS)
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        {t("forms.amount") || "Сумма"} (USD)
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5" />{t("forms.payment_method") || "Тип"}</span>
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        {t("common.exchange_rate") || "Курс"}
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" />{t("common.comment") || "Комментарий"}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supplierPayments.map((payment, idx) => (
+                      <tr
+                        key={payment.id}
+                        className={`border-b transition-colors hover:bg-muted/30 ${
+                          idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'
+                        }`}
+                      >
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-medium">
+                            {new Date(payment.payment_date).toLocaleDateString('ru-RU', {
+                              day: '2-digit', month: '2-digit', year: 'numeric',
+                            })}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(payment.payment_date).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit', minute: '2-digit',
+                            })}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                            #{payment.stock_entry?.id}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {payment.stock_entry?.store_name || '—'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-semibold text-emerald-600">
+                            {formatCurrency(payment.amount)} {payment.currency_short_name}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-medium text-blue-600">
+                            {formatCurrency(payment.amount_in_uzs)} UZS
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-medium text-violet-600">
+                            {formatNumber(payment.amount_in_usd)} $
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                            {paymentTypeLabel(payment.payment_type)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm">
+                          {payment.rate_at_payment ? formatCurrency(payment.rate_at_payment) : '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="max-w-[200px] truncate text-sm text-muted-foreground" title={payment.comment || ''}>
+                            {payment.comment || '—'}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/40 border-t-2">
+                      <td colSpan={3} className="py-3 px-4 font-semibold text-right">
+                        {t("common.total") || "Итого"}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-emerald-600">—</td>
+                      <td className="py-3 px-4 text-right font-bold text-blue-600">
+                        {formatCurrency(totalPaidUzs)} UZS
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-violet-600">
+                        {formatNumber(totalPaidUsd)} $
+                      </td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPaymentPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+                  <span className="text-sm text-muted-foreground">
+                    {t("common.page") || "Стр."} {paymentsPage} / {totalPaymentPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={paymentsPage <= 1}
+                      onClick={() => setPaymentsPage(p => p - 1)}
+                    >
+                      {t("common.previous") || "Назад"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={paymentsPage >= totalPaymentPages}
+                      onClick={() => setPaymentsPage(p => p + 1)}
+                    >
+                      {t("common.next") || "Далее"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Payment Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={(open) => {
@@ -602,7 +915,14 @@ export default function SupplierDetailPage() {
                 type="number"
                 step="0.01"
                 value={exchangeRate}
-                onChange={(e) => setExchangeRate(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only up to 5 digits (before decimal point)
+                  const integerPart = value.split('.')[0];
+                  if (integerPart.length <= 5) {
+                    setExchangeRate(value);
+                  }
+                }}
                 placeholder="12200"
               />
             </div>

@@ -318,3 +318,242 @@ export const useGetDeletedPayments = (page: number = 1) => {
     },
   });
 };
+
+export interface ClientDetailedPayment {
+  id: number;
+  debt: {
+    id: number;
+    due_date: string;
+    is_paid: boolean;
+    total_amount: string;
+    total_amount_uzs: string;
+    total_amount_usd: string;
+    remainder: string;
+    remainder_uzs: string;
+    remainder_usd: string;
+    client_id: number;
+    client_name: string;
+    store_id: number;
+    store_name: string;
+    sale: {
+      id: number;
+      sale_id: string;
+    };
+  };
+  worker_read: {
+    id: number;
+    name: string;
+  } | null;
+  amount: string;
+  payment_method: string;
+  target_debt_currency: string;
+  currency: string;
+  usd_rate_at_payment: string;
+  amount_in_uzs: string;
+  paid_at: string;
+}
+
+export interface ClientPaymentsFilters {
+  paid_at_after?: string;
+  paid_at_before?: string;
+  payment_method?: string;
+  worker?: number;
+  debt?: number;
+}
+
+export const useGetClientPaymentsDetailed = (
+  clientId: number, 
+  page: number = 1,
+  filters?: ClientPaymentsFilters
+) => {
+  return useQuery<PaginatedResponse<ClientDetailedPayment>>({
+    queryKey: ["clientPaymentsDetailed", clientId, page, filters],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: page.toString() });
+      
+      if (filters?.paid_at_after) params.append('paid_at_after', filters.paid_at_after);
+      if (filters?.paid_at_before) params.append('paid_at_before', filters.paid_at_before);
+      if (filters?.payment_method) params.append('payment_method', filters.payment_method);
+      if (filters?.worker) params.append('worker', filters.worker.toString());
+      if (filters?.debt) params.append('debt', filters.debt.toString());
+      
+      const response = await api.get(`debts/clients/${clientId}/payments/detailed/?${params.toString()}`);
+      return response.data;
+    },
+    enabled: !!clientId,
+  });
+};
+
+// ============ NEW DETAILED API TYPES ============
+
+export interface DetailedDebtItem {
+  id: number;
+  name: string;
+  qty: string;
+  unit: string;
+  price: string;
+  subtotal: string;
+}
+
+export interface DetailedDebtPayment {
+  id: number;
+  paid_at: string;
+  amount: string;
+  currency: string;
+  method: string;
+  target_debt_currency: string;
+  worker_name: string;
+  amount_in_uzs: number | null;
+  usd_rate_at_payment: number | null;
+  closes_debt: boolean;
+  comment?: string;
+}
+
+export interface DetailedDebt {
+  id: number;
+  is_manual: boolean;
+  sale_id: number | null;
+  created_at: string;
+  due_date: string;
+  total_amount_uzs: string;
+  total_amount_usd: string;
+  remainder_uzs: string;
+  remainder_usd: string;
+  usd_rate_at_creation: string;
+  last_usd_rate: string;
+  deposit: string;
+  deposit_payment_method: string;
+  status: string;
+  days_overdue: number;
+  store_name: string;
+  seller_name: string;
+  items_count: number;
+  items: DetailedDebtItem[];
+  payments: DetailedDebtPayment[];
+}
+
+export interface ClientDebtsDetailedResponse {
+  count: number;
+  client: {
+    id: number;
+    name: string;
+    type?: string;
+    phone?: string;
+    balance_by_currency: Record<string, string>;
+    last_purchase_date?: string;
+  };
+  totals: {
+    debt_count: number;
+    total_by_currency: Record<string, string>;
+    paid_by_currency: Record<string, string>;
+    remainder_by_currency: Record<string, string>;
+    counts: {
+      all: number;
+      open: number;
+      overdue: number;
+      closed: number;
+      manual: number;
+    };
+  };
+  links: { first: string | null; last: string | null; next: string | null; previous: string | null };
+  total_pages: number;
+  current_page: number;
+  page_range: number[];
+  page_size: number;
+  results: DetailedDebt[];
+}
+
+export interface PaymentDebtInfo {
+  id: number;
+  is_manual: boolean;
+  sale_id: number | null;
+  due_date: string;
+  store_name: string;
+  items_count: number;
+  total_amount_uzs: string;
+  total_amount_usd: string;
+  remainder_uzs: string;
+  remainder_usd: string;
+  usd_rate_at_creation: string;
+  last_usd_rate: string;
+  deposit: string;
+  deposit_payment_method: string;
+}
+
+export interface DetailedPaymentEntry {
+  id: number;
+  paid_at: string;
+  amount: string;
+  currency: string;
+  method: string;
+  target_debt_currency: string;
+  worker_name: string;
+  amount_in_uzs: number | null;
+  usd_rate_at_payment: number | null;
+  closes_debt: boolean;
+  debt: PaymentDebtInfo;
+}
+
+export interface ClientPaymentsDetailedNewResponse {
+  count: number;
+  client: {
+    id: number;
+    name: string;
+    balance_by_currency: Record<string, string>;
+  };
+  totals: {
+    payment_count: number;
+    paid_by_currency: Record<string, string>;
+    remainder_by_currency: Record<string, string>;
+    by_method: Record<string, {
+      count: number;
+      amount_by_currency: Record<string, string>;
+    }>;
+  };
+  links: { first: string | null; last: string | null; next: string | null; previous: string | null };
+  total_pages: number;
+  current_page: number;
+  page_range: number[];
+  page_size: number;
+  results: DetailedPaymentEntry[];
+}
+
+// Direct API call for payment history
+export const debtApi = {
+  getClientPaymentHistory: async (clientId: number, params?: {
+    date_from?: string;
+    date_to?: string;
+    method?: string;
+    search?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.date_from) queryParams.append('date_from', params.date_from);
+    if (params?.date_to) queryParams.append('date_to', params.date_to);
+    if (params?.method) queryParams.append('method', params.method);
+    if (params?.search) queryParams.append('search', params.search);
+    
+    const response = await api.get(`debts/clients/${clientId}/payments/detailed/?${queryParams.toString()}`);
+    return response.data;
+  },
+  
+  getClientDebtsDetailed: async (clientId: number, params?: {
+    date_from?: string;
+    date_to?: string;
+    status?: string;
+    search?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.date_from) queryParams.append('date_from', params.date_from);
+    if (params?.date_to) queryParams.append('date_to', params.date_to);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.search) queryParams.append('search', params.search);
+    
+    const response = await api.get(`debts/clients/${clientId}/debts/detailed/?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  getDebtItems: async (debtId: number) => {
+    const response = await api.get(`debts/${debtId}/items/`);
+    return response.data;
+  }
+};

@@ -353,13 +353,15 @@ export interface StockEntryResponse {
   count: number;
 }
 
-// Stock Debt Payment types
+// Stock Debt 
+// Payment types
 export interface StockDebtPaymentRequest {
   stock_entry: number;
   amount: number;
   payment_type: string;
   debt_currency: string;
   comment?: string;
+  store?: number;
   rate_at_payment?: number;
 }
 

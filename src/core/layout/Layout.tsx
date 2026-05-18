@@ -843,7 +843,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               step="0.01"
                               placeholder="12800.00"
                               value={currencyRate}
-                              onChange={(e) => setCurrencyRate(e.target.value)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Allow only up to 5 digits (before decimal point)
+                                const integerPart = value.split('.')[0];
+                                if (integerPart.length <= 5) {
+                                  setCurrencyRate(value);
+                                }
+                              }}
                               required
                             />
                           </div>
