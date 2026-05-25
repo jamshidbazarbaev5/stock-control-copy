@@ -17,11 +17,19 @@ export default function CashInflowHistoryPage() {
       onError: () => toast.error(t('messages.error.delete', { item: t('navigation.categories') })),
     });
   };
+   const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
   const columns = [
     {
       header: t('forms.store'),
       accessorKey: 'store_read.name',
       cell: (row: any) => row.store_read?.name || '-',
+    },
+     {
+      header: t('forms.date'),
+      accessorKey: 'date',
+      cell: (row: any) => formatDate(row.date)
     },
     {
       header: t('forms.amount3'),

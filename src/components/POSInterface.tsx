@@ -670,21 +670,35 @@ const POSInterfaceCore = () => {
   // Fetch products when modal opens or search term changes
   useEffect(() => {
     if (isSearchModalOpen && !isLoadingAllProducts) {
+      let cancelled = false;
       const timeoutId = setTimeout(() => {
         setLoadingProducts(true);
         fetchFirstPageProducts({
           product_name: searchTerm.length > 0 ? searchTerm : undefined,
           barcode: barcodeSearchTerm.length > 0 ? barcodeSearchTerm : undefined,
         })
-            .then((data) => setFetchedProducts(data))
-            .catch((error) => {
-              console.error("Error fetching products:", error);
-              toast.error("Ошибка при загрузке товаров");
+            .then((data) => {
+              if (!cancelled) {
+                setFetchedProducts(data);
+              }
             })
-            .finally(() => setLoadingProducts(false));
+            .catch((error) => {
+              if (!cancelled) {
+                console.error("Error fetching products:", error);
+                toast.error("Ошибка при загрузке товаров");
+              }
+            })
+            .finally(() => {
+              if (!cancelled) {
+                setLoadingProducts(false);
+              }
+            });
       }, 300);
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        cancelled = true;
+        clearTimeout(timeoutId);
+      };
     }
   }, [isSearchModalOpen, searchTerm, barcodeSearchTerm, isLoadingAllProducts]);
 
@@ -1491,6 +1505,16 @@ const POSInterfaceCore = () => {
   // Keyboard navigation handlers
   const handleKeyDown = useCallback(
       (e: KeyboardEvent) => {
+        // Skip global shortcuts when any modal is open or typing in a visible input
+        const target = e.target as HTMLElement;
+        const isInBarcodeInput = target === barcodeInputRef.current;
+        const isTypingInInput = !isInBarcodeInput && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        const anyModalOpen = isSearchModalOpen || isUserModalOpen || isQuantityModalOpen || isPriceModalOpen || isPaymentModalOpen;
+
+        if (anyModalOpen || isTypingInInput) {
+          return;
+        }
+
         // Handle global shortcuts that work regardless of cart state
         switch (e.key) {
           case "Control":
@@ -1666,6 +1690,10 @@ const POSInterfaceCore = () => {
         updateProductQuantity,
         removeProduct,
         handleSearchClick,
+        isSearchModalOpen,
+        isUserModalOpen,
+        isQuantityModalOpen,
+        isPriceModalOpen,
         total,
         setPaymentMethods,
         setIsPaymentModalOpen,
