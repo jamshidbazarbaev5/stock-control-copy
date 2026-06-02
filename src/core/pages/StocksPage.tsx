@@ -276,6 +276,15 @@ export default function StocksPage() {
                         {t("navigation.history")}
                       </span>
                     </DropdownMenuItem>
+                    {(row.product?.category_read?.category_name === "Лист" ||
+                      row.product_read?.category_read?.category_name === "Лист") && (
+                      <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
+                        <span className="flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Добавить количество
+                        </span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
                       <span className="flex items-center gap-2">
                         <ArrowRightLeft className="h-4 w-4" />
@@ -536,23 +545,33 @@ export default function StocksPage() {
                       {t("navigation.history")}
                     </span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
-                    <span className="flex items-center gap-2">
-                      <ArrowRightLeft className="h-4 w-4" />
-                      Перенос продажи на другой приход
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    setSelectedStocks([row.id!]);
-                    setWriteOffDialogOpen(true);
-                  }}>
-                    <span className="flex items-center gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      Списать товар
-                    </span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  {(row.product?.category_read?.category_name === "Лист" ||
+                    row.product_read?.category_read?.category_name === "Лист") && (
+                    <DropdownMenuItem onClick={() => handleAddExtraQuantity(row)}>
+                      <span className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Добавить количество
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                    
+                    <DropdownMenuItem onClick={() => handleOpenReallocate(row)}>
+                      <span className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-4 w-4" />
+                        Перенос продажи на другой приход
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setSelectedStocks([row.id!]);
+                      setWriteOffDialogOpen(true);
+                    }}>
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Списать товар
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
           );
         }
 
