@@ -23,6 +23,8 @@ export default function SponsorLoansPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [currencyTab, setCurrencyTab] = useState<'UZS' | 'USD'>('UZS');
   const [loanTotals, setLoanTotals] = useState<LoanTotalsByCurrency[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { data: storesData } = useGetStores({});
   const stores = Array.isArray(storesData) ? storesData : storesData?.results || [];
   // const { data: currenciesData } = useGetCurrencies({});
@@ -54,15 +56,17 @@ export default function SponsorLoansPage() {
     }
   }
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (page: number = 1) => {
     if (!id) return;
     setIsLoading(true);
     try {
       const [loansData, totalsData] = await Promise.all([
-        fetchLoans(Number(id), currencyTab, activeTab === 'paid' ? true : activeTab === 'unpaid' ? false : undefined),
+        fetchLoans(Number(id), currencyTab, activeTab === 'paid' ? true : activeTab === 'unpaid' ? false : undefined, page),
         fetchLoanTotalsByCurrency(Number(id))
       ]);
-      setLoans(loansData);
+      setLoans(loansData.results);
+      setTotalCount(loansData.totalCount);
+      setCurrentPage(page);
       setLoanTotals(totalsData);
     } catch (error) {
       toast.error(t('Failed to fetch loans'));
@@ -72,8 +76,12 @@ export default function SponsorLoansPage() {
   }, [id, t, activeTab, currencyTab]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(currentPage);
+  }, [fetchData, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, currencyTab]);
 
   const handlePayLoan = async (data: any) => {
     if (!id || !payModalLoan) return;
@@ -89,7 +97,7 @@ export default function SponsorLoansPage() {
       toast.success(t('Платеж успешно добавлен'));
       setPayModalLoan(null);
       // Re-fetch all data to get updated remainder, totals, and overpayment_unused
-      fetchData();
+      fetchData(currentPage);
     } catch {
       toast.error(t('Ошибка при добавлении платежа'));
     } finally {
@@ -221,7 +229,10 @@ export default function SponsorLoansPage() {
         data={loans}
         columns={loanColumns}
         isLoading={isLoading}
-        totalCount={loans.length}
+        totalCount={totalCount}
+        currentPage={currentPage}
+        onPageChange={(page) => setCurrentPage(page)}
+        pageSize={30}
         actions={(loan) => (
           <div className="flex gap-2">
             <button

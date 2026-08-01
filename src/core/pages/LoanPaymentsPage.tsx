@@ -20,12 +20,30 @@ export default function LoanPaymentsPage() {
   useEffect(() => {
     if (!sponsorId || !loanId) return;
     setIsLoanLoading(true);
-    fetchLoans(Number(sponsorId), '')
-      .then((loans) => {
-        const found = loans.find((l: Loan) => String(l.id) === String(loanId));
-        setLoan(found || null);
-      })
-      .finally(() => setIsLoanLoading(false));
+    const findLoan = async () => {
+      try {
+        let page = 1;
+        let foundLoan = null;
+        while (true) {
+          const data = await fetchLoans(Number(sponsorId), '', undefined, page);
+          const found = data.results.find((l: Loan) => String(l.id) === String(loanId));
+          if (found) {
+            foundLoan = found;
+            break;
+          }
+          if (page * 30 >= data.totalCount) {
+             break;
+          }
+          page++;
+        }
+        setLoan(foundLoan);
+      } catch (e) {
+        setLoan(null);
+      } finally {
+        setIsLoanLoading(false);
+      }
+    };
+    findLoan();
   }, [sponsorId, loanId]);
 
   const formatDate = (dateString: string) => {
